@@ -14,6 +14,9 @@ pip install rl_zoo
 ```
 python3 main.py --env_config=PATH_TO_ENV_CONFIG --agent_config=PATH_TO_AGENT_CONFIG --train_config=PATH_TO_TRAIN_CONFIG
 ```
+### Evaluation Benchmarks 
+OpenAI Gymnasium. 
+DeepMind Control Suite.
 
 ## Algorithm included.
 | Name | Discrete/Continuous | Model-Free | Model-Based | Paper |
