@@ -33,4 +33,5 @@ python3 main.py --env_config=PATH_TO_ENV_CONFIG --agent_config=PATH_TO_AGENT_CON
 | Model-Based Value Expansion-Actor  | ---        | No  | Yes | --- |
 | Model-Based Value Expansion-Critic | ---        | No  | Yes | --- |
 | STEVE                              | ---        | No  | Yes | --- |
+| PILCO                              | ---        | No  | Yes | --- |
 
