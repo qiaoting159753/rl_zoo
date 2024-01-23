@@ -5,9 +5,9 @@ I aim to include as many algorithms as possible in Model-Free Reinforcement Lear
 ### Installation 
 pip install rl_zoo
 ### Run from a Command Line 
-'''
+```
 python3 main.py --env_config=PATH_TO_ENV_CONFIG --agent_confg=PATH_TO_AGENT_CONFIG --train_config=PATH_TO_TRAIN_CONFIG
-'''
+```
 
 ## Algorithm included.
 | Name | Discrete/Continuous | Model-Free | Model-Based |
