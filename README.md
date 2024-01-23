@@ -18,15 +18,15 @@ python3 main.py --env_config=PATH_TO_ENV_CONFIG --agent_config=PATH_TO_AGENT_CON
 ## Algorithm included.
 | Name | Discrete/Continuous | Model-Free | Model-Based |
 | --- |               --- | --- | --- |
-| Deep Q Network (DQN)| Discrete | --- | --- |
-| Double DQN |        Discrete | --- | --- |
-| Dueling DQN |       Discrete | --- | --- |
-| Distributional DQN| Discrete | --- | --- |
-| Rainbow           | Discrete | --- | --- |
-| Policy Gradient (PG)| Continuous | --- | --- |
-| Deep Deterministic PG | Continuous | --- | --- |
-| TD-3              | Continuous | --- | --- |
-| Soft Actor Critic | Continuous | --- | --- |
-| Trust Region Policy Optimization | Continuous | --- | --- |
-| Proximal Policy Optimization | Continuous | --- | --- |
+| Deep Q Network (DQN)| Discrete | Yes | No |
+| Double DQN |        Discrete | Yes | No |
+| Dueling DQN |       Discrete | Yes | No |
+| Distributional DQN| Discrete | Yes | No |
+| Rainbow           | Discrete | Yes | No |
+| Policy Gradient (PG)| Continuous | Yes | No |
+| Deep Deterministic PG | Continuous | Yes | No|
+| TD-3              | Continuous | Yes | No |
+| Soft Actor Critic | Continuous | Yes | No |
+| Trust Region Policy Optimization | Continuous | Yes | No |
+| Proximal Policy Optimization | Continuous | Yes | No |
 
