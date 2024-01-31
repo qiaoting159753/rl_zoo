@@ -352,7 +352,7 @@ class MBRL_SAC:
                     pred_act = self.env.action_space.sample()
                 pred_action.append(pred_act)
             pred_action = torch.FloatTensor(np.array(pred_action)).to(self.device)
-            ###    Predictions    ###
+            ###    Predictions   ###
             pred_next_state, _, means, stds = self.world_model.pred_next_states(
                 pred_state, pred_action)
             pred_reward, _ = self.world_model.pred_rewards(pred_state,
