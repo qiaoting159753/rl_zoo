@@ -1,5 +1,5 @@
 # rl_zoo
-I aim to include as many algorithms as possible in Model-Free Reinforcement Learning and Model-Based Reinforcement learning. However, the primary focus will be on Model-Based Reinforcement Learning.
+I aim to include as many algorithms as possible in Model-Free Reinforcement Learning and Model-Based Reinforcement learning. However, the primary focus will be on Model-Based Reinforcement Learning. Trick to improve data efficiency: do as many as updates you can with the collected data. Do regularization: Ensemble of Q/Model, Norm Layer. 
 
 ## How to use it. 
 ### Installation 
