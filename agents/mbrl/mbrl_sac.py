@@ -3,8 +3,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from utils import soft_update
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+from utils import vi
 
 
 class MBRL_SAC:
@@ -19,6 +18,7 @@ class MBRL_SAC:
         super().__init__()
         self.type = "mbrl"
         # Switches
+        self.sample_times = 3
         self.horizon = horizon
         self.use_bounded_active = use_bound
         self.use_critic_steve = use_critic_steve
@@ -35,16 +35,17 @@ class MBRL_SAC:
         self.device = device
 
         # Actor Critic.
-        self.actor = actor_network.to(device)
-        self.critic = critic_network.to(device)
-        self.critic_target = copy.deepcopy(self.critic).to(device)
+        self.actor_net = actor_network.to(device)
+        self.critic_net = critic_network.to(device)
+        self.target_critic_net = copy.deepcopy(self.critic_net).to(device)
+
         self.log_alpha = torch.tensor(np.log(1.0)).float().to(device)
         self.log_alpha.requires_grad = True
         self.target_entropy = -action_dim
         # optimizers
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
+        self.actor_optimizer = torch.optim.Adam(self.actor_net.parameters(),
                                                 lr=actor_lr)
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),
+        self.critic_optimizer = torch.optim.Adam(self.critic_net.parameters(),
                                                  lr=critic_lr)
         self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha],
                                                     lr=alpha_lr)
@@ -61,48 +62,45 @@ class MBRL_SAC:
         return self.log_alpha.exp()
 
     # Only interact with the environment.
-    def act(self, obs, sample=False):
+    def select_action_from_policy(self, state, evaluation=False,
+                                  noise_scale=0):
         """
         Make decisions with the trained policy.
+        # note that when evaluating this algorithm we need to select mu as action
+        # _, _, action = self.actor_net.sample(state_tensor)
+
         :param obs:
         :param sample:
         :return:
         """
-        assert len(obs.shape) == 1
-        obs = torch.FloatTensor(obs).to(self.device).unsqueeze(dim=0)
+        assert len(state.shape) == 1
+        self.actor_net.eval()
+        state_tensor = torch.FloatTensor(state).to(self.device).unsqueeze(dim=0)
         # Evaluation
-        if not sample:
-            use_action, _, _, _ = self.actor.forward(obs)
+        if evaluation:
+            _, _, action = self.actor_net.forward(state_tensor)
         # Exploration
         else:
             with torch.no_grad():
                 if not self.use_bounded_active:
-                    _, use_action, _, _ = self.actor.forward(obs)
+                    action, _, _ = self.actor_net.forward(state_tensor)
                 else:
-                    _, _, _, ten_times = self.actor.forward(obs)
-                    obs2 = torch.repeat_interleave(obs, 5, dim=0)
-                    # Solution: s1: Epistemic / s2: Aleatoric
+                    multi_action, _, _ = self.actor_net.sample(
+                        state_tensor, sample_times=self.sample_times)
+                    obs2 = torch.repeat_interleave(state_tensor,
+                                                   self.sample_times, dim=0)
                     _, _, mean, var = self.world_model.pred_next_states(
-                        obs2, ten_times)
+                        obs2, multi_action)
                     uncertainty2 = vi(mean, var)
-                    # uncertainty2=(uncertainty2-torch.min(uncertainty2))+0.001
                     prob2 = F.softmax(torch.squeeze(uncertainty2), dim=0)
                     new_dist = torch.distributions.Categorical(prob2)
-                    # Sample less  of world model, sample more infavor of sac
-                    candi = new_dist.sample([1]).squeeze()
-                    uncert_actions = ten_times[candi]
-                    use_action = uncert_actions.unsqueeze(0)
-                    # Who should be closer? Random Action? Mu? Mean?
-                    # dist_2_mean = torch.pow((uncert_actions - dist_mean), 2)
-                    # dist_2_mean = torch.sum(dist_2_mean, dim=1).squeeze()
-                    # use_action=
-                    # uncert_actions[torch.argmin(dist_2_mean)].unsqueeze(0)
-        action_range = [float(self.env.action_space.low.min()),
-                        float(self.env.action_space.high.max())]
-        use_action = use_action.clamp(*action_range)
-        assert use_action.ndim == 2 and use_action.shape[0] == 1
-        use_action = use_action.detach().cpu().numpy()[0]
-        return use_action
+                    candi = new_dist.sample(torch.Size([1])).squeeze()
+                    uncert_actions = multi_action[candi]
+                    action = uncert_actions.unsqueeze(0)
+        assert action.ndim == 2 and action.shape[0] == 1
+        action = action.cpu().data.numpy().flatten()
+        self.actor_net.train()
+        return action
 
     def update_critic(self, obs, actions, rewards, next_obs, not_dones):
         """
@@ -113,12 +111,6 @@ class MBRL_SAC:
         :param next_obs:
         :param not_dones:
         """
-        assert len(obs.shape) >= 2
-        assert len(actions.shape) == 2
-        assert len(rewards.shape) == 2 and rewards.shape[1] == 1
-        assert len(next_obs.shape) >= 2
-        assert len(not_dones.shape) == 2 and not_dones.shape[1] == 1
-
         with torch.no_grad():
             if self.use_critic_steve:
                 # Horizon = 0
@@ -131,21 +123,22 @@ class MBRL_SAC:
                     pred_all_next_rewards_list = []
                     pred_all_next_next_obs = []
                     est_target_q = []
-                    # For each state batch [256, 17], reward extend 5 times, next extend 5 time.
+                    # For each state batch [256, 17], reward extend 5 times,
+                    # next extend 5 time.
                     for stat in range(pred_all_next_obs.shape[0]):
-                        _, pred_target_us, pred_log_pi, _ = self.actor.forward(
+                        pred_target_us, pred_log_pi, _ = self.actor_net(
                             pred_all_next_obs[stat])
-                        pred_target_q1, pred_target_q2 = self.critic_target.forward(
+                        pred_target_q1, pred_target_q2 = self.target_critic_net(
                             pred_all_next_obs[stat], pred_target_us)
-                        pred_target_q = torch.min(pred_target_q1,
-                                                  pred_target_q2) - self.alpha.detach() * pred_log_pi
+                        pred_target_q = torch.min(pred_target_q1, pred_target_q2) \
+                                        - self.alpha.detach() * pred_log_pi
                         _, pred_rewards = self.world_model.pred_rewards(
                             obs=pred_all_next_obs[stat],
                             actions=pred_target_us)
 
                         temp_disc_rewards = []
                         for rwd in range(pred_rewards.shape[0]):
-                            disc_pred_reward = (self.discount ** (hori + 1)) * \
+                            disc_pred_reward = (self.gamma ** (hori + 1)) * \
                                                pred_rewards[rwd]
                             if hori > 0:
                                 a = pred_all_next_rewards[
@@ -155,7 +148,7 @@ class MBRL_SAC:
                             temp_disc_rewards.append(a)
                             assert rewards.shape == not_dones.shape == a.shape == pred_target_q.shape
                             pred_q = rewards + a + not_dones * (
-                                    self.discount ** (
+                                    self.gamma ** (
                                     hori + 2)) * pred_target_q
                             est_target_q.append(pred_q)
 
@@ -187,37 +180,15 @@ class MBRL_SAC:
                     all_vars[n] /= total_vars
                 target_q = torch.sum(all_vars * all_means, dim=0)
                 # target_q = torch.mean(all_means, dim=0)
-
-            if self.use_critic_mve:
-                pred_rewards = torch.zeros(rewards.shape).to(self.device)
-                pred_next_obs = next_obs
-                for i in range(self.horizon):
-                    _, pred_act, pred_log, _ = self.actor.forward(
-                        pred_next_obs)
-                    pred_reward, _ = self.world_model.pred_rewards(
-                        obs=pred_next_obs, actions=pred_act)
-                    pred_rewards += (self.discount ** (i + 1)) * pred_reward
-                    pred_next_obs, _, _, _ = self.world_model.pred_next_states(
-                        pred_next_obs, pred_act)
-                # In the end
-                target_q1, target_q2 = self.critic_target.forward(
-                    pred_next_obs, pred_act)
-                target_q = torch.min(target_q1, target_q2) \
-                           - self.alpha.detach() * pred_log
-                target_q = rewards + not_dones * pred_rewards + \
-                           not_dones * (self.discount ** (i + 2)) * target_q
-
-            if (not self.use_critic_mve) and (not self.use_critic_steve):
-                _, target_us, log_pi, _ = self.actor.forward(next_obs)
-                target_q1, target_q2 = self.critic_target.forward(next_obs,
-                                                                  target_us)
-                target_q = torch.min(target_q1,
-                                     target_q2) - self.alpha.detach() * log_pi
-                target_q = rewards + not_dones * self.discount * target_q
+            else:
+                next_actions, next_log_pi, _ = self.actor_net.sample(next_obs)
+                q_1, q_2 = self.target_critic_net(next_obs, next_actions)
+                t_q = (torch.minimum(q_1, q_2) - self.alpha * next_log_pi)
+                target_q = rewards + self.gamma * not_dones * t_q
 
         target_q = target_q.detach()
         assert (len(target_q.shape) == 2) and (target_q.shape[1] == 1)
-        current_q1, current_q2 = self.critic.forward(obs, actions)
+        current_q1, current_q2 = self.critic_net.forward(obs, actions)
         td_error1 = target_q - current_q1
         td_error2 = target_q - current_q2
         critic1_loss = 0.5 * (td_error1.pow(2)).mean()
@@ -230,70 +201,16 @@ class MBRL_SAC:
 
     def update_actor_and_alpha(self, obs):
         """
+
         Update the actor with respect to critics.
         :param obs:
         """
         # MFRL
-        if (not self.use_actor_mve) and (not self.use_actor_pg):
-            _, action, first_log_pi, _ = self.actor.forward(obs)
-            actor_q1, actor_q2 = self.critic.forward(obs, action)
-            actor_q = torch.min(actor_q1, actor_q2)
-            # Q - alpha * log = V
-            actor_loss = -(actor_q - self.alpha.detach() * first_log_pi).mean()
-        # MBRL-MVE
-        else:
-            ########################    Expansion    #########################
-            if self.use_actor_mve:
-                # MVE for actor
-                sum_dist_rewards = torch.zeros((self.batch_size, 1)).to(self.device)
-                for hori in range(self.horizon):
-                    _, act, log_pi, _ = self.actor.forward(obs)
-                    pred_next, _, _, _ = self.world_model.pred_next_states(obs,
-                                                                           act)
-                    pred_reward, _ = self.world_model.pred_rewards(obs, act)
-                    sum_dist_rewards += (self.discount ** (hori + 1)) * pred_reward
-                    sum_dist_rewards -= self.alpha * log_pi
-                    obs = pred_next
-                _, act, first_log_pi, _ = self.actor.forward(obs)
-                q_1, q_2 = self.critic.forward(obs, act)
-                temp_loss = torch.min(q_1, q_2) + sum_dist_rewards
-                actor_loss = -(temp_loss - self.alpha.detach() * first_log_pi).mean()
-            elif self.use_actor_pg:
-                # Policy Gradient for Actor.
-                pred_xs = [obs]
-                u_s = []
-                log_p_us = []
-                first_log_pi = 0
-                for h in range(self.horizon):
-                    # Roll out
-                    _, sample_ut, log_p_ut, _ = self.actor.forward(obs)
-                    if h == 0:
-                        first_log_pi = log_p_ut
-                    pred_next, _, _, _ = self.world_model.pred_next_states(
-                        obs, sample_ut)
-                    # Add to list
-                    u_s.append(sample_ut)
-                    log_p_us.append(log_p_ut.squeeze())
-                    obs = pred_next
-                    pred_xs.append(obs)
-                #########################   Last step    ##########################
-                _, sample_ut, log_p_ut, _ = self.actor.forward(obs)
-                u_s.append(sample_ut)
-                log_p_us.append(log_p_ut.squeeze())
-                ####################    Stacking all produced data    #############
-                pred_xs = torch.stack(pred_xs)
-                u_s = torch.stack(u_s)
-                log_p_us = torch.stack(log_p_us)
-                ####################    Computing the loss of the Actor    ########
-                pred_v = 0
-                for i in range(self.horizon):
-                    q_1, q_2 = self.critic.forward(pred_xs[i, :], u_s[i, :])
-                    # V = Q -alpha * log
-                    v_min = torch.min(q_1, q_2).reshape(
-                        self.batch_size) - self.alpha.detach() * log_p_us[i, :]
-                    pred_v += v_min.sum()
-                actor_loss = -1 * pred_v
-
+        action, first_log_pi, _ = self.actor_net.sample(obs)
+        actor_q1, actor_q2 = self.critic_net.forward(obs, action)
+        actor_q = torch.min(actor_q1, actor_q2)
+        # Q - alpha * log = V
+        actor_loss = -(actor_q - self.alpha.detach() * first_log_pi).mean()
         # optimize the actor.
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
@@ -308,12 +225,19 @@ class MBRL_SAC:
     def train_policy(self, transitions):
         # Train with normal samples.
         states, actions, rewards, next_states, not_dones, _, _ = transitions
+
+        assert len(states.shape) >= 2
+        assert len(actions.shape) == 2
+        assert len(rewards.shape) == 2 and rewards.shape[1] == 1
+        assert len(next_states.shape) >= 2
+        assert len(not_dones.shape) == 2 and not_dones.shape[1] == 1
+
         # Update current Q network
         self.update_critic(states, actions, rewards, next_states, not_dones)
         # Update Actor
         self.update_actor_and_alpha(states)
         # Update target Q network
-        soft_update(self.critic, self.critic_target, self.tau)
+        soft_update(self.critic_net, self.target_critic_net, self.tau)
 
     def train_world_model(self, statistics, transitions):
         self.world_model.set_statistics(statistics)

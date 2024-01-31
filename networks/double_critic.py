@@ -7,8 +7,9 @@ from utils import weight_init
 
 class DoubleQCritic(nn.Module):
     """Critic network, employes double Q-learning."""
-    def __init__(self, state_dim, action_dim, hidden_dim):
+    def __init__(self, state_dim, action_dim):
         super().__init__()
+        hidden_dim = 256
         self.linear1 = nn.Linear(state_dim + action_dim, hidden_dim)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
         self.linear3 = nn.Linear(hidden_dim, 1)

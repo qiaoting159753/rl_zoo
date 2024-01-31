@@ -7,8 +7,8 @@ import torch.utils
 from torch import optim
 import numpy as np
 from utils import normalize_obs_deltas
-from simple_dynamics import (Simple_Dynamics)
-from simple_reward import (Simple_Reward)
+from .simple_dynamics import (Simple_Dynamics)
+from .simple_reward import (Simple_Reward)
 
 
 class IntegratedWorldModel:
@@ -113,7 +113,7 @@ class Ensemble_World_Reward:
     """
 
     def __init__(self, state_dim, action_dim, num_models,
-                 hidden_size=128):
+                 hidden_size=256):
         self.device = None
         self.num_models = num_models
         self.observation_size = state_dim
