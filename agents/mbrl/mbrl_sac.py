@@ -17,18 +17,18 @@ class MBRL_SAC:
                  use_actor_pg, use_bound, device):
 
         super().__init__()
-        self.birufication = True
         self.type = "mbrl"
         # Switches
         self.use_normal = False
         self.sample_times = 10
         self.horizon = horizon
+        self.use_dyna = use_dyna
         self.use_bounded_active = use_bound
         self.use_critic_steve = use_critic_steve
         self.use_critic_mve = use_critic_mve
         self.use_actor_mve = use_actor_mve
         self.use_actor_pg = use_actor_pg
-        self.dyna_use_uncertainty = use_dyna
+        # self.dyna_use_uncertainty = use_dyna
 
         # Other Variables
         self.action_dim = action_dim
@@ -89,7 +89,7 @@ class MBRL_SAC:
                 # Divide action queries based on uncertainty.
                 # if uncertaintu high, to env.
                 # if uncertainty low, to model.
-                if self.birufication:
+                if self.use_dyna:
                     threshold = 0.4
                     multi_action, _, _ = self.actor_net.sample(
                         state_tensor, sample_times=self.sample_times)
@@ -115,8 +115,6 @@ class MBRL_SAC:
                         dyna_states, dyna_actions)
                     pred_reward = pred_reward.detach()
                     pred_not_dones = torch.ones(pred_reward.shape)
-
-
                     # Exploring.
                     prob2 = F.softmax(torch.squeeze(uncertainty2), dim=0)
                     new_dist = torch.distributions.Categorical(prob2)
@@ -124,7 +122,10 @@ class MBRL_SAC:
                     uncert_actions = multi_action[candi]
                     action = uncert_actions.unsqueeze(0)
                     # action = multi_action[0].unsqueeze(0)
-            self.update_critic(dyna_states, dyna_actions, pred_reward, pred_next, pred_not_dones)
+                else:
+                    action, _, _ = self.actor_net.forward(state_tensor)
+            if self.use_dyna:
+                self.update_critic(dyna_states, dyna_actions, pred_reward, pred_next, pred_not_dones)
 
                 # if self.use_normal:
                 #     action, _, _ = self.actor_net.forward(state_tensor)
@@ -269,6 +270,10 @@ class MBRL_SAC:
         self.log_alpha_optimizer.step()
 
     def train_policy(self, transitions):
+        """
+
+        :param transitions:
+        """
         # Train with normal samples.
         states, actions, rewards, next_states, not_dones, _, _ = transitions
 
@@ -286,6 +291,11 @@ class MBRL_SAC:
         soft_update(self.critic_net, self.target_critic_net, self.tau)
 
     def train_world_model(self, statistics, transitions):
+        """
+
+        :param statistics:
+        :param transitions:
+        """
         self.world_model.set_statistics(statistics)
         states, actions, rewards, next_states, _, next_actions, next_rewards = transitions
         # mask the nones and zeros out.
@@ -304,51 +314,51 @@ class MBRL_SAC:
         self.world_model.train_world(states, actions, rewards, next_states,
                                      next_actions, next_rewards)
 
-    def dyna_generate_and_train(self, transitions, on_policy=False):
-        states, actions, rewards, next_states, not_dones, _, _ = transitions
-        pred_states = [states]
-        pred_actions = [actions]
-        pred_rewards = [rewards]
-        pred_next_states = [next_states]
-        pred_not_dones = [not_dones]
-        pred_state = next_states
-        for _ in range(self.horizon):
-            ###    Rewards   ###
-            pred_action = []
-            for _ in range(states.shape[0]):
-                if on_policy:
-                    pred_act, _, _, _ = self.actor.forward(pred_state)
-                else:
-                    pred_act = self.env.action_space.sample()
-                pred_action.append(pred_act)
-            pred_action = torch.FloatTensor(np.array(pred_action)).to(
-                self.device)
-            ###    Predictions   ###
-            pred_next_state, _, means, stds = self.world_model.pred_next_states(
-                pred_state, pred_action)
-            pred_reward, _ = self.world_model.pred_rewards(pred_state,
-                                                           pred_action)
-            if self.dyna_use_uncertainty:
-                pred_not_done = vi(means, stds)
-                # pred_not_done = self.uncertainty_measures(means, stds)
-                pred_not_dones.append(pred_not_done)
-            ###    Append    ###
-            pred_states.append(pred_state)
-            pred_actions.append(pred_action)
-            pred_rewards.append(pred_reward.detach())
-            pred_next_states.append(pred_next_state.detach())
-            ###    Move on to the next    ###
-            # pred_state = pred_next_state.detach()
-        pred_states = torch.vstack(pred_states)
-        pred_actions = torch.vstack(pred_actions)
-        pred_rewards = torch.vstack(pred_rewards)
-        pred_next_states = torch.vstack(pred_next_states)
-        if self.dyna_use_uncertainty:
-            pred_not_dones = torch.vstack(pred_not_dones)
-        else:
-            pred_not_dones = torch.FloatTensor(np.ones(pred_rewards.shape)).to(
-                self.device)
-        pred_not_dones[:self.batch_size] = not_dones
-        # states, actions, rewards, next_states, not_dones
-        self.train_policy((pred_states, pred_actions, pred_rewards,
-                           pred_next_states, pred_not_dones, None, None))
+    # def dyna_generate_and_train(self, transitions, on_policy=False):
+    #     states, actions, rewards, next_states, not_dones, _, _ = transitions
+    #     pred_states = [states]
+    #     pred_actions = [actions]
+    #     pred_rewards = [rewards]
+    #     pred_next_states = [next_states]
+    #     pred_not_dones = [not_dones]
+    #     pred_state = next_states
+    #     for _ in range(self.horizon):
+    #         ###    Rewards   ###
+    #         pred_action = []
+    #         for _ in range(states.shape[0]):
+    #             if on_policy:
+    #                 pred_act, _, _, _ = self.actor.forward(pred_state)
+    #             else:
+    #                 pred_act = self.env.action_space.sample()
+    #             pred_action.append(pred_act)
+    #         pred_action = torch.FloatTensor(np.array(pred_action)).to(
+    #             self.device)
+    #         ###    Predictions   ###
+    #         pred_next_state, _, means, stds = self.world_model.pred_next_states(
+    #             pred_state, pred_action)
+    #         pred_reward, _ = self.world_model.pred_rewards(pred_state,
+    #                                                        pred_action)
+    #         if self.dyna_use_uncertainty:
+    #             pred_not_done = vi(means, stds)
+    #             # pred_not_done = self.uncertainty_measures(means, stds)
+    #             pred_not_dones.append(pred_not_done)
+    #         ###    Append    ###
+    #         pred_states.append(pred_state)
+    #         pred_actions.append(pred_action)
+    #         pred_rewards.append(pred_reward.detach())
+    #         pred_next_states.append(pred_next_state.detach())
+    #         ###    Move on to the next    ###
+    #         # pred_state = pred_next_state.detach()
+    #     pred_states = torch.vstack(pred_states)
+    #     pred_actions = torch.vstack(pred_actions)
+    #     pred_rewards = torch.vstack(pred_rewards)
+    #     pred_next_states = torch.vstack(pred_next_states)
+    #     if self.dyna_use_uncertainty:
+    #         pred_not_dones = torch.vstack(pred_not_dones)
+    #     else:
+    #         pred_not_dones = torch.FloatTensor(np.ones(pred_rewards.shape)).to(
+    #             self.device)
+    #     pred_not_dones[:self.batch_size] = not_dones
+    #     # states, actions, rewards, next_states, not_dones
+    #     self.train_policy((pred_states, pred_actions, pred_rewards,
+    #                        pred_next_states, pred_not_dones, None, None))
