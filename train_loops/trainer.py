@@ -12,23 +12,28 @@ class Trainer:
 
     """
 
-    def __init__(self, env, agent, memory):
+    def __init__(self, env, agent, memory, use_dyna, use_critic_steve,
+                 use_critic_mve,
+                 use_actor_mve,
+                 use_actor_pg,
+                 use_bound):
         # Should be Goal Conditioned.
         self.max_steps = 1000000
         self.max_epi_steps = 1000
         self.num_eval = 5
-        self.est_epi = int(math.ceil(self.max_steps/self.max_epi_steps) * 1.5)
+        self.est_epi = int(
+            math.ceil(self.max_steps / self.max_epi_steps) * 1.5)
 
         self.current_step = 0
         self.train_world_times = 1
         self.train_agent_times = 1
 
-        self.use_dyna = False
-        self.use_critic_steve = True
-        self.use_critic_mve = False
-        self.use_actor_mve = False
-        self.use_actor_pg = False
-        self.use_bound = False
+        self.use_dyna = use_dyna
+        self.use_critic_steve = use_critic_steve
+        self.use_critic_mve = use_critic_mve
+        self.use_actor_mve = use_actor_mve
+        self.use_actor_pg = use_actor_pg
+        self.use_bound = use_bound
 
         self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
         self.batch_size = 128

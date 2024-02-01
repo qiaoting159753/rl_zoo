@@ -46,7 +46,14 @@ def main():
                      use_bound=False,
                      device=device)
 
-    runner = Trainer(env, agent, memory)
+    runner = Trainer(env, agent, memory,
+                     use_dyna=False,
+                     use_critic_steve=True,
+                     use_critic_mve=False,
+                     use_actor_mve=False,
+                     use_actor_pg=False,
+                     use_bound=False)
+
     runner.train_loop()
 
 
