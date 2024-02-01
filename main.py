@@ -13,7 +13,7 @@ def main():
     Create all parts and get it to run
     """
     use_dyna = False
-    use_critic_steve = False
+    use_critic_steve = True
     use_critic_mve = False
     use_actor_mve = False
     use_actor_pg = False

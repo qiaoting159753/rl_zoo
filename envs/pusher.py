@@ -145,7 +145,7 @@ class PusherEnv(MujocoEnv, utils.EzPickle):
 
 
 if __name__ == "__main__":
-    env = PusherEnv(render_mode="human")  # gym.make("Pusher-v4", render_mode="human")
+    env = PusherEnv(render_mode="human")
     state, _ = env.reset()
     goal_position = state[-6:]
 

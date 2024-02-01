@@ -148,6 +148,20 @@ class Ensemble_World_Reward:
         for model in self.models:
             model.statistics = statistics
             model.dyna_network.statistics = statistics
+    def pred_mix_rewards(self, obs, actions):
+        rewards = []
+        # Iterate over the neural networks and get the predictions
+        for model_1 in self.models:
+            # Predict delta
+            mean, _, _ = model_1.dyna_network.forward(obs, actions)
+            pred_obs = mean + obs
+            for model_2 in self.models:
+                # Let the action remain actions for now.
+                pred_rewards = model_2.reward_network.forward(pred_obs, actions)
+                rewards.append(pred_rewards)
+        # Use average
+        rewards = torch.stack(rewards)
+        print(rewards.shape)
 
     def pred_rewards(self, obs, actions):
         """

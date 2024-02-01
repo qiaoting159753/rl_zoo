@@ -13,10 +13,7 @@ class Trainer:
     """
 
     def __init__(self, env, agent, memory, use_dyna, use_critic_steve,
-                 use_critic_mve,
-                 use_actor_mve,
-                 use_actor_pg,
-                 use_bound):
+                 use_critic_mve, use_actor_mve, use_actor_pg, use_bound):
         # Should be Goal Conditioned.
         self.max_steps = 1000000
         self.max_epi_steps = 1000
@@ -114,9 +111,8 @@ class Trainer:
                      "_" + str(self.use_actor_mve) + "_" + \
                      str(self.use_actor_pg) + "_" + str(self.use_critic_mve) + \
                      "_" + str(self.use_critic_steve) + "_"
-        training_str = "2_2_sac_act_"
 
-        file_name = self.env_name + param_list + training_str + self.date_and_time
+        file_name = self.env_name + param_list + self.date_and_time
 
         np.savetxt(file_name + "_eval_rewards.csv",
                    eval_array, delimiter=",")
