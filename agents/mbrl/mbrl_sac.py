@@ -114,7 +114,7 @@ class MBRL_SAC:
                     pred_reward, _ = self.world_model.pred_rewards(
                         dyna_states, dyna_actions)
                     pred_reward = pred_reward.detach()
-                    pred_not_dones = torch.ones(pred_reward.shape)
+                    pred_not_dones = torch.ones(pred_reward.shape).to(self.device)
                     # Exploring.
                     prob2 = F.softmax(torch.squeeze(uncertainty2), dim=0)
                     new_dist = torch.distributions.Categorical(prob2)
