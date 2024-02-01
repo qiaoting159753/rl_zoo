@@ -17,9 +17,11 @@ class MBRL_SAC:
                  use_actor_pg, use_bound, device):
 
         super().__init__()
+        self.birufication = True
         self.type = "mbrl"
         # Switches
-        self.sample_times = 3
+        self.use_normal = False
+        self.sample_times = 10
         self.horizon = horizon
         self.use_bounded_active = use_bound
         self.use_critic_steve = use_critic_steve
@@ -84,21 +86,63 @@ class MBRL_SAC:
         # Exploration
         else:
             with torch.no_grad():
-                if not self.use_bounded_active:
-                    action, _, _ = self.actor_net.forward(state_tensor)
-                else:
+                # Divide action queries based on uncertainty.
+                # if uncertaintu high, to env.
+                # if uncertainty low, to model.
+                if self.birufication:
+                    threshold = 0.4
                     multi_action, _, _ = self.actor_net.sample(
                         state_tensor, sample_times=self.sample_times)
                     obs2 = torch.repeat_interleave(state_tensor,
                                                    self.sample_times, dim=0)
                     _, _, mean, var = self.world_model.pred_next_states(
                         obs2, multi_action)
-                    uncertainty2 = vi(mean, var)
+                    uncertainty2 = vi(mean, var, device=self.device)
+                    # Take the less uncertain ones.
+                    take_or_not = [
+                        True if uncertainty2[k] < threshold else False for k in
+                        range(uncertainty2.shape[0])]
+
+                    # Dyna Training.
+                    dyna_actions = multi_action[take_or_not]
+                    dyna_actions = dyna_actions.detach()
+                    dyna_states = obs2[take_or_not]
+                    dyna_states = dyna_states.detach()
+                    pred_next, _, _, _ = self.world_model.pred_next_states(
+                        dyna_states, dyna_actions)
+                    pred_next = pred_next.detach()
+                    pred_reward, _ = self.world_model.pred_rewards(
+                        dyna_states, dyna_actions)
+                    pred_reward = pred_reward.detach()
+                    pred_not_dones = torch.ones(pred_reward.shape)
+
+
+                    # Exploring.
                     prob2 = F.softmax(torch.squeeze(uncertainty2), dim=0)
                     new_dist = torch.distributions.Categorical(prob2)
                     candi = new_dist.sample(torch.Size([1])).squeeze()
                     uncert_actions = multi_action[candi]
                     action = uncert_actions.unsqueeze(0)
+                    # action = multi_action[0].unsqueeze(0)
+            self.update_critic(dyna_states, dyna_actions, pred_reward, pred_next, pred_not_dones)
+
+                # if self.use_normal:
+                #     action, _, _ = self.actor_net.forward(state_tensor)
+                #
+                # if self.use_bounded_active:
+                #     multi_action, _, _ = self.actor_net.sample(
+                #         state_tensor, sample_times=self.sample_times)
+                #     obs2 = torch.repeat_interleave(state_tensor,
+                #                                    self.sample_times, dim=0)
+                #     _, _, mean, var = self.world_model.pred_next_states(
+                #         obs2, multi_action)
+                #     uncertainty2 = vi(mean, var)
+                #     prob2 = F.softmax(torch.squeeze(uncertainty2), dim=0)
+                #     new_dist = torch.distributions.Categorical(prob2)
+                #     candi = new_dist.sample(torch.Size([1])).squeeze()
+                #     uncert_actions = multi_action[candi]
+                #     action = uncert_actions.unsqueeze(0)
+
         assert action.ndim == 2 and action.shape[0] == 1
         action = action.cpu().data.numpy().flatten()
         self.actor_net.train()
@@ -118,7 +162,8 @@ class MBRL_SAC:
                 # Horizon = 0
                 # For next episodes used
                 pred_all_next_obs = next_obs.unsqueeze(dim=0)
-                pred_all_next_rewards = torch.zeros(rewards.shape).unsqueeze(dim=0)
+                pred_all_next_rewards = torch.zeros(rewards.shape).unsqueeze(
+                    dim=0)
                 means = []
                 vars = []
                 for hori in range(self.horizon):
