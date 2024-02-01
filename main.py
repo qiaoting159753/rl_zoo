@@ -12,6 +12,13 @@ def main():
     """
     Create all parts and get it to run
     """
+    use_dyna = False
+    use_critic_steve = False
+    use_critic_mve = False
+    use_actor_mve = False
+    use_actor_pg = False
+    use_bound = False
+
     env_name = "HalfCheetah-v4"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -38,21 +45,21 @@ def main():
                      gamma=0.99,
                      tau=0.005,
                      horizon=3,
-                     use_dyna=False,
-                     use_critic_steve=False,
-                     use_critic_mve=False,
-                     use_actor_mve=False,
-                     use_actor_pg=False,
-                     use_bound=False,
+                     use_dyna=use_dyna,
+                     use_critic_steve=use_critic_steve,
+                     use_critic_mve=use_critic_mve,
+                     use_actor_mve=use_actor_mve,
+                     use_actor_pg=use_actor_pg,
+                     use_bound=use_bound,
                      device=device)
 
     runner = Trainer(env, agent, memory,
-                     use_dyna=False,
-                     use_critic_steve=True,
-                     use_critic_mve=False,
-                     use_actor_mve=False,
-                     use_actor_pg=False,
-                     use_bound=False)
+                     use_dyna=use_dyna,
+                     use_critic_steve=use_critic_steve,
+                     use_critic_mve=use_critic_mve,
+                     use_actor_mve=use_actor_mve,
+                     use_actor_pg=use_actor_pg,
+                     use_bound=use_bound)
 
     runner.train_loop()
 
