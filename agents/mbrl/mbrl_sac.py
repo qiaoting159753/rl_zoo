@@ -90,7 +90,7 @@ class MBRL_SAC:
                 # if uncertaintu high, to env.
                 # if uncertainty low, to model.
                 if self.use_dyna:
-                    threshold = 0.4
+                    threshold = 0.99
                     multi_action, _, _ = self.actor_net.sample(
                         state_tensor, sample_times=self.sample_times)
                     obs2 = torch.repeat_interleave(state_tensor,
@@ -98,11 +98,13 @@ class MBRL_SAC:
                     _, _, mean, var = self.world_model.pred_next_states(
                         obs2, multi_action)
                     uncertainty2 = vi(mean, var, device=self.device)
+
+                    ind = torch.argmax(uncertainty2)
+                    action = multi_action[ind].unsqueeze(0)
                     # Take the less uncertain ones.
                     take_or_not = [
                         True if uncertainty2[k] < threshold else False for k in
                         range(uncertainty2.shape[0])]
-
                     # Dyna Training.
                     dyna_actions = multi_action[take_or_not]
                     dyna_actions = dyna_actions.detach()
@@ -116,11 +118,11 @@ class MBRL_SAC:
                     pred_reward = pred_reward.detach()
                     pred_not_dones = torch.ones(pred_reward.shape).to(self.device)
                     # Exploring.
-                    prob2 = F.softmax(torch.squeeze(uncertainty2), dim=0)
-                    new_dist = torch.distributions.Categorical(prob2)
-                    candi = new_dist.sample(torch.Size([1])).squeeze()
-                    uncert_actions = multi_action[candi]
-                    action = uncert_actions.unsqueeze(0)
+                    # prob2 = F.softmax(torch.squeeze(uncertainty2), dim=0)
+                    # new_dist = torch.distributions.Categorical(prob2)
+                    # candi = new_dist.sample(torch.Size([1])).squeeze()
+                    # uncert_actions = multi_action[candi]
+                    # action = uncert_actions.unsqueeze(0)
                     # action = multi_action[0].unsqueeze(0)
                 else:
                     action, _, _ = self.actor_net.forward(state_tensor)
