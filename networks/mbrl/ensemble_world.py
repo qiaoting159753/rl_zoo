@@ -89,9 +89,11 @@ class IntegratedWorldModel:
         pred_next_state = mean_deltas + states
         target = (next_states - states)
         delta_targets_normalized = normalize_obs_deltas(target, self.statistics)
+
         model_loss = F.gaussian_nll_loss(input=normalized_mean,
                                          target=delta_targets_normalized,
                                          var=normalized_var).mean()
+
         pred_rewards = self.reward_network.forward(pred_next_state,
                                                    next_actions)
         all_loss = F.mse_loss(pred_rewards, next_rewards) + model_loss.mean()
@@ -180,7 +182,10 @@ class Ensemble_World_Reward:
             rewards.append(pred_rewards)
         # Use average
         rewards = torch.stack(rewards)
-        reward = torch.mean(rewards, dim=0)
+        # reward = torch.mean(rewards, dim=0)
+        # rand_ind = random.randint(0, rewards.shape[0] - 1)
+        # reward = rewards[rand_ind]
+        reward = torch.min(rewards, dim=0)
         return reward, rewards
 
     def pred_next_states(self, obs, actions):

@@ -4,6 +4,7 @@ from memories import ReplayBuffer
 from agents.mbrl.mbrl_sac import MBRL_SAC
 from networks.soft_actor import Actor
 from networks.double_critic import DoubleQCritic
+# from networks.distribution_Q import DoubleDistributionalQCritic
 from networks.mbrl.ensemble_world import Ensemble_World_Reward
 from train_loops.trainer import Trainer
 
@@ -12,8 +13,8 @@ def main():
     """
     Create all parts and get it to run
     """
-    use_dyna = True
-    use_critic_steve = False
+    use_dyna = False
+    use_critic_steve = True
     use_critic_mve = False
     use_actor_mve = False
     use_actor_pg = False
@@ -31,12 +32,14 @@ def main():
 
     actor = Actor(state_dim, action_dim)
     critic = DoubleQCritic(state_dim, action_dim)
+    # critic = DoubleDistributionalQCritic(state_dim, action_dim)
+
     world_model = Ensemble_World_Reward(state_dim, action_dim, num_models)
 
     memory = ReplayBuffer(env.observation_space.shape, env.action_space.shape,
                           capacity, device)
 
-    agent = MBRL_SAC(actor, critic, world_model,
+    agent = MBRL_SAC(actor, critic, world_model, device=device,
                      state_dim=state_dim,
                      action_dim=action_dim,
                      actor_lr=3e-4,
@@ -50,10 +53,9 @@ def main():
                      use_critic_mve=use_critic_mve,
                      use_actor_mve=use_actor_mve,
                      use_actor_pg=use_actor_pg,
-                     use_bound=use_bound,
-                     device=device)
+                     use_bound=use_bound, action_space=env.action_space)
 
-    runner = Trainer(env, agent, memory,
+    runner = Trainer(env, agent, memory, device=device,
                      use_dyna=use_dyna,
                      use_critic_steve=use_critic_steve,
                      use_critic_mve=use_critic_mve,

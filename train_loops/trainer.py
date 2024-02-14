@@ -12,9 +12,10 @@ class Trainer:
 
     """
 
-    def __init__(self, env, agent, memory, use_dyna, use_critic_steve,
+    def __init__(self, env, agent, memory, device, use_dyna, use_critic_steve,
                  use_critic_mve, use_actor_mve, use_actor_pg, use_bound):
         # Should be Goal Conditioned.
+        self.device = device
         self.max_steps = 1000000
         self.max_epi_steps = 1000
         self.num_eval = 5
@@ -41,16 +42,6 @@ class Trainer:
         self.memory = memory
         self.agent = agent
 
-    def train_loop(self):
-        """
-        The main loop. Call Tranin or evaluation.
-
-        """
-        with logging_redirect_tqdm():
-            for _ in trange(self.est_epi):
-                self.train_agent()
-                self.evaluate()
-
     def evaluate(self):
         """
 
@@ -70,6 +61,27 @@ class Trainer:
                 next_state, reward, terminate, truncate, _ = self.env.step(
                     action)
                 total_rewards += reward
+
+                # state_tensor = torch.FloatTensor(next_state).to(device=self.device)
+                # state_tensor = state_tensor.unsqueeze(dim=0)
+
+                # num_act_per = 10
+                #
+                # actions, _, _ = self.agent.actor_net.sample(obs=state_tensor,
+                #                                             sample_times=100)
+                # # This line have to goes after sample actions.
+                # state_tensor = torch.repeat_interleave(state_tensor, 100,
+                #                                        dim=0)
+                #
+                #
+                # q1s, _ = self.agent.critic_net.sample(state_tensor, actions)
+                #
+                # # Normalize
+                # temp_min = torch.min(q1s)
+                # temp_max = torch.max(q1s)
+                # temp_scale = temp_max - temp_min
+                # norm_q1s = (q1s - temp_min) / temp_scale
+
                 # Reward Prediction.
                 # state_tensor = torch.FloatTensor(state).to(device).unsqueeze(
                 #     dim=0)
@@ -90,6 +102,7 @@ class Trainer:
                 # total_uncert2 += sampling(pred_mean, pred_var)
                 # # uncert 3
                 # total_uncert3 += mean_std(pred_mean, pred_var)
+
                 counter += 1
                 state = next_state
                 done = terminate or truncate
@@ -152,6 +165,9 @@ class Trainer:
                 for _ in range(self.train_agent_times):
                     transitions = self.memory.sample(
                         batch_size=self.batch_size)
+                    # if self.use_dyna:
+                    #     self.agent.dyna_generate_and_train(transitions, self.env)
+                    # else:
                     self.agent.train_policy(transitions)
 
             # Do evaluation for every 200
@@ -162,3 +178,14 @@ class Trainer:
                 break
             # Move to the next state
             state = next_state
+
+    def train_loop(self):
+        """
+        The main loop. Call Tranin or evaluation.
+
+        """
+        self.evaluate()
+        with logging_redirect_tqdm():
+            for _ in trange(self.est_epi):
+                self.train_agent()
+                self.evaluate()
