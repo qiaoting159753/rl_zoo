@@ -11,7 +11,7 @@ from torch.autograd import Variable
 from .classifier import Generator, Discriminator
 
 
-class MBRL_DYNA_SAC:
+class MBRL_MNMDYNA_SAC:
     """
     A MBRL class that implemented all MBRL algorithms for SAC.
     """

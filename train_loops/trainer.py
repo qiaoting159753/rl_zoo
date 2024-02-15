@@ -2,7 +2,7 @@ import numpy as np
 import math
 from datetime import datetime
 from tqdm import trange
-
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 class Trainer:
     """
@@ -112,7 +112,7 @@ class Trainer:
         self.evaluation_array[4].append(0)
         eval_array = np.array(self.evaluation_array)
 
-        self.logger.info(f'Evaluation: {total_rewards / counter} at {time_step} \n')
+        self.logger.info(f'Evaluation: {total_rewards / counter}')
 
         if self.generate_results:
             # Save the metrics
@@ -170,6 +170,7 @@ class Trainer:
         The main loop. Call Tranin or evaluation.
 
         """
-        for i in trange(self.est_epi):
-            self.evaluate(i)
-            self.train_agent()
+        with logging_redirect_tqdm():
+            for i in trange(self.est_epi):
+                self.evaluate(i)
+                self.train_agent()
