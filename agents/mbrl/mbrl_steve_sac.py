@@ -8,15 +8,14 @@ from utils import soft_update
 from .classifier import Generator, Discriminator
 
 
-class MBRL_SAC:
+class MBRL_STEVE_SAC:
     """
     A MBRL class.
     """
 
     def __init__(self, actor_network, critic_network, world_model, gamma, tau,
                  state_dim, action_dim, actor_lr, critic_lr, alpha_lr, horizon,
-                 use_dyna, use_critic_steve, use_critic_mve, use_actor_mve,
-                 use_actor_pg, use_bound, device):
+                 use_bound, device):
 
         super().__init__()
         self.batch_size = None
@@ -25,12 +24,7 @@ class MBRL_SAC:
         self.use_normal = False
         self.sample_times = 512
         self.horizon = horizon
-        self.use_dyna = use_dyna
         self.use_bounded_active = use_bound
-        self.use_critic_steve = use_critic_steve
-        self.use_critic_mve = use_critic_mve
-        self.use_actor_mve = use_actor_mve
-        self.use_actor_pg = use_actor_pg
         # self.dyna_use_uncertainty = use_dyna
 
         # Other Variables
