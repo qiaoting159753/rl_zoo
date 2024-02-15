@@ -185,7 +185,7 @@ class Ensemble_World_Reward:
         # reward = torch.mean(rewards, dim=0)
         # rand_ind = random.randint(0, rewards.shape[0] - 1)
         # reward = rewards[rand_ind]
-        reward = torch.min(rewards, dim=0)
+        reward = torch.min(rewards, dim=0).values
         return reward, rewards
 
     def pred_next_states(self, obs, actions):

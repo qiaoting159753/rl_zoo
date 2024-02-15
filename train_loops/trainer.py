@@ -12,9 +12,10 @@ class Trainer:
 
     """
 
-    def __init__(self, env, agent, memory, device, use_dyna, use_critic_steve,
+    def __init__(self, generate_results, env, agent, memory, device, use_dyna, use_critic_steve,
                  use_critic_mve, use_actor_mve, use_actor_pg, use_bound):
         # Should be Goal Conditioned.
+        self.generate_results = generate_results
         self.device = device
         self.max_steps = 1000000
         self.max_epi_steps = 1000
@@ -36,7 +37,6 @@ class Trainer:
         self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
         self.batch_size = 128
         self.evaluation_array = [[], [], [], [], []]
-        self.env_name = "HalfCheetah-v4"
         # self.env = PusherEnv()
         self.env = env
         self.memory = memory
@@ -54,19 +54,16 @@ class Trainer:
         counter = 1
 
         for _ in range(self.num_eval):
-            state, _ = self.env.reset()
+            state = self.env.reset()
             for _ in range(self.max_epi_steps):
-                action = self.agent.select_action_from_policy(state,
-                                                              evaluation=True)
-                next_state, reward, terminate, truncate, _ = self.env.step(
-                    action)
+                action = self.agent.select_action_from_policy(state, evaluation=True)
+                next_state, reward, done, _ = self.env.step(action)
                 total_rewards += reward
 
                 # state_tensor = torch.FloatTensor(next_state).to(device=self.device)
                 # state_tensor = state_tensor.unsqueeze(dim=0)
 
                 # num_act_per = 10
-                #
                 # actions, _, _ = self.agent.actor_net.sample(obs=state_tensor,
                 #                                             sample_times=100)
                 # # This line have to goes after sample actions.
@@ -105,7 +102,6 @@ class Trainer:
 
                 counter += 1
                 state = next_state
-                done = terminate or truncate
                 if done:
                     break
         avg_rewards = total_rewards / self.num_eval
@@ -118,20 +114,21 @@ class Trainer:
         self.evaluation_array[3].append(self.current_step)
         self.evaluation_array[4].append(0)
         eval_array = np.array(self.evaluation_array)
+        if self.generate_results:
+            # Save the metrics
+            param_list = "_" + str(self.use_bound) + "_" + str(self.use_dyna) + \
+                         "_" + str(self.use_actor_mve) + "_" + \
+                         str(self.use_actor_pg) + "_" + str(self.use_critic_mve) + \
+                         "_" + str(self.use_critic_steve) + "_"
 
-        # Save the metrics
-        param_list = "_" + str(self.use_bound) + "_" + str(self.use_dyna) + \
-                     "_" + str(self.use_actor_mve) + "_" + \
-                     str(self.use_actor_pg) + "_" + str(self.use_critic_mve) + \
-                     "_" + str(self.use_critic_steve) + "_"
+            file_name = (self.env.domain + "_" + self.env.task + param_list +
+                         self.date_and_time)
 
-        file_name = self.env_name + param_list + self.date_and_time
-
-        np.savetxt(file_name + "_eval_rewards.csv",
-                   eval_array, delimiter=",")
-        # Save the actor
-        # torch.save(self.agent.actor.state_dict(),
-        #            file_name + "_actor_params.pth")
+            np.savetxt(file_name + "_eval_rewards.csv",
+                       eval_array, delimiter=",")
+            # Save the actor
+            # torch.save(self.agent.actor.state_dict(),
+            #            file_name + "_actor_params.pth")
         logging.info(msg=f'Evaluation: {total_rewards / counter}')
 
     def train_agent(self):
@@ -139,18 +136,17 @@ class Trainer:
         Train the agent
         :param max_epi_steps: Maximum number of steps for each episode
         """
-        state, _ = self.env.reset()
+        state = self.env.reset()
+
         for _ in range(self.max_epi_steps):
             # Execute action and add to memory.
             if len(self.memory) < self.batch_size + 1:
-                action = self.env.action_space.sample()
+                action = np.random.uniform(-1, 1, (self.env.action_num,))
             else:
                 action = self.agent.select_action_from_policy(state=state,
                                                               evaluation=False)
-            next_state, reward, terminated, truncated, _ = self.env.step(
-                action)
 
-            done = terminated or truncated
+            next_state, reward, done, _ = self.env.step(action)
             self.memory.add(state, action, reward, next_state, done)
             # Training the world model and the agent
             if len(self.memory) > self.batch_size:
@@ -165,10 +161,10 @@ class Trainer:
                 for _ in range(self.train_agent_times):
                     transitions = self.memory.sample(
                         batch_size=self.batch_size)
-                    # if self.use_dyna:
-                    #     self.agent.dyna_generate_and_train(transitions, self.env)
-                    # else:
-                    self.agent.train_policy(transitions)
+                    if self.use_dyna:
+                        self.agent.dyna_generate_and_train(transitions, self.env)
+                    else:
+                        self.agent.train_policy(transitions)
 
             # Do evaluation for every 200
             self.current_step += 1

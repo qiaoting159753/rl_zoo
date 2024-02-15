@@ -1,5 +1,5 @@
 import torch
-import gymnasium as gym
+from envs import DMCSEnvironment
 from memories import ReplayBuffer
 from agents.mbrl.mbrl_sac import MBRL_SAC
 from networks.soft_actor import Actor
@@ -13,20 +13,23 @@ def main():
     """
     Create all parts and get it to run
     """
-    use_dyna = False
-    use_critic_steve = True
+    generate_results = False
+    use_dyna = True
+    use_critic_steve = False
     use_critic_mve = False
     use_actor_mve = False
     use_actor_pg = False
     use_bound = False
 
-    env_name = "HalfCheetah-v4"
+    domain_name = "cheetah"
+    task_name = "run"
+
+    env = DMCSEnvironment(domain_name, task_name)
+
+    action_dim = env.action_num
+    state_dim = env.observation_space
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    env = gym.make(env_name)
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.shape[0]
-
     num_models = 5
     capacity = 1000000
 
@@ -36,7 +39,7 @@ def main():
 
     world_model = Ensemble_World_Reward(state_dim, action_dim, num_models)
 
-    memory = ReplayBuffer(env.observation_space.shape, env.action_space.shape,
+    memory = ReplayBuffer((state_dim,), (action_dim,),
                           capacity, device)
 
     agent = MBRL_SAC(actor, critic, world_model, device=device,
@@ -53,9 +56,10 @@ def main():
                      use_critic_mve=use_critic_mve,
                      use_actor_mve=use_actor_mve,
                      use_actor_pg=use_actor_pg,
-                     use_bound=use_bound, action_space=env.action_space)
+                     use_bound=use_bound)
 
-    runner = Trainer(env, agent, memory, device=device,
+    runner = Trainer(generate_results, env, agent, memory,
+                     device=device,
                      use_dyna=use_dyna,
                      use_critic_steve=use_critic_steve,
                      use_critic_mve=use_critic_mve,

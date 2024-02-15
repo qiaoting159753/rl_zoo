@@ -7,6 +7,8 @@ import torch
 import torch.nn.functional as F
 from utils import soft_update
 from utils import vi
+from torch.autograd import Variable
+from .classifier import Generator, Discriminator
 
 
 class MBRL_SAC:
@@ -17,10 +19,9 @@ class MBRL_SAC:
     def __init__(self, actor_network, critic_network, world_model, gamma, tau,
                  state_dim, action_dim, actor_lr, critic_lr, alpha_lr, horizon,
                  use_dyna, use_critic_steve, use_critic_mve, use_actor_mve,
-                 use_actor_pg, use_bound, device, action_space):
+                 use_actor_pg, use_bound, device):
 
         super().__init__()
-        self.action_space = action_space
         self.batch_size = None
         self.type = "mbrl"
         # Switches
@@ -43,6 +44,18 @@ class MBRL_SAC:
         self.device = device
 
         # Actor Critic.
+        self.generator = Generator(latent_variable=1,
+                                   observation_size=self.state_dim,
+                                   num_actions=self.action_dim)
+
+        self.discriminator = Discriminator(observation_size=self.state_dim,
+                                           num_actions=self.action_dim)
+
+        self.optimizer_G = torch.optim.RMSprop(self.generator.parameters(),
+                                               lr=0.001)
+        self.optimizer_D = torch.optim.RMSprop(self.discriminator.parameters(),
+                                               lr=0.001)
+
         self.actor_net = actor_network.to(device)
         self.critic_net = critic_network.to(device)
         self.target_critic_net = copy.deepcopy(self.critic_net).to(device)
@@ -101,9 +114,12 @@ class MBRL_SAC:
                 # actions, _, _ = self.actor_net.forward(obs2)
                 random_actions = []
                 for _ in range(obs2.shape[0]):
-                    pred_act = self.action_space.sample()
+                    # pred_act = self.action_space.sample()
+                    pred_act = np.random.uniform(-1, 1,
+                                                 (self.action_dim,))
                     random_actions.append(pred_act)
-                actions = torch.FloatTensor(np.array(random_actions)).to(self.device)
+                actions = torch.FloatTensor(np.array(random_actions)).to(
+                    self.device)
 
                 # _, _, mean, var = self.world_model.pred_next_states(
                 #     obs2, multi_action)
@@ -182,7 +198,7 @@ class MBRL_SAC:
                             obs=pred_all_next_obs[stat],
                             actions=pred_action)
 
-                        if hori < (self.horizon -1):
+                        if hori < (self.horizon - 1):
                             _, pred_obs, _, _ = self.world_model.pred_next_states(
                                 pred_all_next_obs[stat], pred_action)
                             horizon_obs_list.append(pred_obs)
@@ -223,7 +239,8 @@ class MBRL_SAC:
                     ## Horizon level.
                     if hori < (self.horizon - 1):
                         pred_all_next_obs = torch.vstack(horizon_obs_list)
-                        pred_all_next_rewards = torch.vstack(horizon_rewards_list)
+                        pred_all_next_rewards = torch.vstack(
+                            horizon_rewards_list)
                     #     # Statistics of target q
                     h_0 = torch.stack(horizon_q_list)
                     mean_0 = torch.mean(h_0, dim=0)
@@ -241,7 +258,8 @@ class MBRL_SAC:
                 # target_q = torch.mean(all_means, dim=0)
             else:
                 next_actions, next_log_pi, _ = self.actor_net.sample(next_obs)
-                q_1, q_2 = self.target_critic_net.sample(next_obs, next_actions)
+                q_1, q_2 = self.target_critic_net.sample(next_obs,
+                                                         next_actions)
                 t_q = torch.minimum(q_1, q_2) - self.alpha * next_log_pi
                 target_q = rewards + self.gamma * not_dones * t_q
 
@@ -297,8 +315,6 @@ class MBRL_SAC:
         assert len(next_states.shape) >= 2
         assert len(not_dones.shape) == 2 and not_dones.shape[1] == 1
 
-        # # See different reactions of different parts: Sample action space for 20 times.
-
         # Update current Q network
         self.update_critic(states, actions, rewards, next_states, not_dones)
         # Update Actor
@@ -330,7 +346,14 @@ class MBRL_SAC:
         self.world_model.train_world(states, actions, rewards, next_states,
                                      next_actions, next_rewards)
 
-    def dyna_generate_and_train(self, transitions):
+        transi = torch.cat((states, actions, next_states), dim=1)
+        self.train_classifier(transi)
+
+    def dyna_generate_and_train(self, transitions, env):
+        """
+        Only off-policy Dyna will work.
+        :param transitions:
+        """
         states, actions, rewards, next_states, not_dones, _, _ = transitions
         self.batch_size = states.shape[0]
         pred_states = [states]
@@ -346,12 +369,22 @@ class MBRL_SAC:
             #     pred_act = self.env.action_space.sample()
             #     random_actions.append(pred_act)
             # pred_act = torch.FloatTensor(np.array(random_actions)).to(self.device)
-
             pred_act, _, _ = self.actor_net.forward(pred_state)
             ###    Predictions   ###
             pred_next_state, _, _, _ = self.world_model.pred_next_states(
                 pred_state, pred_act)
-            pred_reward, _ = self.world_model.pred_rewards(pred_state, pred_act)
+            pred_reward, _ = self.world_model.pred_rewards(pred_state,
+                                                           pred_act)
+            # Uncertainty measures.
+            fake_transi = torch.cat((pred_state.detach(),
+                                     actions.detach(),
+                                     pred_next_state.detach()), dim=1)
+            scores = self.discriminator(fake_transi)
+            scores[scores == 1.0] = 0.99
+            pred_reward[pred_reward <= 0.0] = 0.01
+            pred_reward = torch.log(pred_reward.detach()) + torch.log(
+                scores / (1 - scores))
+
             ###    Append    ###
             pred_states.append(pred_state)
             pred_actions.append(pred_act)
@@ -365,9 +398,41 @@ class MBRL_SAC:
         pred_next_states = torch.vstack(pred_next_states)
 
         pred_not_dones = torch.FloatTensor(np.ones(pred_rewards.shape)).to(
-                self.device)
+            self.device)
         pred_not_dones[:self.batch_size] = not_dones
 
         # states, actions, rewards, next_states, not_dones
         self.train_policy((pred_states, pred_actions, pred_rewards,
                            pred_next_states, pred_not_dones, None, None))
+
+    def train_classifier(self, real_transition):
+        """
+
+        :param real_transition:
+        """
+        real_size = real_transition.size(0)
+        valid = Variable(
+            torch.FloatTensor(real_transition.size(0), 1).fill_(1.0),
+            requires_grad=False)
+        fake = Variable(
+            torch.FloatTensor(real_transition.size(0), 1).fill_(0.0),
+            requires_grad=False)
+
+        # Train Generator
+        self.optimizer_G.zero_grad()
+        # Generate a batch of images
+        z = Variable(torch.FloatTensor(np.random.normal(0, 1, (real_size, 1))))
+        gen_imgs = self.generator(z).detach()
+        loss_g = F.binary_cross_entropy(self.discriminator(gen_imgs), valid)
+        loss_g.backward()
+        self.optimizer_G.step()
+
+        # Train Discriminator
+        self.optimizer_D.zero_grad()
+        real_loss = F.binary_cross_entropy(self.discriminator(real_transition),
+                                           valid)
+        fake_loss = F.binary_cross_entropy(
+            self.discriminator(gen_imgs.detach()), fake)
+        d_loss = (real_loss + fake_loss) / 2
+        d_loss.backward()
+        self.optimizer_D.step()

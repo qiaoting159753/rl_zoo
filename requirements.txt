@@ -1,1 +1,7 @@
-
+cv2=4.9.0
+numpy~=1.26.4
+gymnasium~=0.29.1
+opencv-python~=4.8.1.78
+gym~=0.26.2
+pygame~=2.5.2
+tqdm~=4.65.0
