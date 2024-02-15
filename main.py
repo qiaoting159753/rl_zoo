@@ -1,18 +1,22 @@
 import torch
 from envs import DMCSEnvironment
 from memories import ReplayBuffer
-from agents.mbrl.mbrl_sac import MBRL_SAC
+from agents.mbrl.mbrl_steve_sac import MBRL_SAC
 from networks.soft_actor import Actor
 from networks.double_critic import DoubleQCritic
 # from networks.distribution_Q import DoubleDistributionalQCritic
 from networks.mbrl.ensemble_world import Ensemble_World_Reward
 from train_loops.trainer import Trainer
+from utils import set_seed
 
 
 def main():
     """
     Create all parts and get it to run
     """
+    seed = 10
+    set_seed(seed)
+
     generate_results = False
     use_dyna = True
     use_critic_steve = False

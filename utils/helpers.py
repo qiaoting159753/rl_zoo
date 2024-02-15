@@ -54,7 +54,7 @@ def normalize_obs_deltas(deltas, statistics):
     return (deltas - statistics["delta_mean"]) / statistics["delta_std"]
 
 
-def seed_everything(seed):
+def set_seed(seed):
     """
     Set a new seed to all environment, neuarl network initializations.
 
@@ -63,6 +63,7 @@ def seed_everything(seed):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
 
 

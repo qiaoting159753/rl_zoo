@@ -1,14 +1,11 @@
+import logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 import numpy as np
 import math
 from datetime import datetime
-import logging
-from tqdm.contrib.logging import logging_redirect_tqdm
-from tqdm import tqdm
-from utils import TqdmLoggingHandler
 
-log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
-log.addHandler(TqdmLoggingHandler())
 
 class Trainer:
     """
@@ -16,7 +13,8 @@ class Trainer:
 
     """
 
-    def __init__(self, generate_results, env, agent, memory, device, use_dyna, use_critic_steve,
+    def __init__(self, generate_results, env, agent, memory, device, use_dyna,
+                 use_critic_steve,
                  use_critic_mve, use_actor_mve, use_actor_pg, use_bound):
         # Should be Goal Conditioned.
         self.generate_results = generate_results
@@ -46,9 +44,10 @@ class Trainer:
         self.memory = memory
         self.agent = agent
 
-    def evaluate(self):
+    def evaluate(self, time_step):
         """
 
+        :param time_step: evaluating at when
         :param max_epi_steps: Each episode, the maximum number of steps.
         :param num_eval: Number of episodes to evaluate the agent.
         """
@@ -60,7 +59,8 @@ class Trainer:
         for _ in range(self.num_eval):
             state = self.env.reset()
             for _ in range(self.max_epi_steps):
-                action = self.agent.select_action_from_policy(state, evaluation=True)
+                action = self.agent.select_action_from_policy(state,
+                                                              evaluation=True)
                 next_state, reward, done, _ = self.env.step(action)
                 total_rewards += reward
 
@@ -118,11 +118,15 @@ class Trainer:
         self.evaluation_array[3].append(self.current_step)
         self.evaluation_array[4].append(0)
         eval_array = np.array(self.evaluation_array)
+
+        logger.info(f'Evaluation: {total_rewards / counter} at {time_step} \n')
+
         if self.generate_results:
             # Save the metrics
             param_list = "_" + str(self.use_bound) + "_" + str(self.use_dyna) + \
                          "_" + str(self.use_actor_mve) + "_" + \
-                         str(self.use_actor_pg) + "_" + str(self.use_critic_mve) + \
+                         str(self.use_actor_pg) + "_" + str(
+                self.use_critic_mve) + \
                          "_" + str(self.use_critic_steve) + "_"
 
             file_name = (self.env.domain + "_" + self.env.task + param_list +
@@ -133,7 +137,6 @@ class Trainer:
             # Save the actor
             # torch.save(self.agent.actor.state_dict(),
             #            file_name + "_actor_params.pth")
-        log.info(msg=f'Evaluation: {total_rewards / counter}')
 
     def train_agent(self):
         """
@@ -166,7 +169,8 @@ class Trainer:
                     transitions = self.memory.sample(
                         batch_size=self.batch_size)
                     if self.use_dyna:
-                        self.agent.dyna_generate_and_train(transitions, self.env)
+                        self.agent.dyna_generate_and_train(transitions,
+                                                           self.env)
                     else:
                         self.agent.train_policy(transitions)
 
@@ -184,7 +188,6 @@ class Trainer:
         The main loop. Call Tranin or evaluation.
 
         """
-        self.evaluate()
-        for _ in tqdm(range(self.est_epi)):
+        for i in range(self.est_epi):
+            self.evaluate(i)
             self.train_agent()
-            self.evaluate()

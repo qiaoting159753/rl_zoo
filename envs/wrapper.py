@@ -9,12 +9,12 @@ class DMCSEnvironment:
     """
 
     """
-    def __init__(self, domain_name, task_name):
+    def __init__(self, domain_name, task_name, seed=10):
         super().__init__()
         logging.info(f"Training on Domain {domain_name}")
         self.domain = domain_name
         self.task = task_name
-        self.env = suite.load(domain_name, task_name)
+        self.env = suite.load(domain_name, task_name, task_kwargs={"random": seed})
 
     @cached_property
     def min_action_value(self) -> float:

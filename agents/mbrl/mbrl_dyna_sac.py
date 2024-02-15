@@ -104,56 +104,9 @@ class MBRL_SAC:
             _, _, action = self.actor_net.forward(state_tensor)
         # Exploration
         else:
-            if self.use_dyna:
-                # Divide action queries based on uncertainty.
-                # if uncertaintu high, to env.
-                # if uncertainty low, to model.
-                # threshold = 0.99
-                obs2 = torch.repeat_interleave(state_tensor,
-                                               self.sample_times, dim=0)
-                # actions, _, _ = self.actor_net.forward(obs2)
-                random_actions = []
-                for _ in range(obs2.shape[0]):
-                    # pred_act = self.action_space.sample()
-                    pred_act = np.random.uniform(-1, 1,
-                                                 (self.action_dim,))
-                    random_actions.append(pred_act)
-                actions = torch.FloatTensor(np.array(random_actions)).to(
-                    self.device)
-
-                # _, _, mean, var = self.world_model.pred_next_states(
-                #     obs2, multi_action)
-                # uncertainty2 = vi(mean, var, device=self.device)
-                # ind = torch.argmax(uncertainty2)
-                # action = multi_action[ind].unsqueeze(0)
-
-                # # Dyna Training.
-                pred_next, _, _, _ = self.world_model.pred_next_states(
-                    obs2, actions)
-                pred_reward, _ = self.world_model.pred_rewards(
-                    obs2, actions)
-                # pred_reward = pred_reward.detach()
-                pred_not_dones = torch.FloatTensor(
-                    np.ones(pred_reward.shape)).to(
-                    self.device)
-
-                # Exploring.
-                # prob2 = F.softmax(torch.squeeze(uncertainty2), dim=0)
-                # new_dist = torch.distributions.Categorical(prob2)
-                # candi = new_dist.sample(torch.Size([1])).squeeze()
-                # uncert_actions = multi_action[candi]
-                # action = uncert_actions.unsqueeze(0)
-                # action = multi_action[0].unsqueeze(0)
-
-                self.train_policy(
-                    (obs2, actions.detach(), pred_reward.detach(),
-                     pred_next.detach(), pred_not_dones, None,
-                     None))
-
             action, _, _ = self.actor_net.forward(state_tensor)
-            action = action.detach()
-
         assert action.ndim == 2 and action.shape[0] == 1
+        action = action.detach()
         action = action.cpu().data.numpy().flatten()
         self.actor_net.train()
         return action
@@ -168,101 +121,10 @@ class MBRL_SAC:
         :param not_dones:
         """
         with torch.no_grad():
-            if self.use_critic_steve:
-                # Horizon = 0
-                # For next episodes used
-                pred_all_next_obs = next_obs.unsqueeze(dim=0)
-                pred_all_next_rewards = torch.zeros(rewards.shape).unsqueeze(
-                    dim=0)
-                means = []
-                vars = []
-                for hori in range(self.horizon):
-                    horizon_rewards_list = []
-                    horizon_obs_list = []
-                    horizon_q_list = []
-                    # For each state batch [256, 17], reward extend 5 times,
-                    # next extend 5 time.
-                    for stat in range(pred_all_next_obs.shape[0]):
-                        pred_action, pred_log_pi, _ = self.actor_net(
-                            pred_all_next_obs[stat])
-                        pred_q1, pred_q2 = self.target_critic_net.sample(
-                            pred_all_next_obs[stat], pred_action)
-                        pred_q3, pred_q4 = self.critic_net.sample(
-                            pred_all_next_obs[stat], pred_action)
-                        pred_q1 -= self.alpha.detach() * pred_log_pi
-                        pred_q2 -= self.alpha.detach() * pred_log_pi
-                        pred_q3 -= self.alpha.detach() * pred_log_pi
-                        pred_q4 -= self.alpha.detach() * pred_log_pi
-                        # Predict a set of reward first
-                        _, pred_rewards = self.world_model.pred_rewards(
-                            obs=pred_all_next_obs[stat],
-                            actions=pred_action)
-
-                        if hori < (self.horizon - 1):
-                            _, pred_obs, _, _ = self.world_model.pred_next_states(
-                                pred_all_next_obs[stat], pred_action)
-                            horizon_obs_list.append(pred_obs)
-
-                        temp_disc_rewards = []
-                        # For each predict reward.
-                        for rwd in range(pred_rewards.shape[0]):
-                            disc_pred_reward = not_dones * \
-                                               (self.gamma ** (hori + 1)) * \
-                                               pred_rewards[rwd]
-                            if hori > 0:
-                                # Horizon = 1, 2, 3, 4, 5
-                                disc_sum_reward = pred_all_next_rewards[stat] + \
-                                                  disc_pred_reward
-                            else:
-                                disc_sum_reward = not_dones * disc_pred_reward
-                            temp_disc_rewards.append(disc_sum_reward)
-                            assert rewards.shape == not_dones.shape == disc_sum_reward.shape
-                            # Q = r + disc_rewards + pred_v
-                            pred_tq1 = rewards + disc_sum_reward + not_dones * (
-                                    self.gamma ** (hori + 2)) * pred_q1
-                            pred_tq2 = rewards + disc_sum_reward + not_dones * (
-                                    self.gamma ** (hori + 2)) * pred_q2
-                            pred_tq3 = rewards + disc_sum_reward + not_dones * (
-                                    self.gamma ** (hori + 2)) * pred_q3
-                            pred_tq4 = rewards + disc_sum_reward + not_dones * (
-                                    self.gamma ** (hori + 2)) * pred_q4
-
-                            horizon_q_list.append(pred_tq1)
-                            horizon_q_list.append(pred_tq2)
-                            horizon_q_list.append(pred_tq3)
-                            horizon_q_list.append(pred_tq4)
-
-                        ## Observation Level
-                        if hori < (self.horizon - 1):
-                            temp_disc_rewards = torch.stack(temp_disc_rewards)
-                            horizon_rewards_list.append(temp_disc_rewards)
-                    ## Horizon level.
-                    if hori < (self.horizon - 1):
-                        pred_all_next_obs = torch.vstack(horizon_obs_list)
-                        pred_all_next_rewards = torch.vstack(
-                            horizon_rewards_list)
-                    #     # Statistics of target q
-                    h_0 = torch.stack(horizon_q_list)
-                    mean_0 = torch.mean(h_0, dim=0)
-                    means.append(mean_0)
-                    var_0 = torch.var(h_0, dim=0)
-                    var_0[torch.abs(var_0) < 0.001] = 0.001
-                    var_0 = 1.0 / var_0
-                    vars.append(var_0)
-                all_means = torch.stack(means)
-                all_vars = torch.stack(vars)
-                total_vars = torch.sum(all_vars, dim=0)
-                for n in range(self.horizon):
-                    all_vars[n] /= total_vars
-                target_q = torch.sum(all_vars * all_means, dim=0)
-                # target_q = torch.mean(all_means, dim=0)
-            else:
-                next_actions, next_log_pi, _ = self.actor_net.sample(next_obs)
-                q_1, q_2 = self.target_critic_net.sample(next_obs,
-                                                         next_actions)
-                t_q = torch.minimum(q_1, q_2) - self.alpha * next_log_pi
-                target_q = rewards + self.gamma * not_dones * t_q
-
+            next_actions, next_log_pi, _ = self.actor_net.sample(next_obs)
+            q_1, q_2 = self.target_critic_net.sample(next_obs, next_actions)
+            t_q = torch.minimum(q_1, q_2) - self.alpha * next_log_pi
+            target_q = rewards + self.gamma * not_dones * t_q
         target_q = target_q.detach()
         assert (len(target_q.shape) == 2) and (target_q.shape[1] == 1)
 
