@@ -4,7 +4,11 @@ A MBRL class that implemented all MBRL algorithms for SAC.
 import copy
 import numpy as np
 import torch
+import torch.nn.functional as F
 from utils import soft_update
+# from utils import vi
+from torch.autograd import Variable
+from .classifier import Generator, Discriminator
 
 
 class MBRL_DYNA_SAC:
@@ -14,16 +18,17 @@ class MBRL_DYNA_SAC:
 
     def __init__(self, actor_network, critic_network, world_model, gamma, tau,
                  state_dim, action_dim, actor_lr, critic_lr, alpha_lr, horizon,
-                 sample_times, use_bound, device):
+                 use_bound, device):
 
         super().__init__()
         self.batch_size = None
         self.type = "mbrl"
         self.algorithm_name = "dyna_norm"
         # Switches
-        self.sample_times = sample_times
+        self.sample_times = 512
         self.horizon = horizon
         self.use_bounded_active = use_bound
+        # self.dyna_use_uncertainty = use_dyna
 
         # Other Variables
         self.action_dim = action_dim
@@ -31,6 +36,19 @@ class MBRL_DYNA_SAC:
         self.gamma = gamma
         self.tau = tau
         self.device = device
+
+        # Actor Critic.
+        self.generator = Generator(latent_variable=1,
+                                   observation_size=self.state_dim,
+                                   num_actions=self.action_dim)
+
+        self.discriminator = Discriminator(observation_size=self.state_dim,
+                                           num_actions=self.action_dim)
+
+        self.optimizer_G = torch.optim.RMSprop(self.generator.parameters(),
+                                               lr=0.001)
+        self.optimizer_D = torch.optim.RMSprop(self.discriminator.parameters(),
+                                               lr=0.001)
 
         self.actor_net = actor_network.to(device)
         self.critic_net = critic_network.to(device)
@@ -140,11 +158,6 @@ class MBRL_DYNA_SAC:
         self.log_alpha_optimizer.step()
 
     def train_with_true(self, transitions):
-        """
-        Train with the transitions.
-
-        :param transitions:
-        """
         states, actions, rewards, next_states, not_dones, _, _ = transitions
         # Update current Q network
         self.update_critic(states, actions, rewards, next_states, not_dones)
@@ -155,7 +168,7 @@ class MBRL_DYNA_SAC:
 
     def train_policy(self, transitions):
         """
-        Train with true transition and then dyna generated transitions.
+
         :param transitions:
         """
         # Train with normal samples.
@@ -168,7 +181,7 @@ class MBRL_DYNA_SAC:
         assert len(not_dones.shape) == 2 and not_dones.shape[1] == 1
 
         self.train_with_true(transitions)
-        # self.dyna_generate_and_train(transitions)
+        self.dyna_generate_and_train(transitions)
 
     def train_world_model(self, statistics, transitions):
         """
@@ -193,6 +206,8 @@ class MBRL_DYNA_SAC:
         next_rewards = next_rewards[ok_masks]
         self.world_model.train_world(states, actions, rewards, next_states,
                                      next_actions, next_rewards)
+        # transi = torch.cat((states, actions, next_states), dim=1)
+        # self.train_classifier(transi)
 
     def dyna_generate_and_train(self, transitions):
 
@@ -221,6 +236,16 @@ class MBRL_DYNA_SAC:
                 pred_state, pred_act)
             pred_reward, _ = self.world_model.pred_rewards(pred_state,
                                                            pred_act)
+            # Uncertainty measures.
+            # fake_transi = torch.cat((pred_state.detach(),
+            #                          actions.detach(),
+            #                          pred_next_state.detach()), dim=1)
+            # scores = self.discriminator(fake_transi)
+            # scores[scores == 1.0] = 0.99
+            # pred_reward[pred_reward <= 0.0] = 0.01
+            # pred_reward = torch.log(pred_reward.detach()) + torch.log(
+            #     scores / (1 - scores))
+
             ###    Append    ###
             pred_states.append(pred_state)
             pred_actions.append(pred_act)
@@ -240,3 +265,49 @@ class MBRL_DYNA_SAC:
         # states, actions, rewards, next_states, not_dones
         self.train_policy((pred_states, pred_actions, pred_rewards,
                            pred_next_states, pred_not_dones, None, None))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def train_classifier(self, real_transition):
+        """
+
+        :param real_transition:
+        """
+        real_size = real_transition.size(0)
+        valid = Variable(
+            torch.FloatTensor(real_transition.size(0), 1).fill_(1.0),
+            requires_grad=False)
+        fake = Variable(
+            torch.FloatTensor(real_transition.size(0), 1).fill_(0.0),
+            requires_grad=False)
+
+        # Train Generator
+        self.optimizer_G.zero_grad()
+        # Generate a batch of images
+        z = Variable(torch.FloatTensor(np.random.normal(0, 1, (real_size, 1))))
+        gen_imgs = self.generator(z).detach()
+        loss_g = F.binary_cross_entropy(self.discriminator(gen_imgs), valid)
+        loss_g.backward()
+        self.optimizer_G.step()
+
+        # Train Discriminator
+        self.optimizer_D.zero_grad()
+        real_loss = F.binary_cross_entropy(self.discriminator(real_transition),
+                                           valid)
+        fake_loss = F.binary_cross_entropy(
+            self.discriminator(gen_imgs.detach()), fake)
+        d_loss = (real_loss + fake_loss) / 2
+        d_loss.backward()
+        self.optimizer_D.step()

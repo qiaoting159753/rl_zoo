@@ -1,4 +1,3 @@
-import logging
 from functools import cached_property
 import cv2
 import numpy as np
@@ -11,7 +10,6 @@ class DMCSEnvironment:
     """
     def __init__(self, domain_name, task_name, seed=10):
         super().__init__()
-        logging.info(f"Training on Domain {domain_name}")
         self.domain = domain_name
         self.task = task_name
         self.env = suite.load(domain_name, task_name, task_kwargs={"random": seed})

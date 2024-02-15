@@ -1,10 +1,7 @@
-import logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
 import numpy as np
 import math
 from datetime import datetime
+from tqdm import trange
 
 
 class Trainer:
@@ -13,10 +10,13 @@ class Trainer:
 
     """
 
-    def __init__(self, generate_results, env, agent, memory, device, use_dyna,
-                 use_critic_steve,
-                 use_critic_mve, use_actor_mve, use_actor_pg, use_bound):
+    def __init__(self, generate_results, env, agent, memory, device, name,
+                 use_dyna, logger):
+
         # Should be Goal Conditioned.
+        self.logger = logger
+        self.use_dyna = use_dyna
+        self.name = name
         self.generate_results = generate_results
         self.device = device
         self.max_steps = 1000000
@@ -28,13 +28,6 @@ class Trainer:
         self.current_step = 0
         self.train_world_times = 1
         self.train_agent_times = 1
-
-        self.use_dyna = use_dyna
-        self.use_critic_steve = use_critic_steve
-        self.use_critic_mve = use_critic_mve
-        self.use_actor_mve = use_actor_mve
-        self.use_actor_pg = use_actor_pg
-        self.use_bound = use_bound
 
         self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
         self.batch_size = 128
@@ -119,19 +112,12 @@ class Trainer:
         self.evaluation_array[4].append(0)
         eval_array = np.array(self.evaluation_array)
 
-        logger.info(f'Evaluation: {total_rewards / counter} at {time_step} \n')
+        self.logger.info(f'Evaluation: {total_rewards / counter} at {time_step} \n')
 
         if self.generate_results:
             # Save the metrics
-            param_list = "_" + str(self.use_bound) + "_" + str(self.use_dyna) + \
-                         "_" + str(self.use_actor_mve) + "_" + \
-                         str(self.use_actor_pg) + "_" + str(
-                self.use_critic_mve) + \
-                         "_" + str(self.use_critic_steve) + "_"
-
-            file_name = (self.env.domain + "_" + self.env.task + param_list +
-                         self.date_and_time)
-
+            file_name = (self.env.domain + "_" + self.env.task + "_" +
+                         self.name + "_" + self.date_and_time)
             np.savetxt(file_name + "_eval_rewards.csv",
                        eval_array, delimiter=",")
             # Save the actor
@@ -168,11 +154,7 @@ class Trainer:
                 for _ in range(self.train_agent_times):
                     transitions = self.memory.sample(
                         batch_size=self.batch_size)
-                    if self.use_dyna:
-                        self.agent.dyna_generate_and_train(transitions,
-                                                           self.env)
-                    else:
-                        self.agent.train_policy(transitions)
+                    self.agent.train_policy(transitions)
 
             # Do evaluation for every 200
             self.current_step += 1
@@ -188,6 +170,6 @@ class Trainer:
         The main loop. Call Tranin or evaluation.
 
         """
-        for i in range(self.est_epi):
+        for i in trange(self.est_epi):
             self.evaluate(i)
             self.train_agent()
