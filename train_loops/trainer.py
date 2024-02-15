@@ -3,8 +3,12 @@ import math
 from datetime import datetime
 import logging
 from tqdm.contrib.logging import logging_redirect_tqdm
-from tqdm import trange
+from tqdm import tqdm
+from utils import TqdmLoggingHandler
 
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+log.addHandler(TqdmLoggingHandler())
 
 class Trainer:
     """
@@ -129,7 +133,7 @@ class Trainer:
             # Save the actor
             # torch.save(self.agent.actor.state_dict(),
             #            file_name + "_actor_params.pth")
-        logging.info(msg=f'Evaluation: {total_rewards / counter}')
+        log.info(msg=f'Evaluation: {total_rewards / counter}')
 
     def train_agent(self):
         """
@@ -181,7 +185,6 @@ class Trainer:
 
         """
         self.evaluate()
-        with logging_redirect_tqdm():
-            for _ in trange(self.est_epi):
-                self.train_agent()
-                self.evaluate()
+        for _ in tqdm(range(self.est_epi)):
+            self.train_agent()
+            self.evaluate()
