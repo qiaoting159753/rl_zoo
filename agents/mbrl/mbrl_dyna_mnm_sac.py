@@ -45,10 +45,10 @@ class MBRL_DYNA_MNM_SAC:
         self.generator = Generator(latent_variable=1,
                                    observation_size=self.state_dim,
                                    num_actions=self.action_dim)
-
+        self.generator.to(device)
         self.discriminator = Discriminator(observation_size=self.state_dim,
                                            num_actions=self.action_dim)
-
+        self.discriminator.to(device)
         self.optimizer_G = torch.optim.RMSprop(self.generator.parameters(),
                                                lr=0.001)
         self.optimizer_D = torch.optim.RMSprop(self.discriminator.parameters(),
