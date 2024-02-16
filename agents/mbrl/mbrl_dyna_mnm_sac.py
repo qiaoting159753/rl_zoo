@@ -4,31 +4,28 @@ A MBRL class that implemented all MBRL algorithms for SAC.
 import copy
 import numpy as np
 import torch
-import torch.nn.functional as F
 from utils import soft_update
-# from utils import vi
+from networks.mbrl import Generator, Discriminator
+import torch.nn.functional as F
 from torch.autograd import Variable
-from .classifier import Generator, Discriminator
 
 
-class MBRL_MNMDYNA_SAC:
+class MBRL_DYNA_MNM_SAC:
     """
     A MBRL class that implemented all MBRL algorithms for SAC.
     """
 
     def __init__(self, actor_network, critic_network, world_model, gamma, tau,
                  state_dim, action_dim, actor_lr, critic_lr, alpha_lr, horizon,
-                 use_bound, device):
+                 sample_times, on_policy, use_bound, device):
 
         super().__init__()
-        self.batch_size = None
         self.type = "mbrl"
-        self.algorithm_name = "dyna_norm"
         # Switches
-        self.sample_times = 512
+        self.on_policy = on_policy
+        self.sample_times = sample_times
         self.horizon = horizon
         self.use_bounded_active = use_bound
-        # self.dyna_use_uncertainty = use_dyna
 
         # Other Variables
         self.action_dim = action_dim
@@ -37,7 +34,14 @@ class MBRL_MNMDYNA_SAC:
         self.tau = tau
         self.device = device
 
-        # Actor Critic.
+        self.actor_net = actor_network.to(device)
+        self.critic_net = critic_network.to(device)
+        self.target_critic_net = copy.deepcopy(self.critic_net).to(device)
+
+        self.log_alpha = torch.tensor(np.log(1.0)).float().to(device)
+        self.log_alpha.requires_grad = True
+        self.target_entropy = -action_dim
+
         self.generator = Generator(latent_variable=1,
                                    observation_size=self.state_dim,
                                    num_actions=self.action_dim)
@@ -49,14 +53,6 @@ class MBRL_MNMDYNA_SAC:
                                                lr=0.001)
         self.optimizer_D = torch.optim.RMSprop(self.discriminator.parameters(),
                                                lr=0.001)
-
-        self.actor_net = actor_network.to(device)
-        self.critic_net = critic_network.to(device)
-        self.target_critic_net = copy.deepcopy(self.critic_net).to(device)
-
-        self.log_alpha = torch.tensor(np.log(1.0)).float().to(device)
-        self.log_alpha.requires_grad = True
-        self.target_entropy = -action_dim
 
         # optimizers
         self.actor_optimizer = torch.optim.Adam(self.actor_net.parameters(),
@@ -116,13 +112,13 @@ class MBRL_MNMDYNA_SAC:
         """
         with torch.no_grad():
             next_actions, next_log_pi, _ = self.actor_net.sample(next_obs)
-            q_1, q_2 = self.target_critic_net.sample(next_obs, next_actions)
+            q_1, q_2 = self.target_critic_net(next_obs, next_actions)
             t_q = torch.minimum(q_1, q_2) - self.alpha * next_log_pi
             target_q = rewards + self.gamma * not_dones * t_q
         target_q = target_q.detach()
         assert (len(target_q.shape) == 2) and (target_q.shape[1] == 1)
 
-        current_q1, current_q2 = self.critic_net.forward(obs, actions)
+        current_q1, current_q2 = self.critic_net(obs, actions)
         td_error1 = target_q - current_q1
         td_error2 = target_q - current_q2
         # loss_1, loss_2 = self.critic_net.loss(obs, actions, target_q)
@@ -142,7 +138,7 @@ class MBRL_MNMDYNA_SAC:
         """
         # MFRL
         action, first_log_pi, _ = self.actor_net.sample(obs)
-        actor_q1, actor_q2 = self.critic_net.sample(obs, action)
+        actor_q1, actor_q2 = self.critic_net(obs, action)
         actor_q = torch.min(actor_q1, actor_q2)
         # Q - alpha * log = V
         actor_loss = -(actor_q - self.alpha.detach() * first_log_pi).mean()
@@ -158,6 +154,11 @@ class MBRL_MNMDYNA_SAC:
         self.log_alpha_optimizer.step()
 
     def train_with_true(self, transitions):
+        """
+        Train with the transitions.
+
+        :param transitions:
+        """
         states, actions, rewards, next_states, not_dones, _, _ = transitions
         # Update current Q network
         self.update_critic(states, actions, rewards, next_states, not_dones)
@@ -168,7 +169,7 @@ class MBRL_MNMDYNA_SAC:
 
     def train_policy(self, transitions):
         """
-
+        Train with true transition and then dyna generated transitions.
         :param transitions:
         """
         # Train with normal samples.
@@ -181,7 +182,7 @@ class MBRL_MNMDYNA_SAC:
         assert len(not_dones.shape) == 2 and not_dones.shape[1] == 1
 
         self.train_with_true(transitions)
-        self.dyna_generate_and_train(transitions)
+        self.dyna_generate_and_train(next_states)
 
     def train_world_model(self, statistics, transitions):
         """
@@ -206,79 +207,8 @@ class MBRL_MNMDYNA_SAC:
         next_rewards = next_rewards[ok_masks]
         self.world_model.train_world(states, actions, rewards, next_states,
                                      next_actions, next_rewards)
-        # transi = torch.cat((states, actions, next_states), dim=1)
-        # self.train_classifier(transi)
-
-    def dyna_generate_and_train(self, transitions):
-
-        """
-        Only off-policy Dyna will work.
-        :param transitions:
-        """
-        states, actions, rewards, next_states, not_dones, _, _ = transitions
-        self.batch_size = states.shape[0]
-        pred_states = [states]
-        pred_actions = [actions]
-        pred_rewards = [rewards]
-        pred_next_states = [next_states]
-
-        pred_state = next_states
-        for _ in range(self.horizon):
-            ###    Rewards   ###
-            # random_actions = []
-            # for _ in range(pred_state.shape[0]):
-            #     pred_act = self.env.action_space.sample()
-            #     random_actions.append(pred_act)
-            # pred_act = torch.FloatTensor(np.array(random_actions)).to(self.device)
-            pred_act, _, _ = self.actor_net.forward(pred_state)
-            ###    Predictions   ###
-            pred_next_state, _, _, _ = self.world_model.pred_next_states(
-                pred_state, pred_act)
-            pred_reward, _ = self.world_model.pred_rewards(pred_state,
-                                                           pred_act)
-            # Uncertainty measures.
-            # fake_transi = torch.cat((pred_state.detach(),
-            #                          actions.detach(),
-            #                          pred_next_state.detach()), dim=1)
-            # scores = self.discriminator(fake_transi)
-            # scores[scores == 1.0] = 0.99
-            # pred_reward[pred_reward <= 0.0] = 0.01
-            # pred_reward = torch.log(pred_reward.detach()) + torch.log(
-            #     scores / (1 - scores))
-
-            ###    Append    ###
-            pred_states.append(pred_state)
-            pred_actions.append(pred_act)
-            pred_rewards.append(pred_reward.detach())
-            pred_next_states.append(pred_next_state.detach())
-            ###    Move on to the next    ###
-            # pred_state = pred_next_state.detach()
-        pred_states = torch.vstack(pred_states)
-        pred_actions = torch.vstack(pred_actions)
-        pred_rewards = torch.vstack(pred_rewards)
-        pred_next_states = torch.vstack(pred_next_states)
-
-        pred_not_dones = torch.FloatTensor(np.ones(pred_rewards.shape)).to(
-            self.device)
-        pred_not_dones[:self.batch_size] = not_dones
-
-        # states, actions, rewards, next_states, not_dones
-        self.train_policy((pred_states, pred_actions, pred_rewards,
-                           pred_next_states, pred_not_dones, None, None))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        transi = torch.cat((states, actions, next_states), dim=1)
+        self.train_classifier(transi)
 
     def train_classifier(self, real_transition):
         """
@@ -311,3 +241,63 @@ class MBRL_MNMDYNA_SAC:
         d_loss = (real_loss + fake_loss) / 2
         d_loss.backward()
         self.optimizer_D.step()
+
+    def dyna_generate_and_train(self, next_states):
+
+        """
+        Only off-policy Dyna will work.
+        :param next_states:
+        """
+        pred_states = []
+        pred_actions = []
+        pred_rewards = []
+        pred_next_states = []
+        pred_state = next_states
+        for _ in range(self.horizon):
+            ###    Rewards   ###
+            pred_state = torch.repeat_interleave(pred_state,
+                                                 self.sample_times, dim=0)
+            if self.on_policy:
+                pred_acts, _, _ = self.actor_net.forward(pred_state)
+            else:
+                random_actions = []
+                for _ in range(pred_state.shape[0]):
+                    for _ in range(self.sample_times):
+                        pred_act = np.random.uniform(-1, 1,
+                                                     (self.action_dim,))
+                        random_actions.append(pred_act)
+                pred_acts = torch.FloatTensor(np.array(random_actions)).to(
+                    self.device)
+            ###    Predictions   ###
+            pred_next_state, _, _, _ = self.world_model.pred_next_states(
+                pred_state, pred_acts)
+            pred_reward, _ = self.world_model.pred_rewards(pred_state,
+                                                           pred_acts)
+
+            # Uncertainty measures.
+            fake_transi = torch.cat((pred_state.detach(),
+                                     pred_acts.detach(),
+                                     pred_next_state.detach()), dim=1)
+            scores = self.discriminator(fake_transi)
+            scores[scores == 1.0] = 0.99
+            pred_reward[pred_reward <= 0.0] = 0.01
+            pred_reward = torch.log(pred_reward.detach()) + torch.log(
+                scores / (1 - scores))
+
+            ###    Append    ###
+            pred_states.append(pred_state)
+            pred_actions.append(pred_acts.detach())
+            pred_rewards.append(pred_reward.detach())
+            pred_next_states.append(pred_next_state.detach())
+            ###    Move on to the next    ###
+            pred_state = pred_next_state.detach()
+        pred_states = torch.vstack(pred_states)
+        pred_actions = torch.vstack(pred_actions)
+        pred_rewards = torch.vstack(pred_rewards)
+        pred_next_states = torch.vstack(pred_next_states)
+        pred_not_dones = torch.FloatTensor(np.ones(pred_rewards.shape)).to(
+            self.device)
+
+        # states, actions, rewards, next_states, not_dones
+        self.train_with_true((pred_states, pred_actions, pred_rewards,
+                              pred_next_states, pred_not_dones, None, None))

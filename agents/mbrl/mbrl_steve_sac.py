@@ -5,7 +5,7 @@ import copy
 import numpy as np
 import torch
 from utils import soft_update
-from .classifier import Generator, Discriminator
+from networks.mbrl.classifier import Generator, Discriminator
 
 
 class MBRL_STEVE_SAC:

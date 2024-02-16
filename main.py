@@ -2,7 +2,7 @@ import torch
 import logging
 from envs import DMCSEnvironment
 from memories import ReplayBuffer
-from agents.mbrl import MBRL_DYNA_SAC, MBRL_STEVE_SAC
+from agents.mbrl import MBRL_DYNA_SAC, MBRL_DYNA_MNM_SAC
 from networks.soft_actor import Actor
 from networks.double_critic import DoubleQCritic
 # from networks.distribution_Q import DoubleDistributionalQCritic
@@ -57,18 +57,18 @@ def main():
     memory = ReplayBuffer((state_dim,), (action_dim,),
                           capacity, device)
 
-    agent = MBRL_DYNA_SAC(actor, critic, world_model, device=device,
-                          state_dim=state_dim,
-                          action_dim=action_dim,
-                          actor_lr=3e-4,
-                          critic_lr=3e-4,
-                          alpha_lr=3e-4,
-                          gamma=0.99,
-                          tau=0.005,
-                          horizon=3,
-                          sample_times=10,
-                          on_policy=on_policy,
-                          use_bound=use_bound)
+    agent = MBRL_DYNA_MNM_SAC(actor, critic, world_model, device=device,
+                              state_dim=state_dim,
+                              action_dim=action_dim,
+                              actor_lr=3e-4,
+                              critic_lr=3e-4,
+                              alpha_lr=3e-4,
+                              gamma=0.99,
+                              tau=0.005,
+                              horizon=3,
+                              sample_times=10,
+                              on_policy=on_policy,
+                              use_bound=use_bound)
 
     runner = Trainer(generate_results, env, agent, memory, name=name,
                      device=device, use_dyna=use_dyna, logger=log)

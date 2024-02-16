@@ -4,11 +4,8 @@ A MBRL class that implemented all MBRL algorithms for SAC.
 import copy
 import numpy as np
 import torch
-import torch.nn.functional as F
 from utils import soft_update
-from utils import vi
-from torch.autograd import Variable
-from .classifier import Generator, Discriminator
+from networks.mbrl.classifier import Generator, Discriminator
 
 
 class MBRL_PG_SAC:
