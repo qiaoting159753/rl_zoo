@@ -1,31 +1,31 @@
 """
-A MBRL class.
+A MBRL class that implemented all MBRL algorithms for SAC.
 """
 import copy
 import numpy as np
 import torch
 from utils import soft_update
-from networks.mbrl.classifier import Generator, Discriminator
+from networks.mbrl import Generator, Discriminator
+import torch.nn.functional as F
+from torch.autograd import Variable
 
 
 class MBRL_STEVE_SAC:
     """
-    A MBRL class.
+    A MBRL class that implemented all MBRL algorithms for SAC.
     """
 
     def __init__(self, actor_network, critic_network, world_model, gamma, tau,
                  state_dim, action_dim, actor_lr, critic_lr, alpha_lr, horizon,
-                 use_bound, device):
+                 sample_times, on_policy, use_bound, device):
 
         super().__init__()
-        self.batch_size = None
         self.type = "mbrl"
         # Switches
-        self.use_normal = False
-        self.sample_times = 512
+        self.on_policy = on_policy
+        self.sample_times = sample_times
         self.horizon = horizon
         self.use_bounded_active = use_bound
-        # self.dyna_use_uncertainty = use_dyna
 
         # Other Variables
         self.action_dim = action_dim
@@ -33,19 +33,6 @@ class MBRL_STEVE_SAC:
         self.gamma = gamma
         self.tau = tau
         self.device = device
-
-        # Actor Critic.
-        self.generator = Generator(latent_variable=1,
-                                   observation_size=self.state_dim,
-                                   num_actions=self.action_dim)
-
-        self.discriminator = Discriminator(observation_size=self.state_dim,
-                                           num_actions=self.action_dim)
-
-        self.optimizer_G = torch.optim.RMSprop(self.generator.parameters(),
-                                               lr=0.001)
-        self.optimizer_D = torch.optim.RMSprop(self.discriminator.parameters(),
-                                               lr=0.001)
 
         self.actor_net = actor_network.to(device)
         self.critic_net = critic_network.to(device)
@@ -200,7 +187,8 @@ class MBRL_STEVE_SAC:
 
         target_q = target_q.detach()
         assert (len(target_q.shape) == 2) and (target_q.shape[1] == 1)
-        current_q1, current_q2 = self.critic_net.forward(obs, actions)
+
+        current_q1, current_q2 = self.critic_net(obs, actions)
         td_error1 = target_q - current_q1
         td_error2 = target_q - current_q2
         # loss_1, loss_2 = self.critic_net.loss(obs, actions, target_q)
@@ -220,7 +208,7 @@ class MBRL_STEVE_SAC:
         """
         # MFRL
         action, first_log_pi, _ = self.actor_net.sample(obs)
-        actor_q1, actor_q2 = self.critic_net.sample(obs, action)
+        actor_q1, actor_q2 = self.critic_net(obs, action)
         actor_q = torch.min(actor_q1, actor_q2)
         # Q - alpha * log = V
         actor_loss = -(actor_q - self.alpha.detach() * first_log_pi).mean()
@@ -235,9 +223,23 @@ class MBRL_STEVE_SAC:
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
 
+    def train_with_true(self, transitions):
+        """
+        Train with the transitions.
+
+        :param transitions:
+        """
+        states, actions, rewards, next_states, not_dones, _, _ = transitions
+        # Update current Q network
+        self.update_critic(states, actions, rewards, next_states, not_dones)
+        # Update Actor
+        self.update_actor_and_alpha(states)
+        # Update target Q network
+        soft_update(self.critic_net, self.target_critic_net, self.tau)
+
     def train_policy(self, transitions):
         """
-
+        Train with true transition and then dyna generated transitions.
         :param transitions:
         """
         # Train with normal samples.
@@ -249,12 +251,7 @@ class MBRL_STEVE_SAC:
         assert len(next_states.shape) >= 2
         assert len(not_dones.shape) == 2 and not_dones.shape[1] == 1
 
-        # Update current Q network
-        self.update_critic(states, actions, rewards, next_states, not_dones)
-        # Update Actor
-        self.update_actor_and_alpha(states)
-        # Update target Q network
-        soft_update(self.critic_net, self.target_critic_net, self.tau)
+        self.train_with_true(transitions)
 
     def train_world_model(self, statistics, transitions):
         """
