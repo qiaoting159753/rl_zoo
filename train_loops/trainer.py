@@ -11,36 +11,36 @@ class Trainer:
     """
 
     def __init__(self, generate_results, env, agent, memory, device, name,
-                 use_dyna, logger):
+                 use_mbrl, logger):
 
         # Should be Goal Conditioned.
         self.logger = logger
-        self.use_dyna = use_dyna
+        self.use_mbrl = use_mbrl
         self.name = name
         self.generate_results = generate_results
         self.device = device
+
+        self.batch_size = 128
         self.max_steps = 1000000
         self.max_epi_steps = 1000
         self.num_eval = 5
         self.est_epi = int(
             math.ceil(self.max_steps / self.max_epi_steps) * 1.5)
-
-        self.current_step = 0
         self.train_world_times = 1
         self.train_agent_times = 1
 
+        self.current_step = 0
         self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
-        self.batch_size = 128
+
         self.evaluation_array = [[], [], [], [], []]
         # self.env = PusherEnv()
         self.env = env
         self.memory = memory
         self.agent = agent
 
-    def evaluate(self, time_step):
+    def evaluate(self):
         """
 
-        :param time_step: evaluating at when
         :param max_epi_steps: Each episode, the maximum number of steps.
         :param num_eval: Number of episodes to evaluate the agent.
         """
@@ -112,7 +112,7 @@ class Trainer:
         self.evaluation_array[4].append(0)
         eval_array = np.array(self.evaluation_array)
 
-        self.logger.info(f'Evaluation: {total_rewards / counter}')
+        self.logger.info(f'Evaluation: {total_rewards / self.num_eval}')
 
         if self.generate_results:
             # Save the metrics
@@ -143,14 +143,16 @@ class Trainer:
             self.memory.add(state, action, reward, next_state, done)
             # Training the world model and the agent
             if len(self.memory) > self.batch_size:
-                statistics = self.memory.get_statistics()
-                self.agent.world_model.set_statistics(statistics)
-                for _ in range(self.train_world_times):
-                    transitions = self.memory.sample(
-                        batch_size=self.batch_size)
-                    self.agent.train_world_model(
-                        statistics=statistics,
-                        transitions=transitions)
+                if self.use_mbrl and self.agent.type == "mbrl":
+                    statistics = self.memory.get_statistics()
+                    self.agent.world_model.set_statistics(statistics)
+                    for _ in range(self.train_world_times):
+                        transitions = self.memory.sample(
+                            batch_size=self.batch_size)
+                        self.agent.train_world_model(
+                            statistics=statistics,
+                            transitions=transitions)
+
                 for _ in range(self.train_agent_times):
                     transitions = self.memory.sample(
                         batch_size=self.batch_size)
