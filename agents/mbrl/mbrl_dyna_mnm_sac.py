@@ -279,7 +279,7 @@ class MBRL_DYNA_MNM_SAC:
                                      pred_acts.detach(),
                                      pred_next_state.detach()), dim=1)
             scores = self.discriminator(fake_transi)
-            scores[scores == 1.0] = 0.99
+            scores *= 0.99
             pred_reward[pred_reward <= 0.0] = 0.01
             pred_reward = torch.log(pred_reward.detach()) + torch.log(
                 scores / (1 - scores))
