@@ -216,17 +216,20 @@ class MBRL_DYNA_MNM_SAC:
         :param real_transition:
         """
         real_size = real_transition.size(0)
+
         valid = Variable(
             torch.FloatTensor(real_transition.size(0), 1).fill_(1.0),
-            requires_grad=False)
+            requires_grad=False).to(self.device)
         fake = Variable(
             torch.FloatTensor(real_transition.size(0), 1).fill_(0.0),
-            requires_grad=False)
+            requires_grad=False).to(self.device)
 
         # Train Generator
         self.optimizer_G.zero_grad()
         # Generate a batch of images
-        z = Variable(torch.FloatTensor(np.random.normal(0, 1, (real_size, 1))))
+        z = Variable(torch.FloatTensor(np.random.normal(0, 1,
+                                                        (real_size, 1))))
+        z.to(self.device)
         gen_imgs = self.generator(z).detach()
         loss_g = F.binary_cross_entropy(self.discriminator(gen_imgs), valid)
         loss_g.backward()
