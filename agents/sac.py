@@ -69,10 +69,10 @@ class SAC:
             dim=0)
         # Evaluation
         if evaluation:
-            _, _, action = self.actor_net.forward(state_tensor)
+            _, _, action, _ = self.actor_net.forward(state_tensor)
         # Exploration
         else:
-            action, _, _ = self.actor_net.forward(state_tensor)
+            action, _, _, _ = self.actor_net.forward(state_tensor)
         assert action.ndim == 2 and action.shape[0] == 1
         action = action.detach()
         action = action.cpu().data.numpy().flatten()
@@ -89,8 +89,9 @@ class SAC:
         :param not_dones:
         """
         with torch.no_grad():
-            next_actions, next_log_pi, _ = self.actor_net.sample(next_obs)
+            next_actions, next_log_pi, _, _ = self.actor_net.sample(next_obs)
             q_1, q_2 = self.target_critic_net(next_obs, next_actions)
+            # The world model error penalty term should be added here.
             t_q = torch.minimum(q_1, q_2) - self.alpha * next_log_pi
             target_q = rewards + self.gamma * not_dones * t_q
         target_q = target_q.detach()
@@ -115,7 +116,7 @@ class SAC:
         :param obs:
         """
         # MFRL
-        action, first_log_pi, _ = self.actor_net.sample(obs)
+        action, first_log_pi, _, _ = self.actor_net.sample(obs)
         actor_q1, actor_q2 = self.critic_net(obs, action)
         actor_q = torch.min(actor_q1, actor_q2)
         # Q - alpha * log = V

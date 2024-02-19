@@ -91,7 +91,7 @@ class Actor(nn.Module):
             ten_times = dist.sample(torch.Size([sample_times]))
             ten_times = ten_times.squeeze()
             return ten_times, log_pi, dist.mean
-        return sample, log_pi, dist.mean
+        return sample, log_pi, dist.mean, dist
 
     def forward(self, state):
         return self.sample(state)
