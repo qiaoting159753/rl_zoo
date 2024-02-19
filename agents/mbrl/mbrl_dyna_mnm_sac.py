@@ -49,10 +49,10 @@ class MBRL_DYNA_MNM_SAC:
         self.discriminator = Discriminator(observation_size=self.state_dim,
                                            num_actions=self.action_dim)
         self.discriminator.to(device)
-        self.optimizer_G = torch.optim.RMSprop(self.generator.parameters(),
-                                               lr=0.001)
-        self.optimizer_D = torch.optim.RMSprop(self.discriminator.parameters(),
-                                               lr=0.001)
+        self.optimizer_G = torch.optim.Adam(self.generator.parameters(),
+                                               lr=0.0002)
+        self.optimizer_D = torch.optim.Adam(self.discriminator.parameters(),
+                                               lr=0.0002)
 
         # optimizers
         self.actor_optimizer = torch.optim.Adam(self.actor_net.parameters(),
@@ -216,7 +216,9 @@ class MBRL_DYNA_MNM_SAC:
         :param real_transition:
         """
         real_size = real_transition.size(0)
-
+        adv_loss = torch.nn.BCELoss()
+        adv_loss = adv_loss.to(self.device)
+        
         valid = Variable(
             torch.FloatTensor(real_transition.size(0), 1).fill_(1.0),
             requires_grad=False).to(self.device)
@@ -230,16 +232,16 @@ class MBRL_DYNA_MNM_SAC:
         z = Variable(torch.FloatTensor(np.random.normal(0, 1,
                                                         (real_size, 1))))
         z.to(self.device)
-        gen_imgs = self.generator(z).detach()
-        loss_g = F.binary_cross_entropy(self.discriminator(gen_imgs), valid)
+        gen_imgs = self.generator(z)
+        loss_g = adv_loss(self.discriminator(gen_imgs), valid)
         loss_g.backward()
         self.optimizer_G.step()
 
         # Train Discriminator
         self.optimizer_D.zero_grad()
-        real_loss = F.binary_cross_entropy(self.discriminator(real_transition),
+        real_loss = adv_loss(self.discriminator(real_transition),
                                            valid)
-        fake_loss = F.binary_cross_entropy(
+        fake_loss = adv_loss(
             self.discriminator(gen_imgs.detach()), fake)
         d_loss = (real_loss + fake_loss) / 2
         d_loss.backward()
