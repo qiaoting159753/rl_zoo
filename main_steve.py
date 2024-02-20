@@ -35,7 +35,6 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Algorithm settings.
-    use_dyna = False
     alg = "steve"
     if use_bound:
         bound = "_bound_"
@@ -71,7 +70,7 @@ def main():
                            use_bound=use_bound)
 
     runner = Trainer(generate_results, env, agent, memory, name=name,
-                     device=device, use_dyna=use_dyna, logger=log)
+                     device=device, use_mbrl=True, logger=log)
 
     runner.train_loop()
 

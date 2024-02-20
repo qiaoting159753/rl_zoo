@@ -71,7 +71,7 @@ def main():
                           use_bound=use_bound)
 
     runner = Trainer(generate_results, env, agent, memory, name=name,
-                     device=device, use_dyna=use_dyna, logger=log)
+                     device=device, use_mbrl=use_dyna, logger=log)
 
     runner.train_loop()
 

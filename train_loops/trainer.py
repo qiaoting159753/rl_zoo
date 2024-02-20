@@ -24,11 +24,8 @@ class Trainer:
         self.device = device
 
         self.batch_size = 128
-        self.max_steps = 10000000
         self.max_epi_steps = 1000
         self.num_eval = 5
-        self.est_epi = int(
-            math.ceil(self.max_steps / self.max_epi_steps) * 1.5)
         self.train_world_times = 1
         self.train_agent_times = 1
 
@@ -180,7 +177,6 @@ class Trainer:
         :param max_epi_steps: Maximum number of steps for each episode
         """
         state = self.env.reset()
-
         for _ in range(self.max_epi_steps):
             # Execute action and add to memory.
             if len(self.memory) < self.batch_size + 1:
@@ -188,7 +184,6 @@ class Trainer:
             else:
                 action = self.agent.select_action_from_policy(state=state,
                                                               evaluation=False)
-
             next_state, reward, done, _ = self.env.step(action)
             self.memory.add(state, action, reward, next_state, done)
             # Training the world model and the agent
@@ -223,7 +218,7 @@ class Trainer:
         # state = self.env.reset()
         # self.observe_critic_actor(state)
         with logging_redirect_tqdm():
-            for i in trange(200):
+            for i in trange(1200):
                 self.evaluate()
                 # if i == 50:
                 #     state = self.env.reset()

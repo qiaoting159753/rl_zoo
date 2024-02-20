@@ -50,9 +50,9 @@ class MBRL_DYNA_MNM_SAC:
                                            num_actions=self.action_dim)
         self.discriminator.to(device)
         self.optimizer_G = torch.optim.Adam(self.generator.parameters(),
-                                               lr=0.0002)
+                                            lr=0.0002)
         self.optimizer_D = torch.optim.Adam(self.discriminator.parameters(),
-                                               lr=0.0002)
+                                            lr=0.0002)
 
         # optimizers
         self.actor_optimizer = torch.optim.Adam(self.actor_net.parameters(),
@@ -91,10 +91,10 @@ class MBRL_DYNA_MNM_SAC:
             dim=0)
         # Evaluation
         if evaluation:
-            _, _, action = self.actor_net.forward(state_tensor)
+            _, _, action, _ = self.actor_net.forward(state_tensor)
         # Exploration
         else:
-            action, _, _ = self.actor_net.forward(state_tensor)
+            action, _, _, _ = self.actor_net.forward(state_tensor)
         assert action.ndim == 2 and action.shape[0] == 1
         action = action.detach()
         action = action.cpu().data.numpy().flatten()
@@ -111,7 +111,7 @@ class MBRL_DYNA_MNM_SAC:
         :param not_dones:
         """
         with torch.no_grad():
-            next_actions, next_log_pi, _ = self.actor_net.sample(next_obs)
+            next_actions, next_log_pi, _, _ = self.actor_net.sample(next_obs)
             q_1, q_2 = self.target_critic_net(next_obs, next_actions)
             t_q = torch.minimum(q_1, q_2) - self.alpha * next_log_pi
             target_q = rewards + self.gamma * not_dones * t_q
@@ -137,7 +137,7 @@ class MBRL_DYNA_MNM_SAC:
         :param obs:
         """
         # MFRL
-        action, first_log_pi, _ = self.actor_net.sample(obs)
+        action, first_log_pi, _, _ = self.actor_net.sample(obs)
         actor_q1, actor_q2 = self.critic_net(obs, action)
         actor_q = torch.min(actor_q1, actor_q2)
         # Q - alpha * log = V
@@ -218,7 +218,7 @@ class MBRL_DYNA_MNM_SAC:
         real_size = real_transition.size(0)
         adv_loss = torch.nn.BCELoss()
         adv_loss = adv_loss.to(self.device)
-        
+
         valid = Variable(
             torch.FloatTensor(real_transition.size(0), 1).fill_(1.0),
             requires_grad=False).to(self.device)
@@ -240,7 +240,7 @@ class MBRL_DYNA_MNM_SAC:
         # Train Discriminator
         self.optimizer_D.zero_grad()
         real_loss = adv_loss(self.discriminator(real_transition),
-                                           valid)
+                             valid)
         fake_loss = adv_loss(
             self.discriminator(gen_imgs.detach()), fake)
         d_loss = (real_loss + fake_loss) / 2
@@ -263,7 +263,7 @@ class MBRL_DYNA_MNM_SAC:
             pred_state = torch.repeat_interleave(pred_state,
                                                  self.sample_times, dim=0)
             if self.on_policy:
-                pred_acts, _, _ = self.actor_net.forward(pred_state)
+                pred_acts, _, _, _ = self.actor_net.forward(pred_state)
             else:
                 random_actions = []
                 for _ in range(pred_state.shape[0]):

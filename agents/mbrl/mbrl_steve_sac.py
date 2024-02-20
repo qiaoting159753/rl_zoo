@@ -5,9 +5,6 @@ import copy
 import numpy as np
 import torch
 from utils import soft_update
-from networks.mbrl import Generator, Discriminator
-import torch.nn.functional as F
-from torch.autograd import Variable
 
 
 class MBRL_STEVE_SAC:
