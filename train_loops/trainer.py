@@ -1,5 +1,4 @@
 import numpy as np
-import math
 import torch
 from torch.nn import functional as F
 from datetime import datetime
@@ -39,68 +38,48 @@ class Trainer:
         self.agent = agent
 
         num_sample = 5
-        num_act_dim = 4
-        total = 5 * 5 * 5 * 5
+        num_act_dim = 6
+        total = 5 * 5 * 5 * 5 * 5 * 5
         as0 = np.zeros((total, num_act_dim))
         as1 = np.zeros((total, num_act_dim))
-        as2 = np.zeros((total, num_act_dim))
-        as3 = np.zeros((total, num_act_dim))
 
         action = np.zeros((num_act_dim,))
         acts = [-0.8, -0.4, 0.0, 0.4, 0.8]
 
         counter = 0
         for l in range(num_sample):
-            action[3] = acts[l]
+            action[5] = acts[l]
             for k in range(num_sample):
-                action[2] = acts[k]
+                action[4] = acts[k]
                 for j in range(num_sample):
-                    action[1] = acts[j]
-                    for i in range(num_sample):
-                        action[0] = acts[i]
-                        as0[counter] = action
-                        counter += 1
-
-        counter = 0
-        for l in range(num_sample):
-            action[3] = acts[l]
-            for k in range(num_sample):
-                action[2] = acts[k]
-                for j in range(num_sample):
-                    action[0] = acts[j]
-                    for i in range(num_sample):
-                        action[1] = acts[i]
-                        as1[counter] = action
-                        counter += 1
-
-        counter = 0
-        for l in range(num_sample):
-            action[3] = acts[l]
-            for k in range(num_sample):
-                action[1] = acts[k]
-                for j in range(num_sample):
-                    action[0] = acts[j]
+                    action[3] = acts[j]
                     for i in range(num_sample):
                         action[2] = acts[i]
-                        as2[counter] = action
-                        counter += 1
+                        for h in range(num_sample):
+                            action[1] = acts[h]
+                            for g in range(num_sample):
+                                action[0] = acts[g]
+                                as0[counter] = action
+                                counter += 1
 
         counter = 0
         for l in range(num_sample):
-            action[1] = acts[l]
+            action[5] = acts[l]
             for k in range(num_sample):
-                action[2] = acts[k]
+                action[4] = acts[k]
                 for j in range(num_sample):
-                    action[0] = acts[j]
+                    action[3] = acts[j]
                     for i in range(num_sample):
-                        action[3] = acts[i]
-                        as3[counter] = action
-                        counter += 1
+                        action[2] = acts[i]
+                        for h in range(num_sample):
+                            action[1] = acts[h]
+                            for g in range(num_sample):
+                                action[0] = acts[g]
+                                as0[counter] = action
+                                counter += 1
 
         self.as0 = torch.FloatTensor(as0).to(self.device)
         self.as1 = torch.FloatTensor(as1).to(self.device)
-        self.as2 = torch.FloatTensor(as2).to(self.device)
-        self.as3 = torch.FloatTensor(as3).to(self.device)
 
     def observe_critic_actor(self, state):
         """
@@ -109,76 +88,30 @@ class Trainer:
         # Create action samples
         state_tensor = torch.FloatTensor(state).to(device=self.device)
         state_tensor = state_tensor.unsqueeze(dim=0)
-        multi_state_tensor = torch.repeat_interleave(state_tensor, 5**4, dim=0)
+        multi_state_tensor = torch.repeat_interleave(state_tensor, 5 ** 6,
+                                                     dim=0)
 
         # Same states, same action distributions.
         _, _, _, dist = self.agent.actor_net(state_tensor)
         # Same states, different actions.
         q_0, _ = self.agent.critic_net(multi_state_tensor, self.as0)
-        q_1, _ = self.agent.critic_net(multi_state_tensor, self.as1)
         # q_2, _ = self.agent.critic_net(multi_state_tensor, self.as2)
         # q_3, _ = self.agent.critic_net(multi_state_tensor, self.as3)
 
         # Dim 0
-        total_kld_0 = 0
-        for i in range(125):
+        total_kld_0 = 0.0
+        for i in range(3125):
             # For first dimension
-            q_s_0 = q_0[i*5:i*5+5]
+            q_s_0 = q_0[i * 5:i * 5 + 5]
             # qs to distribution.
             q_s_0 = F.softmax(q_s_0, dim=0)
-            a_s_0 = (dist.log_prob(self.as0[i*5:i*5+5]))
+            a_s_0 = (dist.log_prob(self.as0[i * 5:i * 5 + 5]))
             a_s_0 = torch.exp(a_s_0)
             a_s_0 = F.softmax(a_s_0[:, 0], dim=0)
             kld0 = F.kl_div(q_s_0, a_s_0)
             total_kld_0 += kld0
-
-        for i in range(125):
-            # For first dimension
-            q_s_1 = q_1[i*5:i*5+5]
-            # qs to distribution.
-            q_s_1 = F.softmax(q_s_1, dim=0)
-            a_s_1 = (dist.log_prob(self.as1[i*5:i*5+5]))
-            a_s_1 = torch.exp(a_s_1)
-            a_s_1 = F.softmax(a_s_1[:, 1], dim=0)
-            kld1 = F.kl_div(q_s_1, a_s_1)
-
-        # for i in range(125):
-        #     # For first dimension
-        #     q_s_2 = q_2[i*5:i*5+5]
-        #     # qs to distribution.
-        #     q_s_2 = F.softmax(q_s_2, dim=0)
-        #     a_s_2 = (dist.log_prob(self.as2[i*5:i*5+5]))
-        #     a_s_2 = torch.exp(a_s_2)
-        #     a_s_2 = F.softmax(a_s_2[:, 2], dim=0)
-        #     kld2 = F.kl_div(q_s_2, a_s_2)
-        #
-        # for i in range(125):
-        #     # For first dimension
-        #     q_s_3 = q_3[i*5:i*5+5]
-        #     # qs to distribution.
-        #     q_s_3 = F.softmax(q_s_3, dim=0)
-        #     a_s_3 = (dist.log_prob(self.as3[i*5:i*5+5]))
-        #     a_s_3 = torch.exp(a_s_3)
-        #     a_s_3 = F.softmax(a_s_3[:, 3], dim=0)
-        #     kld3 = F.kl_div(q_s_3, a_s_3)
-
-        # Re-shuffle the buffer.
-        # for j in range(5):
-        #
-        #
-        #     j = j * 5
-        #     q_s_1 = q_1[]
-            # print(q_s)
-            # print(a_s)
-
-            # For second dimension
-
-
-
-        # tq1, tq2 = self.agent.target_critic_net(multi_state_tensor, actions_tensor)
-        # Convert q back to dist
-        # 9 * 9 * 9 = 729 same
-
+        self.logger.info(f"{total_kld_0.item()}")
+        return total_kld_0.item()
 
     def evaluate(self, observe=False):
         """
@@ -192,45 +125,48 @@ class Trainer:
 
         for _ in range(self.num_eval):
             state = self.env.reset()
+            if observe:
+                div_value = self.observe_critic_actor(state)
+                reward_error += div_value
+
             for _ in range(self.max_epi_steps):
                 action = self.agent.select_action_from_policy(state,
                                                               evaluation=True)
                 next_state, reward, done, _ = self.env.step(action)
                 total_rewards += reward
 
-                # if observe:
-                    # state_tensor = torch.FloatTensor(next_state).to(
-                    #     device=self.device)
-                    # state_tensor = state_tensor.unsqueeze(dim=0)
-                    # actions, _, _ = self.agent.actor_net.sample(state_tensor)
+                # state_tensor = torch.FloatTensor(next_state).to(
+                #     device=self.device)
+                # state_tensor = state_tensor.unsqueeze(dim=0)
+                # actions, _, _ = self.agent.actor_net.sample(state_tensor)
 
-                    # self.observe_critic_actor()
+                # self.observe_critic_actor()
 
-                    # q1s, _ = self.agent.critic_net.sample(state_tensor, actions)
-                    # # Normalize
-                    # temp_min = torch.min(q1s)
-                    # temp_max = torch.max(q1s)
-                    # temp_scale = temp_max - temp_min
-                    # norm_q1s = (q1s - temp_min) / temp_scale
+                # q1s, _ = self.agent.critic_net.sample(state_tensor, actions)
+                # # Normalize
+                # temp_min = torch.min(q1s)
+                # temp_max = torch.max(q1s)
+                # temp_scale = temp_max - temp_min
+                # norm_q1s = (q1s - temp_min) / temp_scale
 
-                    # # Reward Prediction.
-                    # pred_mean, _ = self.agent.world_model.pred_rewards(
-                    #     obs=state_tensor, actions=actions)
-                    # pred_mean = pred_mean.item()
-                    # reward_error += abs(pred_mean - reward)
+                # # Reward Prediction.
+                # pred_mean, _ = self.agent.world_model.pred_rewards(
+                #     obs=state_tensor, actions=actions)
+                # pred_mean = pred_mean.item()
+                # reward_error += abs(pred_mean - reward)
 
-                    # # World model prediction
-                    # pred_next_state, _, _, _ = self.agent.world_model.pred_next_states(
-                    #     obs=state_tensor, actions=actions)
-                    # pred_next_state = pred_next_state.detach().cpu().numpy().squeeze()
-                    # dynamic_error += (np.mean((pred_next_state - next_state) ** 2))
+                # # World model prediction
+                # pred_next_state, _, _, _ = self.agent.world_model.pred_next_states(
+                #     obs=state_tensor, actions=actions)
+                # pred_next_state = pred_next_state.detach().cpu().numpy().squeeze()
+                # dynamic_error += (np.mean((pred_next_state - next_state) ** 2))
 
-                    # # uncert 1
-                    # total_uncert1 += vi(pred_mean, pred_var)
-                    # # uncert 2
-                    # total_uncert2 += sampling(pred_mean, pred_var)
-                    # # uncert 3
-                    # total_uncert3 += mean_std(pred_mean, pred_var)
+                # # uncert 1
+                # total_uncert1 += vi(pred_mean, pred_var)
+                # # uncert 2
+                # total_uncert2 += sampling(pred_mean, pred_var)
+                # # uncert 3
+                # total_uncert3 += mean_std(pred_mean, pred_var)
 
                 counter += 1
                 state = next_state
@@ -303,12 +239,10 @@ class Trainer:
         The main loop. Call Tranin or evaluation.
 
         """
-        # state = self.env.reset()
-        # self.observe_critic_actor(state)
         with logging_redirect_tqdm():
             for i in trange(1200):
-                self.evaluate()
-                # if i == 10:
-                #     state = self.env.reset()
-                #     self.observe_critic_actor(state)
+                if i % 10 == 0:
+                    self.evaluate(observe=True)
+                else:
+                    self.evaluate()
                 self.train_agent()
