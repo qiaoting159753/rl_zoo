@@ -38,12 +38,17 @@ class Trainer:
         self.memory = memory
         self.agent = agent
 
-        num_sample = 9
+        num_sample = 5
         num_act_dim = 4
-        total = 9 * 9 * 9 * 9
-        actions = np.zeros((total, num_act_dim))
+        total = 5 * 5 * 5 * 5
+        as0 = np.zeros((total, num_act_dim))
+        as1 = np.zeros((total, num_act_dim))
+        as2 = np.zeros((total, num_act_dim))
+        as3 = np.zeros((total, num_act_dim))
+
         action = np.zeros((num_act_dim,))
-        acts = [-0.8, -0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8]
+        acts = [-0.8, -0.4, 0.0, 0.4, 0.8]
+
         counter = 0
         for l in range(num_sample):
             action[3] = acts[l]
@@ -53,39 +58,122 @@ class Trainer:
                     action[1] = acts[j]
                     for i in range(num_sample):
                         action[0] = acts[i]
-                        actions[counter] = action
+                        as0[counter] = action
                         counter += 1
-        self.actions_tensor = torch.FloatTensor(actions).to(self.device)
+
+        counter = 0
+        for l in range(num_sample):
+            action[3] = acts[l]
+            for k in range(num_sample):
+                action[2] = acts[k]
+                for j in range(num_sample):
+                    action[0] = acts[j]
+                    for i in range(num_sample):
+                        action[1] = acts[i]
+                        as1[counter] = action
+                        counter += 1
+
+        counter = 0
+        for l in range(num_sample):
+            action[3] = acts[l]
+            for k in range(num_sample):
+                action[1] = acts[k]
+                for j in range(num_sample):
+                    action[0] = acts[j]
+                    for i in range(num_sample):
+                        action[2] = acts[i]
+                        as2[counter] = action
+                        counter += 1
+
+        counter = 0
+        for l in range(num_sample):
+            action[1] = acts[l]
+            for k in range(num_sample):
+                action[2] = acts[k]
+                for j in range(num_sample):
+                    action[0] = acts[j]
+                    for i in range(num_sample):
+                        action[3] = acts[i]
+                        as3[counter] = action
+                        counter += 1
+
+        self.as0 = torch.FloatTensor(as0).to(self.device)
+        self.as1 = torch.FloatTensor(as1).to(self.device)
+        self.as2 = torch.FloatTensor(as2).to(self.device)
+        self.as3 = torch.FloatTensor(as3).to(self.device)
 
     def observe_critic_actor(self, state):
         """
 
         """
         # Create action samples
-        num_act_dim = self.agent.action_dim
-        num_sample = 9  # 10 * 10 * 10 * 10 = 100 * 100 = 10000
-        total = num_sample ** num_act_dim
-        print(num_act_dim)
         state_tensor = torch.FloatTensor(state).to(device=self.device)
         state_tensor = state_tensor.unsqueeze(dim=0)
-        multi_state_tensor = torch.repeat_interleave(state_tensor, total, dim=0)
+        multi_state_tensor = torch.repeat_interleave(state_tensor, 5**4, dim=0)
 
-        # For each dimension, there are 721 different distributions.
-
-        # Get all values
+        # Same states, same action distributions.
         _, _, _, dist = self.agent.actor_net(state_tensor)
-        q1, q2 = self.agent.critic_net(multi_state_tensor, self.actions_tensor)
+        # Same states, different actions.
+        q_0, _ = self.agent.critic_net(multi_state_tensor, self.as0)
+        q_1, _ = self.agent.critic_net(multi_state_tensor, self.as1)
+        # q_2, _ = self.agent.critic_net(multi_state_tensor, self.as2)
+        # q_3, _ = self.agent.critic_net(multi_state_tensor, self.as3)
 
-        q_s = q1[0:9]
-        # qs to distribution.
-        q_s = F.softmax(q_s, dim=0)
+        # Dim 0
+        total_kld_0 = 0
+        for i in range(125):
+            # For first dimension
+            q_s_0 = q_0[i*5:i*5+5]
+            # qs to distribution.
+            q_s_0 = F.softmax(q_s_0, dim=0)
+            a_s_0 = (dist.log_prob(self.as0[i*5:i*5+5]))
+            a_s_0 = torch.exp(a_s_0)
+            a_s_0 = F.softmax(a_s_0[:, 0], dim=0)
+            kld0 = F.kl_div(q_s_0, a_s_0)
+            total_kld_0 += kld0
 
-        a_s = (dist.log_prob(self.actions_tensor[0:9]))
-        a_s = torch.exp(a_s)
-        print(a_s)
-        a_s = F.softmax(a_s[:, 0], dim=0)
-        print(q_s)
-        print(a_s)
+        for i in range(125):
+            # For first dimension
+            q_s_1 = q_1[i*5:i*5+5]
+            # qs to distribution.
+            q_s_1 = F.softmax(q_s_1, dim=0)
+            a_s_1 = (dist.log_prob(self.as1[i*5:i*5+5]))
+            a_s_1 = torch.exp(a_s_1)
+            a_s_1 = F.softmax(a_s_1[:, 1], dim=0)
+            kld1 = F.kl_div(q_s_1, a_s_1)
+
+        # for i in range(125):
+        #     # For first dimension
+        #     q_s_2 = q_2[i*5:i*5+5]
+        #     # qs to distribution.
+        #     q_s_2 = F.softmax(q_s_2, dim=0)
+        #     a_s_2 = (dist.log_prob(self.as2[i*5:i*5+5]))
+        #     a_s_2 = torch.exp(a_s_2)
+        #     a_s_2 = F.softmax(a_s_2[:, 2], dim=0)
+        #     kld2 = F.kl_div(q_s_2, a_s_2)
+        #
+        # for i in range(125):
+        #     # For first dimension
+        #     q_s_3 = q_3[i*5:i*5+5]
+        #     # qs to distribution.
+        #     q_s_3 = F.softmax(q_s_3, dim=0)
+        #     a_s_3 = (dist.log_prob(self.as3[i*5:i*5+5]))
+        #     a_s_3 = torch.exp(a_s_3)
+        #     a_s_3 = F.softmax(a_s_3[:, 3], dim=0)
+        #     kld3 = F.kl_div(q_s_3, a_s_3)
+
+        # Re-shuffle the buffer.
+        # for j in range(5):
+        #
+        #
+        #     j = j * 5
+        #     q_s_1 = q_1[]
+            # print(q_s)
+            # print(a_s)
+
+            # For second dimension
+
+
 
         # tq1, tq2 = self.agent.target_critic_net(multi_state_tensor, actions_tensor)
         # Convert q back to dist
@@ -220,7 +308,7 @@ class Trainer:
         with logging_redirect_tqdm():
             for i in trange(1200):
                 self.evaluate()
-                # if i == 50:
+                # if i == 10:
                 #     state = self.env.reset()
                 #     self.observe_critic_actor(state)
                 self.train_agent()

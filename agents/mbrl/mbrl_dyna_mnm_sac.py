@@ -5,9 +5,6 @@ import copy
 import numpy as np
 import torch
 from utils import soft_update
-from networks.mbrl import Generator, Discriminator
-import torch.nn.functional as F
-from torch.autograd import Variable
 
 
 class MBRL_DYNA_MNM_SAC:
@@ -41,18 +38,6 @@ class MBRL_DYNA_MNM_SAC:
         self.log_alpha = torch.tensor(np.log(1.0)).float().to(device)
         self.log_alpha.requires_grad = True
         self.target_entropy = -action_dim
-
-        self.generator = Generator(latent_variable=1,
-                                   observation_size=self.state_dim,
-                                   num_actions=self.action_dim)
-        self.generator.to(device)
-        self.discriminator = Discriminator(observation_size=self.state_dim,
-                                           num_actions=self.action_dim)
-        self.discriminator.to(device)
-        self.optimizer_G = torch.optim.Adam(self.generator.parameters(),
-                                            lr=0.0002)
-        self.optimizer_D = torch.optim.Adam(self.discriminator.parameters(),
-                                            lr=0.0002)
 
         # optimizers
         self.actor_optimizer = torch.optim.Adam(self.actor_net.parameters(),
@@ -207,45 +192,6 @@ class MBRL_DYNA_MNM_SAC:
         next_rewards = next_rewards[ok_masks]
         self.world_model.train_world(states, actions, rewards, next_states,
                                      next_actions, next_rewards)
-        transi = torch.cat((states, actions, next_states), dim=1)
-        self.train_classifier(transi)
-
-    def train_classifier(self, real_transition):
-        """
-
-        :param real_transition:
-        """
-        real_size = real_transition.size(0)
-        adv_loss = torch.nn.BCELoss()
-        adv_loss = adv_loss.to(self.device)
-
-        valid = Variable(
-            torch.FloatTensor(real_transition.size(0), 1).fill_(1.0),
-            requires_grad=False).to(self.device)
-        fake = Variable(
-            torch.FloatTensor(real_transition.size(0), 1).fill_(0.0),
-            requires_grad=False).to(self.device)
-
-        # Train Generator
-        self.optimizer_G.zero_grad()
-        # Generate a batch of images
-        z = Variable(torch.FloatTensor(np.random.normal(0, 1,
-                                                        (real_size, 1))))
-        z.to(self.device)
-        gen_imgs = self.generator(z)
-        loss_g = adv_loss(self.discriminator(gen_imgs), valid)
-        loss_g.backward()
-        self.optimizer_G.step()
-
-        # Train Discriminator
-        self.optimizer_D.zero_grad()
-        real_loss = adv_loss(self.discriminator(real_transition),
-                             valid)
-        fake_loss = adv_loss(
-            self.discriminator(gen_imgs.detach()), fake)
-        d_loss = (real_loss + fake_loss) / 2
-        d_loss.backward()
-        self.optimizer_D.step()
 
     def dyna_generate_and_train(self, next_states):
 
@@ -280,15 +226,15 @@ class MBRL_DYNA_MNM_SAC:
                                                            pred_acts)
 
             # Uncertainty measures.
-            fake_transi = torch.cat((pred_state.detach(),
-                                     pred_acts.detach(),
-                                     pred_next_state.detach()), dim=1)
-            scores = self.discriminator(fake_transi)
-            scores = scores.detach()
-            scores *= 0.99
-            pred_reward[pred_reward <= 0.0] = 0.01
-            pred_reward = torch.log(pred_reward.detach()) + torch.log(
-                scores / (1 - scores))
+            # fake_transi = torch.cat((pred_state.detach(),
+            #                          pred_acts.detach(),
+            #                          pred_next_state.detach()), dim=1)
+            # scores = self.discriminator(fake_transi)
+            # scores = scores.detach()
+            # scores *= 0.99
+            # pred_reward[pred_reward <= 0.0] = 0.01
+            # pred_reward = torch.log(pred_reward.detach()) + torch.log(
+            #     scores / (1 - scores))
 
             ###    Append    ###
             pred_states.append(pred_state)

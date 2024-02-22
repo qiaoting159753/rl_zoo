@@ -6,7 +6,7 @@ from agents.mbrl import MBRL_DYNA_MNM_SAC
 from networks.soft_actor import Actor
 from networks.double_critic import DoubleQCritic
 # from networks.distribution_Q import DoubleDistributionalQCritic
-from networks.mbrl.ensemble_world import Ensemble_World_Reward
+from networks.mbrl import Ensemble_World_Reward_GAN
 from train_loops.trainer import Trainer
 from utils import set_seed
 
@@ -33,7 +33,7 @@ def main():
     state_dim = env.observation_space
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    log.info(device)
     # Algorithm settings.
     use_dyna = True
     alg = "dyna_mnm"
@@ -53,7 +53,7 @@ def main():
     actor = Actor(state_dim, action_dim)
     critic = DoubleQCritic(state_dim, action_dim)
     # critic = DoubleDistributionalQCritic(state_dim, action_dim)
-    world_model = Ensemble_World_Reward(state_dim, action_dim, num_models)
+    world_model = Ensemble_World_Reward_GAN(state_dim, action_dim, num_models)
     memory = ReplayBuffer((state_dim,), (action_dim,),
                           capacity, device)
 
