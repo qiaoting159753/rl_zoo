@@ -43,6 +43,7 @@ class Ensemble_World_Reward_GAN:
         A function that take all networks to a designate device.
         """
         self.device = device
+        self.discriminator.to(self.device)
         for model in self.models:
             model.dyna_network.to(device)
             model.reward_network.to(device)
