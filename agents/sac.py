@@ -115,6 +115,8 @@ class SAC:
         Update the actor with respect to critics.
         :param obs:
         """
+        # Can generate more times.No TD structure. No world model needed?
+        # Still can expand the Q value? How to?
         # MFRL
         action, first_log_pi, _, _ = self.actor_net.sample(obs)
         actor_q1, actor_q2 = self.critic_net(obs, action)

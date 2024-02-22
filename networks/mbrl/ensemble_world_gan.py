@@ -26,7 +26,7 @@ class Ensemble_World_Reward_GAN:
     def __init__(self, state_dim, action_dim, num_models,
                  hidden_size=256):
         self.discriminator = Discriminator(observation_size=state_dim)
-        self.optimizer_D = optim.Adam(self.discriminator.parameters(), lr=0.0002)
+        self.optimizer_D = optim.RMSprop(self.discriminator.parameters(), lr=0.0002)
 
         self.device = None
         self.num_models = num_models
@@ -178,8 +178,8 @@ class Ensemble_World_Reward_GAN:
 
 
             total_loss.backward()
-            self.models[i].dyna_optimizer.step()
 
+            self.models[i].dyna_optimizer.step()
             # Train Discriminator
             self.optimizer_D.zero_grad()
             real_loss = adv_loss(self.discriminator(sub_next_states), valid)

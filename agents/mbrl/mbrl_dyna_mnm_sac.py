@@ -5,7 +5,7 @@ import copy
 import numpy as np
 import torch
 from utils import soft_update
-
+import logging
 
 class MBRL_DYNA_MNM_SAC:
     """
@@ -223,13 +223,14 @@ class MBRL_DYNA_MNM_SAC:
             ###    Predictions   ###
             pred_next_state, _, _, _ = self.world_model.pred_next_states(
                 pred_state, pred_acts)
-            pred_reward, _ = self.world_model.pred_rewards(pred_state, pred_acts)
+            pred_reward_temp, _ = self.world_model.pred_rewards(pred_state, pred_acts)
 
             # Uncertainty measures.
             scores = self.world_model.discriminator(pred_next_state)
             scores = scores.detach()
-            scores *= 0.99
-            pred_reward = torch.log(scores/(1-scores)) + torch.log(pred_reward.detach())
+            scores[scores <=0.01] = 0.01
+            scores[scores >=0.99] = 0.99
+            pred_reward = torch.log(scores/(1-scores)) + torch.log(pred_reward_temp.detach())
 
             ###    Append    ###
             pred_states.append(pred_state)
