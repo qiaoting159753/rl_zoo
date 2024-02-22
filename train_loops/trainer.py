@@ -37,6 +37,10 @@ class Trainer:
         self.memory = memory
         self.agent = agent
 
+    def observe_critic_actor(self, state):
+        """
+
+        """
         num_sample = 5
         num_act_dim = 6
         total = 5 * 5 * 5 * 5 * 5 * 5
@@ -81,10 +85,6 @@ class Trainer:
         self.as0 = torch.FloatTensor(as0).to(self.device)
         self.as1 = torch.FloatTensor(as1).to(self.device)
 
-    def observe_critic_actor(self, state):
-        """
-
-        """
         # Create action samples
         state_tensor = torch.FloatTensor(state).to(device=self.device)
         state_tensor = state_tensor.unsqueeze(dim=0)
@@ -125,6 +125,7 @@ class Trainer:
 
         for _ in range(self.num_eval):
             state = self.env.reset()
+
             if observe:
                 div_value = self.observe_critic_actor(state)
                 reward_error += div_value
@@ -135,10 +136,10 @@ class Trainer:
                 next_state, reward, done, _ = self.env.step(action)
                 total_rewards += reward
 
-                # state_tensor = torch.FloatTensor(next_state).to(
-                #     device=self.device)
-                # state_tensor = state_tensor.unsqueeze(dim=0)
-                # actions, _, _ = self.agent.actor_net.sample(state_tensor)
+                state_tensor = torch.FloatTensor(next_state).to(
+                    device=self.device)
+                state_tensor = state_tensor.unsqueeze(dim=0)
+                actions, _, _,_ = self.agent.actor_net.sample(state_tensor)
 
                 # self.observe_critic_actor()
 
@@ -149,17 +150,17 @@ class Trainer:
                 # temp_scale = temp_max - temp_min
                 # norm_q1s = (q1s - temp_min) / temp_scale
 
-                # # Reward Prediction.
-                # pred_mean, _ = self.agent.world_model.pred_rewards(
-                #     obs=state_tensor, actions=actions)
-                # pred_mean = pred_mean.item()
-                # reward_error += abs(pred_mean - reward)
+                # Reward Prediction.
+                pred_mean, _ = self.agent.world_model.pred_rewards(
+                    obs=state_tensor, actions=actions)
+                pred_mean = pred_mean.item()
+                reward_error += abs(pred_mean - reward)
 
-                # # World model prediction
-                # pred_next_state, _, _, _ = self.agent.world_model.pred_next_states(
-                #     obs=state_tensor, actions=actions)
-                # pred_next_state = pred_next_state.detach().cpu().numpy().squeeze()
-                # dynamic_error += (np.mean((pred_next_state - next_state) ** 2))
+                # World model prediction
+                pred_next_state, _, _, _ = self.agent.world_model.pred_next_states(
+                    obs=state_tensor, actions=actions)
+                pred_next_state = pred_next_state.detach().cpu().numpy().squeeze()
+                dynamic_error += (np.mean((pred_next_state - next_state) ** 2))
 
                 # # uncert 1
                 # total_uncert1 += vi(pred_mean, pred_var)
@@ -245,5 +246,5 @@ class Trainer:
                 #     self.evaluate(observe=True)
                 # else:
                 #     self.evaluate()
-                self.evaluate()
                 self.train_agent()
+                self.evaluate()

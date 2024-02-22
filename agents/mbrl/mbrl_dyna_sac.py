@@ -76,10 +76,10 @@ class MBRL_DYNA_SAC:
             dim=0)
         # Evaluation
         if evaluation:
-            _, _, action = self.actor_net.forward(state_tensor)
+            _, _, action, _ = self.actor_net.sample(state_tensor)
         # Exploration
         else:
-            action, _, _ = self.actor_net.forward(state_tensor)
+            action, _, _, _ = self.actor_net.sample(state_tensor)
         assert action.ndim == 2 and action.shape[0] == 1
         action = action.detach()
         action = action.cpu().data.numpy().flatten()
@@ -96,7 +96,7 @@ class MBRL_DYNA_SAC:
         :param not_dones:
         """
         with torch.no_grad():
-            next_actions, next_log_pi, _ = self.actor_net.sample(next_obs)
+            next_actions, next_log_pi, _, _ = self.actor_net.sample(next_obs)
             q_1, q_2 = self.target_critic_net(next_obs, next_actions)
             t_q = torch.minimum(q_1, q_2) - self.alpha * next_log_pi
             target_q = rewards + self.gamma * not_dones * t_q
@@ -122,7 +122,7 @@ class MBRL_DYNA_SAC:
         :param obs:
         """
         # MFRL
-        action, first_log_pi, _ = self.actor_net.sample(obs)
+        action, first_log_pi, _, _ = self.actor_net.sample(obs)
         actor_q1, actor_q2 = self.critic_net(obs, action)
         actor_q = torch.min(actor_q1, actor_q2)
         # Q - alpha * log = V
@@ -178,18 +178,18 @@ class MBRL_DYNA_SAC:
         self.world_model.set_statistics(statistics)
         states, actions, rewards, next_states, _, next_actions, next_rewards = transitions
         # mask the nones and zeros out.
-        ok_masks = []
-        for i in range(len(states)):
-            if torch.sum(next_actions[i]) == 0 or next_rewards[i] == np.inf:
-                ok_masks.append(False)
-            else:
-                ok_masks.append(True)
-        states = states[ok_masks]
-        actions = actions[ok_masks]
-        rewards = rewards[ok_masks]
-        next_states = next_states[ok_masks]
-        next_actions = next_actions[ok_masks]
-        next_rewards = next_rewards[ok_masks]
+        # ok_masks = []
+        # for i in range(len(states)):
+        #     if torch.sum(next_actions[i]) == 0 or next_rewards[i] == np.inf:
+        #         ok_masks.append(False)
+        #     else:
+        #         ok_masks.append(True)
+        # states = states[ok_masks]
+        # actions = actions[ok_masks]
+        # rewards = rewards[ok_masks]
+        # next_states = next_states[ok_masks]
+        # next_actions = next_actions[ok_masks]
+        # next_rewards = next_rewards[ok_masks]
         self.world_model.train_world(states, actions, rewards, next_states,
                                      next_actions, next_rewards)
 
@@ -205,25 +205,12 @@ class MBRL_DYNA_SAC:
         pred_next_states = []
         pred_state = next_states
         for _ in range(self.horizon):
-            ###    Rewards   ###
-            pred_state = torch.repeat_interleave(pred_state,
-                                                 self.sample_times, dim=0)
-            if self.on_policy:
-                pred_acts, _, _ = self.actor_net.forward(pred_state)
-            else:
-                random_actions = []
-                for _ in range(pred_state.shape[0]):
-                    for _ in range(self.sample_times):
-                        pred_act = np.random.uniform(-1, 1,
-                                                     (self.action_dim,))
-                        random_actions.append(pred_act)
-                pred_acts = torch.FloatTensor(np.array(random_actions)).to(
-                    self.device)
-            ###    Predictions   ###
-            pred_next_state, _, _, _ = self.world_model.pred_next_states(
-                pred_state, pred_acts)
-            pred_reward, _ = self.world_model.pred_rewards(pred_state,
-                                                           pred_acts)
+            pred_state = torch.repeat_interleave(pred_state, self.sample_times, dim=0)
+
+            pred_acts, _, _, _ = self.actor_net.sample(pred_state)
+            pred_next_state, _, _, _ = self.world_model.pred_next_states(pred_state, pred_acts)
+            pred_reward, _ = self.world_model.pred_rewards(pred_state, pred_acts)
+
             ###    Append    ###
             pred_states.append(pred_state)
             pred_actions.append(pred_acts.detach())
@@ -237,7 +224,6 @@ class MBRL_DYNA_SAC:
         pred_next_states = torch.vstack(pred_next_states)
         pred_not_dones = torch.FloatTensor(np.ones(pred_rewards.shape)).to(
             self.device)
-
         # states, actions, rewards, next_states, not_dones
         self.train_with_true((pred_states, pred_actions, pred_rewards,
                               pred_next_states, pred_not_dones, None, None))

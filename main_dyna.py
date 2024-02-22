@@ -65,8 +65,8 @@ def main():
                           alpha_lr=3e-4,
                           gamma=0.99,
                           tau=0.005,
-                          horizon=3,
-                          sample_times=10,
+                          horizon=2,
+                          sample_times=5,
                           on_policy=on_policy,
                           use_bound=use_bound)
 
