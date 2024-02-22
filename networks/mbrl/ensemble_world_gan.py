@@ -153,6 +153,8 @@ class Ensemble_World_Reward_GAN:
         # For each model, train with different data.
         mini_batch_size = int(math.floor(states.shape[0] / self.num_models))
         for i in range(self.num_models):
+            self.models[i].dyna_optimizer.zero_grad()
+
             sub_states = states[i * mini_batch_size:(i + 1) * mini_batch_size]
             sub_actions = actions[i * mini_batch_size:(i + 1) * mini_batch_size]
             sub_next_states = next_states[i * mini_batch_size:(i + 1) * mini_batch_size]
@@ -161,7 +163,7 @@ class Ensemble_World_Reward_GAN:
             delta_targets_normalized = normalize_obs_deltas(target,
                                                             self.statistics)
             # Get the world model error.
-            delta_state, n_mean, n_var = self.models[i].dyna_network.forward(sub_states,
+            delta_state, n_mean, n_var = self.models[i].dyna_network(sub_states,
                                                                    sub_actions)
             gen_states = delta_state + sub_states
 
@@ -174,14 +176,14 @@ class Ensemble_World_Reward_GAN:
             loss_g = adv_loss(self.discriminator(gen_states), valid)
             total_loss = model_loss + loss_g
 
-            self.models[i].dyna_optimizer.zero_grad()
+
             total_loss.backward()
             self.models[i].dyna_optimizer.step()
 
             # Train Discriminator
             self.optimizer_D.zero_grad()
-            real_loss = adv_loss(self.discriminator(sub_next_states),valid)
-            fake = Variable(torch.FloatTensor(sub_states.size(0), 1).fill_(0.0),requires_grad=False).to(self.device)
+            real_loss = adv_loss(self.discriminator(sub_next_states), valid)
+            fake = Variable(torch.FloatTensor(sub_states.size(0), 1).fill_(0.0), requires_grad=False).to(self.device)
             fake_loss = adv_loss(self.discriminator(gen_states.detach()), fake)
             d_loss = (real_loss + fake_loss) / 2
             d_loss.backward()

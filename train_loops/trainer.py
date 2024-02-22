@@ -241,8 +241,9 @@ class Trainer:
         """
         with logging_redirect_tqdm():
             for i in trange(1200):
-                if i % 10 == 0:
-                    self.evaluate(observe=True)
-                else:
-                    self.evaluate()
+                # if i % 10 == 0:
+                #     self.evaluate(observe=True)
+                # else:
+                #     self.evaluate()
+                self.evaluate()
                 self.train_agent()

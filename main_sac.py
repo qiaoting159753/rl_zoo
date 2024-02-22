@@ -21,8 +21,8 @@ def main():
     generate_results = True
 
     # Environment settings.
-    domain_name = "cheetah"
-    task_name = "run"
+    domain_name = "cartpole"
+    task_name = "swingup"
     env = DMCSEnvironment(domain_name, task_name)
     action_dim = env.action_num
     state_dim = env.observation_space

@@ -26,8 +26,8 @@ def main():
     on_policy = True
 
     # Environment settings.
-    domain_name = "cheetah"
-    task_name = "run"
+    domain_name = "cartpole"
+    task_name = "swingup"
     env = DMCSEnvironment(domain_name, task_name)
     action_dim = env.action_num
     state_dim = env.observation_space
@@ -65,8 +65,8 @@ def main():
                               alpha_lr=3e-4,
                               gamma=0.99,
                               tau=0.005,
-                              horizon=3,
-                              sample_times=10,
+                              horizon=1,
+                              sample_times=2,
                               on_policy=on_policy,
                               use_bound=use_bound)
 
