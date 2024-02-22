@@ -153,41 +153,49 @@ class Ensemble_World_Reward_GAN:
         # For each model, train with different data.
         mini_batch_size = int(math.floor(states.shape[0] / self.num_models))
         for i in range(self.num_models):
-            self.models[i].dyna_optimizer.zero_grad()
-
+            # self.models[i].dyna_optimizer.zero_grad()
             sub_states = states[i * mini_batch_size:(i + 1) * mini_batch_size]
             sub_actions = actions[i * mini_batch_size:(i + 1) * mini_batch_size]
             sub_next_states = next_states[i * mini_batch_size:(i + 1) * mini_batch_size]
-
             target = (sub_next_states - sub_states)
             delta_targets_normalized = normalize_obs_deltas(target,
                                                             self.statistics)
             # Get the world model error.
-            delta_state, n_mean, n_var = self.models[i].dyna_network(sub_states,
-                                                                   sub_actions)
+            delta_state, n_mean, n_var = self.models[i].dyna_network(
+                sub_states,
+                sub_actions)
             gen_states = delta_state + sub_states
 
             model_loss = F.gaussian_nll_loss(input=n_mean,
                                              target=delta_targets_normalized,
                                              var=n_var).mean()
 
-            adv_loss = torch.nn.BCELoss()
-            valid = Variable(torch.FloatTensor(sub_states.size(0), 1).fill_(1.0),requires_grad=False).to(self.device)
-            loss_g = adv_loss(self.discriminator(gen_states), valid)
-            total_loss = model_loss + loss_g
-
-
-            total_loss.backward()
-
-            self.models[i].dyna_optimizer.step()
             # Train Discriminator
             self.optimizer_D.zero_grad()
-            real_loss = adv_loss(self.discriminator(sub_next_states), valid)
-            fake = Variable(torch.FloatTensor(sub_states.size(0), 1).fill_(0.0), requires_grad=False).to(self.device)
-            fake_loss = adv_loss(self.discriminator(gen_states.detach()), fake)
-            d_loss = (real_loss + fake_loss) / 2
+            real_loss = self.discriminator(sub_next_states)
+            fake_loss = self.discriminator(gen_states.detach())
+            d_loss = torch.mean(-real_loss + fake_loss)
             d_loss.backward()
             self.optimizer_D.step()
+
+            for p in self.discriminator.parameters():
+                p.data.clamp_(-0.5, 0.5)
+
+            g_optimizer = torch.optim.RMSprop(self.models[i].dyna_network.parameters(), 0.0002)
+            loss_g = -torch.mean(self.discriminator(gen_states))
+            total_loss = model_loss + loss_g
+            total_loss.backward()
+            g_optimizer.step()
+
+
+
+
+
+
+
+
+
+
 
             # model.train_reward(states, actions, rewards)
             self.models[i].train_overall(
