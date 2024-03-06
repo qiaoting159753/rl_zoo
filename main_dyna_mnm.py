@@ -3,8 +3,8 @@ import logging
 from envs import DMCSEnvironment
 from memories import ReplayBuffer
 from agents.mbrl import MBRL_DYNA_MNM_SAC
-from networks.soft_actor import Actor
-from networks.double_critic import DoubleQCritic
+from networks.actor import Actor
+from networks.critic import DoubleQCritic
 # from networks.distribution_Q import DoubleDistributionalQCritic
 from networks.mbrl import Ensemble_World_Reward_GAN
 from train_loops.trainer import Trainer

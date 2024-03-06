@@ -1,10 +1,11 @@
 import torch
 import logging
 from envs import DMCSEnvironment
-from memories import ReplayBuffer
-from agents import SAC
+from memories import MemoryBuffer
+from agents.mbrl import MBRL_STEVE_CRITIC
 from networks.actor import Actor
-from networks.critic import DoubleQCritic
+from networks.critic import Critic
+from networks.mbrl import Ensemble_World_Reward
 from train_loops.trainer import Trainer
 from utils import set_seed
 
@@ -16,6 +17,7 @@ def main():
     # Training settings.
     log = logging.getLogger(__name__)
     log.setLevel(logging.INFO)
+
     seed = 10
     set_seed(seed)
     generate_results = True
@@ -30,28 +32,27 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Algorithm settings.
-    use_mbrl = False
     alg = "sac"
     name = alg
 
-    capacity = 1000000
-
+    num_models = 5
     actor = Actor(state_dim, action_dim)
-    critic = DoubleQCritic(state_dim, action_dim)
-    memory = ReplayBuffer((state_dim,), (action_dim,),
-                          capacity, device)
+    critic = Critic(state_dim, action_dim)
+    world_model = Ensemble_World_Reward(state_dim, action_dim, num_models)
+    memory = MemoryBuffer()
 
-    agent = SAC(actor, critic, device=device,
-                state_dim=state_dim,
-                action_dim=action_dim,
-                actor_lr=3e-4,
-                critic_lr=3e-4,
-                alpha_lr=3e-4,
-                gamma=0.99,
-                tau=0.005)
+    agent = MBRL_STEVE_CRITIC(actor, critic, world_model, device=device,
+                              action_num=action_dim,
+                              actor_lr=3e-4,
+                              critic_lr=3e-4,
+                              alpha_lr=3e-4,
+                              gamma=0.99,
+                              tau=0.005,
+                              horizon=2,
+                              num_samples=3, )
 
     runner = Trainer(generate_results, env, agent, memory, name=name,
-                     device=device, use_mbrl=use_mbrl, logger=log)
+                     device=device, use_mbrl=True, logger=log)
 
     runner.train_loop()
 

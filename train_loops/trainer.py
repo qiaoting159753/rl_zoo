@@ -11,7 +11,6 @@ class Trainer:
     A class that responsible for training and evaluating.
 
     """
-
     def __init__(self, generate_results, env, agent, memory, device, name,
                  use_mbrl, logger):
 
@@ -136,10 +135,10 @@ class Trainer:
                 next_state, reward, done, _ = self.env.step(action)
                 total_rewards += reward
 
-                state_tensor = torch.FloatTensor(next_state).to(
-                    device=self.device)
-                state_tensor = state_tensor.unsqueeze(dim=0)
-                actions, _, _,_ = self.agent.actor_net.sample(state_tensor)
+                # state_tensor = torch.FloatTensor(next_state).to(
+                #     device=self.device)
+                # state_tensor = state_tensor.unsqueeze(dim=0)
+                # actions, _, _,_ = self.agent.actor_net.sample(state_tensor)
 
                 # self.observe_critic_actor()
 
@@ -151,16 +150,16 @@ class Trainer:
                 # norm_q1s = (q1s - temp_min) / temp_scale
 
                 # Reward Prediction.
-                pred_mean, _ = self.agent.world_model.pred_rewards(
-                    obs=state_tensor, actions=actions)
-                pred_mean = pred_mean.item()
-                reward_error += abs(pred_mean - reward)
+                # pred_mean, _ = self.agent.world_model.pred_rewards(
+                #     obs=state_tensor, actions=actions)
+                # pred_mean = pred_mean.item()
+                # reward_error += abs(pred_mean - reward)
 
                 # World model prediction
-                pred_next_state, _, _, _ = self.agent.world_model.pred_next_states(
-                    obs=state_tensor, actions=actions)
-                pred_next_state = pred_next_state.detach().cpu().numpy().squeeze()
-                dynamic_error += (np.mean((pred_next_state - next_state) ** 2))
+                # pred_next_state, _, _, _ = self.agent.world_model.pred_next_states(
+                #     obs=state_tensor, actions=actions)
+                # pred_next_state = pred_next_state.detach().cpu().numpy().squeeze()
+                # dynamic_error += (np.mean((pred_next_state - next_state) ** 2))
 
                 # # uncert 1
                 # total_uncert1 += vi(pred_mean, pred_var)
@@ -192,9 +191,6 @@ class Trainer:
                          self.name + "_" + self.date_and_time)
             np.savetxt(file_name + "_eval_rewards.csv",
                        eval_array, delimiter=",")
-            # Save the actor
-            # torch.save(self.agent.actor.state_dict(),
-            #            file_name + "_actor_params.pth")
 
     def train_agent(self):
         """
@@ -202,6 +198,9 @@ class Trainer:
         :param max_epi_steps: Maximum number of steps for each episode
         """
         state = self.env.reset()
+        if len(self.memory) > self.batch_size:
+            statistics = self.memory.get_statistics()
+            self.agent.world_model.set_statistics(statistics)
         for _ in range(self.max_epi_steps):
             # Execute action and add to memory.
             if len(self.memory) < self.batch_size + 1:
@@ -213,21 +212,19 @@ class Trainer:
             self.memory.add(state, action, reward, next_state, done)
             # Training the world model and the agent
             if len(self.memory) > self.batch_size:
-                if self.use_mbrl and self.agent.type == "mbrl":
-                    statistics = self.memory.get_statistics()
-                    self.agent.world_model.set_statistics(statistics)
-                    for _ in range(self.train_world_times):
-                        transitions = self.memory.sample(
-                            batch_size=self.batch_size)
-                        self.agent.train_world_model(
-                            statistics=statistics,
-                            transitions=transitions)
-
+                # if self.use_mbrl and self.agent.type == "mbrl":
+                #     if len(self.memory) == (self.batch_size + 1):
+                #         # First time set statics
+                #         statistics = self.memory.get_statistics()
+                #         self.agent.world_model.set_statistics(statistics)
+                #     # Train world model many times.
+                #     for _ in range(self.train_world_times):
+                #         transitions = self.memory.sample_next(batch_size=self.batch_size)
+                #         self.agent.train_world_model(transitions)
+                # Train the agent many times.
                 for _ in range(self.train_agent_times):
-                    transitions = self.memory.sample(
-                        batch_size=self.batch_size)
+                    transitions = self.memory.sample(batch_size=self.batch_size)
                     self.agent.train_policy(transitions)
-
             # Do evaluation for every 200
             self.current_step += 1
             if done:

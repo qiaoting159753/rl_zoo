@@ -18,14 +18,13 @@ class SACTanhTransform(TanhTransform):
         return isinstance(other, SACTanhTransform)
 
     def _inverse(self, y):
-        # We do not clamp to the boundary here as it may degrade the
-        # performance of certain algorithms. one should use `cache_size=1`
-        # instead
+        # We do not clamp to the boundary here as it may degrade the performance of certain algorithms.
+        # one should use `cache_size=1` instead
         return self.atanh(y)
 
 
-# These methods are not required for the purposes of SAC and are thus
-# intentionally ignored pylint: disable=abstract-method
+# These methods are not required for the purposes of SAC and are thus intentionally ignored
+# pylint: disable=abstract-method
 class SquashedNormal(TransformedDistribution):
     def __init__(self, loc, scale):
         self.loc = loc
@@ -58,22 +57,15 @@ class Actor(nn.Module):
         self.log_std_linear = nn.Linear(self.hidden_size[1], action_dim)
         # self.apply(weight_init)
 
-    def sample(self, obs, sample_times=1):
-        """
-        sample actions from distribution.
-
-        :param sample_times: How many times the action should sample.
-        :param obs:
-        :return:
-        """
+    def sample(self, obs):
         x = F.relu(self.linear1(obs))
         x = F.relu(self.linear2(x))
         mu = self.mean_linear(x)
         log_std = self.log_std_linear(x)
 
-        # Bound the action to finite interval. Apply an invertible squashing
-        # function: tanh employ the change of variables formula to compute
-        # the likelihoods of the bounded actions
+        # Bound the action to finite interval.
+        # Apply an invertible squashing function: tanh
+        # employ the change of variables formula to compute the likelihoods of the bounded actions
 
         # constrain log_std inside [log_std_min, log_std_max]
         log_std = torch.tanh(log_std)
@@ -87,8 +79,7 @@ class Actor(nn.Module):
         sample = dist.rsample()
         log_pi = dist.log_prob(sample).sum(-1, keepdim=True)
 
-        if sample_times > 1:
-            ten_times = dist.sample(torch.Size([sample_times]))
-            ten_times = ten_times.squeeze()
-            return ten_times, log_pi, dist.mean
-        return sample, log_pi, dist.mean, dist
+        return sample, log_pi, dist.mean
+
+    def forward(self, state):
+        raise NotImplementedError("Not required for SAC - use sample() instead")

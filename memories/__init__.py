@@ -1,1 +1,2 @@
-from .memory import ReplayBuffer
+from .memory_buffer import MemoryBuffer
+

@@ -1,12 +1,11 @@
 import torch
 import logging
 from envs import DMCSEnvironment
-from memories import ReplayBuffer
+from memories import MemoryBuffer
 from agents.mbrl import MBRL_DYNA_SAC
-from networks.soft_actor import Actor
-from networks.double_critic import DoubleQCritic
-# from networks.distribution_Q import DoubleDistributionalQCritic
-from networks.mbrl.ensemble_world import Ensemble_World_Reward
+from networks.actor import Actor
+from networks.critic import Critic
+from networks.mbrl import Ensemble_World_Reward
 from train_loops.trainer import Trainer
 from utils import set_seed
 
@@ -22,8 +21,6 @@ def main():
     seed = 10
     set_seed(seed)
     generate_results = True
-    use_bound = False
-    on_policy = True
 
     # Environment settings.
     domain_name = "cheetah"
@@ -37,38 +34,24 @@ def main():
     # Algorithm settings.
     use_dyna = True
     alg = "dyna"
-    if use_bound:
-        bound = "_bound_"
-    else:
-        bound = "_norm_"
-    if on_policy:
-        policy = "on_policy"
-    else:
-        policy = "off_policy"
-    name = alg + bound + policy
-
+    name = alg
     num_models = 5
-    capacity = 1000000
 
     actor = Actor(state_dim, action_dim)
-    critic = DoubleQCritic(state_dim, action_dim)
-    # critic = DoubleDistributionalQCritic(state_dim, action_dim)
+    critic = Critic(state_dim, action_dim)
     world_model = Ensemble_World_Reward(state_dim, action_dim, num_models)
-    memory = ReplayBuffer((state_dim,), (action_dim,),
-                          capacity, device)
+    memory = MemoryBuffer()
 
-    agent = MBRL_DYNA_SAC(actor, critic, world_model, device=device,
-                          state_dim=state_dim,
-                          action_dim=action_dim,
+    agent = MBRL_DYNA_SAC(actor, critic, world_model,
+                          device=device,
+                          action_num=action_dim,
                           actor_lr=3e-4,
                           critic_lr=3e-4,
                           alpha_lr=3e-4,
                           gamma=0.99,
                           tau=0.005,
-                          horizon=2,
-                          sample_times=5,
-                          on_policy=on_policy,
-                          use_bound=use_bound)
+                          horizon=1,
+                          num_samples=3)
 
     runner = Trainer(generate_results, env, agent, memory, name=name,
                      device=device, use_mbrl=use_dyna, logger=log)
