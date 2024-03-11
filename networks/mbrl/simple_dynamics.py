@@ -2,14 +2,14 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import torch.utils
-from cares_reinforcement_learning.util.helpers import (
+from utils.helpers import (
     weight_init,
-    normalize_obs,
-    unnormalize_obs_deltas,
+    normalize_observations,
+    unnormalize_observations_deltas,
 )
 
 
-class Simple_Dynamics(nn.Module):
+class SimpleDynamics(nn.Module):
     """
     A world model with fully connected layers. It takes current states (s) and
     current actions (a), and predict next states (s').
@@ -54,7 +54,7 @@ class Simple_Dynamics(nn.Module):
             obs.shape[1] + actions.shape[1] == self.observation_size + self.num_actions
         )
         # Always normalized obs
-        normalized_obs = normalize_obs(obs, self.statistics)
+        normalized_obs = normalize_observations(obs, self.statistics)
         x = torch.cat((normalized_obs, actions), dim=1)
         x = self.layer1(x)
         x = F.relu(x)
@@ -65,5 +65,5 @@ class Simple_Dynamics(nn.Module):
         logvar = torch.tanh(logvar)
         normalized_var = torch.exp(logvar)
         # Always denormalized delta
-        mean_deltas = unnormalize_obs_deltas(normalized_mean, self.statistics)
+        mean_deltas = unnormalize_observations_deltas(normalized_mean, self.statistics)
         return mean_deltas, normalized_mean, normalized_var

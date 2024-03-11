@@ -42,8 +42,10 @@ class MemoryBuffer:
 
     def sample_next(self, batch_size):
         """
-        For MBRL to train to predict rewards. The right next transition is
-        chosen, WHEN THE BUFFER IS NOT SHUFFLED.
+        For training MBRL to predict rewards. The right next transition is
+        sampled as well. WHEN THE BUFFER IS NOT SHUFFLED.
+
+        (State, action, reward, next_state, next_action, next_reard)
 
         """
         batch_size = min(batch_size, len(self.buffer) - 1)
@@ -92,14 +94,15 @@ class MemoryBuffer:
         next_states = np.array(next_states)
         delta = next_states - states
 
-        ob_mean = np.mean(states, axis=0) + 0.00001
-        ob_std = np.std(states, axis=0) + 0.00001
+        # Add a small number to avoid zeros.
+        observation_mean = np.mean(states, axis=0) + 0.00001
+        observation_std = np.std(states, axis=0) + 0.00001
         delta_mean = np.mean(delta, axis=0) + 0.00001
         delta_std = np.std(delta, axis=0) + 0.00001
 
         statistics = {
-            "ob_mean": ob_mean,
-            "ob_std": ob_std,
+            "observation_mean": observation_mean,
+            "observation_std": observation_std,
             "delta_mean": delta_mean,
             "delta_std": delta_std,
         }

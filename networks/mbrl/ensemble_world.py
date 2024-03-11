@@ -13,7 +13,7 @@ from cares_reinforcement_learning.networks.World_Models.simple_dynamics import (
 )
 
 
-class Ensemble_Dynamics:
+class EnsembleDynamics:
     """
     Ensemble of dynamic models. It works like a group of
     experts. The predicted results can be used to estimate the uncertainty.

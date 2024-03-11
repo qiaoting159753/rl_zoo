@@ -8,13 +8,15 @@ import torch.utils
 from torch import optim
 from torch.autograd import Variable
 import numpy as np
-from cares_reinforcement_learning.util.helpers import normalize_obs_deltas
-from cares_reinforcement_learning.networks.World_Models.ensemble_integrated import IntegratedWorldModel
-
-
+from utils.helpers import normalize_observations_deltas
+from .ensemble_integrated import IntegratedWorldModel
 
 
 class Discriminator(nn.Module):
+    """
+    A GAN like discriminator to decide how likely the transistion is real.
+
+    """
     def __init__(self, observation_size):
         super().__init__()
         self.linear1 = nn.Linear(observation_size, 128)
@@ -190,7 +192,7 @@ class Ensemble_World_Reward_GAN:
             ]
 
             target = sub_next_states - sub_states
-            delta_targets_normalized = normalize_obs_deltas(target, self.statistics)
+            delta_targets_normalized = normalize_observations_deltas(target, self.statistics)
             # Get the world model error.
             delta_state, n_mean, n_var = self.models[i].dyna_network.forward(
                 sub_states, sub_actions

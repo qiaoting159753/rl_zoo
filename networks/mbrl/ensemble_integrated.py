@@ -7,13 +7,9 @@ import torch.nn.functional as F
 import torch.utils
 from torch import optim
 import numpy as np
-from cares_reinforcement_learning.util.helpers import normalize_obs_deltas
-from cares_reinforcement_learning.networks.World_Models.simple_dynamics import (
-    Simple_Dynamics,
-)
-from cares_reinforcement_learning.networks.World_Models.simple_rewards import (
-    Simple_Reward,
-)
+from utils.helpers import normalize_observations_deltas
+from .simple_dynamics import SimpleDynamics
+from .simple_rewards import SimpleReward
 
 
 class IntegratedWorldModel:
@@ -27,12 +23,12 @@ class IntegratedWorldModel:
     """
 
     def __init__(self, observation_size, num_actions, hidden_size, lr=0.001):
-        self.dyna_network = Simple_Dynamics(
+        self.dyna_network = SimpleDynamics(
             observation_size=observation_size,
             num_actions=num_actions,
             hidden_size=hidden_size,
         )
-        self.reward_network = Simple_Reward(
+        self.reward_network = SimpleReward(
             observation_size=observation_size,
             num_actions=num_actions,
             hidden_size=hidden_size,
@@ -56,7 +52,7 @@ class IntegratedWorldModel:
         :param (Tensor) next_states -- target label.
         """
         target = next_states - states
-        delta_targets_normalized = normalize_obs_deltas(target, self.statistics)
+        delta_targets_normalized = normalize_observations_deltas(target, self.statistics)
         _, n_mean, n_var = self.dyna_network.forward(states, actions)
         model_loss = F.gaussian_nll_loss(
             input=n_mean, target=delta_targets_normalized, var=n_var
@@ -83,7 +79,7 @@ class IntegratedWorldModel:
         # Always denormalized delta
         pred_next_state = mean_deltas + states
         target = next_states - states
-        delta_targets_normalized = normalize_obs_deltas(target, self.statistics)
+        delta_targets_normalized = normalize_observations_deltas(target, self.statistics)
         model_loss = F.gaussian_nll_loss(
             input=normalized_mean, target=delta_targets_normalized, var=normalized_var
         ).mean()
@@ -95,7 +91,7 @@ class IntegratedWorldModel:
         self.all_optimizer.step()
 
 
-class Ensemble_World_Reward:
+class EnsembleWorldReward:
     """
     Ensemble the integrated dynamic reward models. It works like a group of
     experts. The predicted results can be used to estimate the uncertainty.
@@ -107,9 +103,14 @@ class Ensemble_World_Reward:
     """
 
     def __init__(
-        self, observation_size, num_actions, num_models, hidden_size=128, lr=0.001
+        self,
+        observation_size,
+        num_actions,
+        num_models,
+        lr,
+        device,
+        hidden_size=128,
     ):
-        self.device = None
         self.num_models = num_models
         self.observation_size = observation_size
         self.num_actions = num_actions
@@ -124,10 +125,7 @@ class Ensemble_World_Reward:
         ]
         self.statistics = {}
 
-    def to(self, device):
-        """
-        A function that take all networks to a designate device.
-        """
+        # Bring all reward prediction and dynamic rediction networks to device.
         self.device = device
         for model in self.models:
             model.dyna_network.to(device)

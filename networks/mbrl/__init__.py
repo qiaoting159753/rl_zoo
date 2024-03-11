@@ -1,3 +1,2 @@
-from .ensemble_world import Ensemble_Dynamics
-from .integrated_ensemble_gan import Ensemble_World_Reward_GAN
-from .integrate_ensemble import Ensemble_World_Reward
+from .ensemble_world import EnsembleDynamics
+from .ensemble_integrated import EnsembleWorldReward

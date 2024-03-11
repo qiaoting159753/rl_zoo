@@ -21,7 +21,7 @@ class Trainer:
         self.generate_results = generate_results
         self.device = device
 
-        self.batch_size = 128
+        self.batch_size = 256
         self.max_epi_steps = 1000
         self.num_eval = 5
         self.train_world_times = 1
@@ -38,7 +38,7 @@ class Trainer:
 
     def observe_critic_actor(self, state):
         """
-
+        For Q evaluation policy vs Q
         """
         num_sample = 5
         num_act_dim = 6
@@ -212,15 +212,15 @@ class Trainer:
             self.memory.add(state, action, reward, next_state, done)
             # Training the world model and the agent
             if len(self.memory) > self.batch_size:
-                # if self.use_mbrl and self.agent.type == "mbrl":
-                #     if len(self.memory) == (self.batch_size + 1):
-                #         # First time set statics
-                #         statistics = self.memory.get_statistics()
-                #         self.agent.world_model.set_statistics(statistics)
-                #     # Train world model many times.
-                #     for _ in range(self.train_world_times):
-                #         transitions = self.memory.sample_next(batch_size=self.batch_size)
-                #         self.agent.train_world_model(transitions)
+                if self.use_mbrl and self.agent.type == "mbrl":
+                    if len(self.memory) == (self.batch_size + 1):
+                        # First time set statics
+                        statistics = self.memory.get_statistics()
+                        self.agent.world_model.set_statistics(statistics)
+                    # Train world model many times.
+                    for _ in range(self.train_world_times):
+                        transitions = self.memory.sample_next(batch_size=self.batch_size)
+                        self.agent.train_world_model(transitions)
                 # Train the agent many times.
                 for _ in range(self.train_agent_times):
                     transitions = self.memory.sample(batch_size=self.batch_size)

@@ -2,10 +2,10 @@ import torch
 import logging
 from envs import DMCSEnvironment
 from memories import MemoryBuffer
-from agents.mbrl import MBRL_DYNA_SAC
+from agents.mbrl import DynaSAC
 from networks.actor import Actor
 from networks.critic import Critic
-from networks.mbrl import Ensemble_World_Reward
+from networks.mbrl import EnsembleWorldReward
 from train_loops.trainer import Trainer
 from utils import set_seed
 
@@ -39,19 +39,19 @@ def main():
 
     actor = Actor(state_dim, action_dim)
     critic = Critic(state_dim, action_dim)
-    world_model = Ensemble_World_Reward(state_dim, action_dim, num_models)
+    world_model = EnsembleWorldReward(state_dim, action_dim, num_models, device=device, lr=0.001)
     memory = MemoryBuffer()
 
-    agent = MBRL_DYNA_SAC(actor, critic, world_model,
-                          device=device,
-                          action_num=action_dim,
-                          actor_lr=3e-4,
-                          critic_lr=3e-4,
-                          alpha_lr=3e-4,
-                          gamma=0.99,
-                          tau=0.005,
-                          horizon=1,
-                          num_samples=3)
+    agent = DynaSAC(actor, critic, world_model,
+                    device=device,
+                    action_num=action_dim,
+                    actor_lr=3e-4,
+                    critic_lr=3e-4,
+                    alpha_lr=3e-4,
+                    gamma=0.99,
+                    tau=0.005,
+                    horizon=1,
+                    num_samples=3)
 
     runner = Trainer(generate_results, env, agent, memory, name=name,
                      device=device, use_mbrl=use_dyna, logger=log)
