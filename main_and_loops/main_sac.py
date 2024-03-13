@@ -5,7 +5,7 @@ from memories import ReplayBuffer
 from agents import SAC
 from networks.actor import Actor
 from networks.critic import DoubleQCritic
-from train_loops.trainer import Trainer
+from main_and_loops.trainer import Trainer
 from utils import set_seed
 
 

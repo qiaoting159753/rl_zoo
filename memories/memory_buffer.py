@@ -40,7 +40,7 @@ class MemoryBuffer:
         transposed_batch = zip(*experience_batch)
         return transposed_batch
 
-    def sample_next(self, batch_size):
+    def sample_consecutive(self, batch_size):
         """
         For training MBRL to predict rewards. The right next transition is
         sampled as well. WHEN THE BUFFER IS NOT SHUFFLED.
@@ -49,17 +49,30 @@ class MemoryBuffer:
 
         """
         batch_size = min(batch_size, len(self.buffer) - 1)
-        max_length = len(self.buffer)
-        idxs = np.random.randint(0, (max_length - 1), size=batch_size)
-        # A list of tuples
-        experience_batch = [
-            self.buffer[i]
-            + (
-                self.buffer[i + 1][1],
-                self.buffer[i + 1][2],
-            )
-            for i in idxs
-        ]
+        max_length = len(self.buffer) - 1
+        batch_size = min(batch_size, max_length)
+        # A list of candidate indices includes all indices.
+        candi_indices = list(range(max_length))
+        sampled = []  # randomly sampled indices that is okay.
+        while True:
+            # Sample size based on how many still needed.
+            idxs = random.sample(candi_indices, batch_size - len(sampled))
+            for i in idxs:
+                # Only takes in the non-terminate.
+                if self.buffer[i][4] is False:
+                    sampled.append(i)
+                # Remove anyway since it is either already sampled or is a terminate
+                candi_indices.remove(i)
+                if len(sampled) == batch_size:
+                    break
+            if len(sampled) == batch_size:
+                break
+
+        # Form the sampled data batch
+        experience_batch = []
+        for index in sampled:
+            experience_batch.append(self.buffer[index] + (self.buffer[index + 1][1], self.buffer[index + 1][2],))
+
         transposed_batch = zip(*experience_batch)
         return transposed_batch
 

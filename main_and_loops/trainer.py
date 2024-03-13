@@ -124,11 +124,9 @@ class Trainer:
 
         for _ in range(self.num_eval):
             state = self.env.reset()
-
             if observe:
                 div_value = self.observe_critic_actor(state)
                 reward_error += div_value
-
             for _ in range(self.max_epi_steps):
                 action = self.agent.select_action_from_policy(state,
                                                               evaluation=True)
@@ -219,7 +217,7 @@ class Trainer:
                         self.agent.world_model.set_statistics(statistics)
                     # Train world model many times.
                     for _ in range(self.train_world_times):
-                        transitions = self.memory.sample_next(batch_size=self.batch_size)
+                        transitions = self.memory.sample_consecutive(batch_size=self.batch_size)
                         self.agent.train_world_model(transitions)
                 # Train the agent many times.
                 for _ in range(self.train_agent_times):

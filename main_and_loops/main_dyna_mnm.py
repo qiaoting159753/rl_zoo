@@ -7,7 +7,7 @@ from networks.actor import Actor
 from networks.critic import DoubleQCritic
 # from networks.distribution_Q import DoubleDistributionalQCritic
 from networks.mbrl import Ensemble_World_Reward_GAN
-from train_loops.trainer import Trainer
+from main_and_loops.trainer import Trainer
 from utils import set_seed
 
 

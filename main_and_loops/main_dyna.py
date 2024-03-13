@@ -6,7 +6,7 @@ from agents.mbrl import DynaSAC
 from networks.actor import Actor
 from networks.critic import Critic
 from networks.mbrl import EnsembleWorldReward
-from train_loops.trainer import Trainer
+from main_and_loops.trainer import Trainer
 from utils import set_seed
 
 
@@ -33,7 +33,7 @@ def main():
 
     # Algorithm settings.
     use_dyna = True
-    alg = "dyna"
+    alg = "dyna_norm"
     name = alg
     num_models = 5
 

@@ -8,7 +8,7 @@ import copy
 import numpy as np
 import torch
 import torch.nn.functional as F
-
+from utils import sampling
 
 class DynaSAC:
     """
@@ -94,7 +94,7 @@ class DynaSAC:
         self.actor_net.train()
         return action
 
-    def _train_policy(self, states, actions, rewards, next_states, dones):
+    def _train_policy(self, states, actions, rewards, next_states, dones, weights=None):
         """
         Train the policy with Model-Based Value Expansion. A family of MBRL.
 
@@ -113,8 +113,11 @@ class DynaSAC:
         assert (len(q_target.shape) == 2) and (q_target.shape[1] == 1)
 
         q_values_one, q_values_two = self.critic_net(states, actions)
-        critic_loss_one = F.mse_loss(q_values_one, q_target)
-        critic_loss_two = F.mse_loss(q_values_two, q_target)
+        # critic_loss_one = F.mse_loss(q_values_one, q_target)
+        td_error1 = (q_target - q_values_one) # * weights
+        td_error2 = (q_target - q_values_two) # * weights
+        critic_loss_one = 0.5 * (td_error1.pow(2)).mean()
+        critic_loss_two = 0.5 * (td_error2.pow(2)).mean()
         critic_loss_total = critic_loss_one + critic_loss_two
         # Update the Critic
         self.critic_net_optimiser.zero_grad()
@@ -227,8 +230,9 @@ class DynaSAC:
             rewards=rewards,
             next_states=next_states,
             dones=dones,
+            weights=torch.ones(rewards.shape).to(self.device),
         )
-        # # # Step 3 Dyna add more data
+        # Step 3 Dyna add more data
         self._dyna_generate_and_train(next_states=next_states)
 
     def _dyna_generate_and_train(self, next_states):
@@ -240,28 +244,47 @@ class DynaSAC:
         pred_actions = []
         pred_rs = []
         pred_n_states = []
+        weights = []
         pred_state = next_states
         for _ in range(self.horizon):
             pred_state = torch.repeat_interleave(pred_state, self.num_samples, dim=0)
             # This part is controversial. But random actions is empirically better.
             rand_acts = np.random.uniform(-1, 1, (pred_state.shape[0], self.action_num))
             pred_acts = torch.FloatTensor(rand_acts).to(self.device)
-            pred_next_state, _, _, _ = self.world_model.pred_next_states(
+            pred_next_state, _, means, variances = self.world_model.pred_next_states(
                 pred_state, pred_acts
             )
             pred_reward, _ = self.world_model.pred_rewards(pred_state, pred_acts)
+
+            # # Quantification of certainty.
+            # uncert = sampling(means, variances)
+            # # Normalizing.
+            # unc_min = torch.min(uncert)
+            # unc_max = torch.max(uncert)
+            # uncert -= unc_min
+            # uncert /= (unc_max - unc_min)
+            # uncert = uncert.unsqueeze(dim=1)
+
+            # pred_reward[pred_reward < 0.001] = 0.001
+            # uncert[uncert < 0.001] = 0.001
+            # uncert[uncert > 0.999] = 0.999
+            # Higher std means higher uncertainty. Add such uncertainty to reward.
+            # pred_reward = torch.log(pred_reward) + torch.log(uncert / (1-uncert))
+            # weights.append(uncert)
             pred_states.append(pred_state)
             pred_actions.append(pred_acts.detach())
             pred_rs.append(pred_reward.detach())
             pred_n_states.append(pred_next_state.detach())
+
             pred_state = pred_next_state.detach()
         pred_states = torch.vstack(pred_states)
         pred_actions = torch.vstack(pred_actions)
         pred_rs = torch.vstack(pred_rs)
         pred_n_states = torch.vstack(pred_n_states)
+        # pred_weights = torch.vstack(weights)
         # Pay attention to here! It is dones in the Cares RL Code!
         pred_dones = torch.FloatTensor(np.zeros(pred_rs.shape)).to(self.device)
         # states, actions, rewards, next_states, not_dones
         self._train_policy(
-            pred_states, pred_actions, pred_rs, pred_n_states, pred_dones
+            pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, None
         )

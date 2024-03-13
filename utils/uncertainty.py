@@ -1,7 +1,14 @@
 import torch
 
 
-def vi(mean, var, device):
+def variational_inference(mean, var, device):
+    """
+
+    :param mean:
+    :param var:
+    :param device:
+    :return:
+    """
     # Distance to unit gaussian, means how certain it is high distance
     # means high certainty.
     # Loss is small: uncertain. Loss is high: certain.
@@ -29,7 +36,7 @@ def vi(mean, var, device):
 
 def mean_std(mean, var):
     """
-
+    Take the std of mean prediction as uncertainty measure.
     :param mean:
     :param var:
     :return:
@@ -40,6 +47,13 @@ def mean_std(mean, var):
 
 
 def sampling(pred_means, pred_vars):
+    """
+    High std means low uncertainty. Therefore, divided by 1
+
+    :param pred_means:
+    :param pred_vars:
+    :return:
+    """
     # 5 models, each sampled 10 times = 50,
     sample1 = torch.distributions.Normal(pred_means[0], pred_vars[0]).sample(
         [10])
@@ -54,11 +68,13 @@ def sampling(pred_means, pred_vars):
     samples = torch.cat((sample1, sample2, sample3, sample4, sample5),
                         dim=0)
     # Samples = [5 * 10, 10 predictions, 11 state dims]
+    # print(samples.shape)
     stds = torch.std(samples, dim=0)
+    # print(stds.shape)
     # [10 predictions, 11 state dims]
     total_stds = torch.mean(stds, dim=1)
-    # total_stds = total_stds
+    # total_stds = 1 / total_stds
     # total_stds = total_stds / torch.mean(total_stds)  # if very uncertain,
     # high std, encouraged.
     # total_stds = total_stds - torch.min(total_stds)
-    return total_stds.item()
+    return total_stds.detach()
