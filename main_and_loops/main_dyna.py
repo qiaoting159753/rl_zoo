@@ -1,11 +1,11 @@
 import torch
 import logging
-from envs import DMCSEnvironment
+from envs import OpenAIEnvrionment
 from memories import MemoryBuffer
-from agents.mbrl import DynaSAC
+from agents.mbrl import DynaSAC_Reweight
 from networks.actor import Actor
 from networks.critic import Critic
-from networks.mbrl import EnsembleWorldReward
+from networks.mbrl import EnsembleWorldAndOneReward
 from main_and_loops.trainer import Trainer
 from utils import set_seed
 
@@ -20,41 +20,37 @@ def main():
 
     seed = 10
     set_seed(seed)
-    generate_results = True
 
     # Environment settings.
-    domain_name = "cheetah"
-    task_name = "run"
-    env = DMCSEnvironment(domain_name, task_name)
+    env = OpenAIEnvrionment("Pendulum-v1")
     action_dim = env.action_num
     state_dim = env.observation_space
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Algorithm settings.
-    use_dyna = True
-    alg = "dyna_norm"
+    alg = "pendulum_dyna_10_1_gt"
     name = alg
     num_models = 5
 
     actor = Actor(state_dim, action_dim)
     critic = Critic(state_dim, action_dim)
-    world_model = EnsembleWorldReward(state_dim, action_dim, num_models, device=device, lr=0.001)
     memory = MemoryBuffer()
 
-    agent = DynaSAC(actor, critic, world_model,
-                    device=device,
-                    action_num=action_dim,
-                    actor_lr=3e-4,
-                    critic_lr=3e-4,
-                    alpha_lr=3e-4,
-                    gamma=0.99,
-                    tau=0.005,
-                    horizon=1,
-                    num_samples=3)
+    world_model = EnsembleWorldAndOneReward(observation_size=state_dim, num_actions=action_dim, num_models=num_models,
+                                            device="cpu", lr=0.001)
+    agent = DynaSAC_Reweight(actor, critic, world_model,
+                             device=device,
+                             action_num=action_dim,
+                             actor_lr=3e-4,
+                             critic_lr=3e-4,
+                             alpha_lr=3e-4,
+                             gamma=0.99,
+                             tau=0.005,
+                             horizon=1,
+                             num_samples=20)
 
-    runner = Trainer(generate_results, env, agent, memory, name=name,
-                     device=device, use_mbrl=use_dyna, logger=log)
+    runner = Trainer(env, agent, memory, name=name, device=device, logger=log)
 
     runner.train_loop()
 

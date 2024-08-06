@@ -94,7 +94,7 @@ class SAC:
             # The world model error penalty term should be added here.
             t_q = torch.minimum(q_1, q_2) - self.alpha * next_log_pi
             target_q = rewards + self.gamma * not_dones * t_q
-        target_q = target_q.detach()
+        # target_q = target_q.detach()
         assert (len(target_q.shape) == 2) and (target_q.shape[1] == 1)
 
         current_q1, current_q2 = self.critic_net(obs, actions)

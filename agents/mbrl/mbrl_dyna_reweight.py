@@ -3,34 +3,37 @@ Sutton, Richard S. "Dyna, an integrated architecture for learning, planning, and
 
 This code runs automatic entropy tuning
 """
-
+import math
 import copy
 import numpy as np
 import torch
+from networks.mbrl import EnsembleWorldAndOneReward
+from envs.openai_pendulum import PendulumEnv
 import torch.nn.functional as F
-from utils import sampling
 
-class DynaSAC:
+class DynaSAC_Reweight:
     """
     Use the Soft Actor Critic as the Actor Critic framework.
 
     """
 
     def __init__(
-        self,
-        actor_network,
-        critic_network,
-        world_network,
-        gamma,
-        tau,
-        action_num,
-        actor_lr,
-        critic_lr,
-        alpha_lr,
-        num_samples,
-        horizon,
-        device,
+            self,
+            actor_network,
+            critic_network,
+            world_network: EnsembleWorldAndOneReward,
+            gamma,
+            tau,
+            action_num,
+            actor_lr,
+            critic_lr,
+            alpha_lr,
+            num_samples,
+            horizon,
+            device,
     ):
+        self.env = PendulumEnv()
+
         self.type = "mbrl"
         # Switches
         self.num_samples = num_samples
@@ -91,6 +94,7 @@ class DynaSAC:
             else:
                 (_, _, action) = self.actor_net.sample(state_tensor)
             action = action.cpu().data.numpy().flatten()
+            action = action * 2.0
         self.actor_net.train()
         return action
 
@@ -99,6 +103,9 @@ class DynaSAC:
         Train the policy with Model-Based Value Expansion. A family of MBRL.
 
         """
+        if weights is None:
+            weights = torch.ones(rewards.shape).to(self.device)
+
         info = {}
         with torch.no_grad():
             next_actions, next_log_pi, _ = self.actor_net.sample(next_states)
@@ -106,7 +113,7 @@ class DynaSAC:
                 next_states, next_actions
             )
             target_q_values = (
-                torch.minimum(target_q_one, target_q_two) - self._alpha * next_log_pi
+                    torch.minimum(target_q_one, target_q_two) - self._alpha * next_log_pi
             )
             q_target = rewards + self.gamma * (1 - dones) * target_q_values
         q_target = q_target.detach()
@@ -114,10 +121,10 @@ class DynaSAC:
 
         q_values_one, q_values_two = self.critic_net(states, actions)
         # critic_loss_one = F.mse_loss(q_values_one, q_target)
-        td_error1 = (q_target - q_values_one)  * weights
-        td_error2 = (q_target - q_values_two)  * weights
-        critic_loss_one = 0.5 * (td_error1.pow(2)).mean()
-        critic_loss_two = 0.5 * (td_error2.pow(2)).mean()
+        td_error1 = (q_target - q_values_one)#  * weights
+        td_error2 = (q_target - q_values_two)#  * weights
+        critic_loss_one = 0.5 * (td_error1.pow(2) * weights).mean()
+        critic_loss_two = 0.5 * (td_error2.pow(2) * weights).mean()
         critic_loss_total = critic_loss_one + critic_loss_two
         # Update the Critic
         self.critic_net_optimiser.zero_grad()
@@ -137,7 +144,7 @@ class DynaSAC:
 
         # update the temperature
         alpha_loss = -(
-            self.log_alpha * (first_log_p + self.target_entropy).detach()
+                self.log_alpha * (first_log_p + self.target_entropy).detach()
         ).mean()
         self.log_alpha_optimizer.zero_grad()
         alpha_loss.backward()
@@ -145,21 +152,11 @@ class DynaSAC:
 
         if self.learn_counter % self.policy_update_freq == 0:
             for target_param, param in zip(
-                self.target_critic_net.parameters(), self.critic_net.parameters()
+                    self.target_critic_net.parameters(), self.critic_net.parameters()
             ):
                 target_param.data.copy_(
                     param.data * self.tau + target_param.data * (1.0 - self.tau)
                 )
-
-        info["q_target"] = q_target
-        info["q_values_one"] = q_values_one
-        info["q_values_two"] = q_values_two
-        info["q_values_min"] = torch.minimum(q_values_one, q_values_two)
-        info["critic_loss_total"] = critic_loss_total
-        info["critic_loss_one"] = critic_loss_one
-        info["critic_loss_two"] = critic_loss_two
-        info["actor_loss"] = actor_loss
-        return info
 
     def train_world_model(self, experiences):
         """
@@ -173,31 +170,23 @@ class DynaSAC:
             rewards,
             next_states,
             _,
-            next_actions,
-            next_rewards,
         ) = experiences
+
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
         rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device).unsqueeze(1)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        next_rewards = (
-            torch.FloatTensor(np.asarray(next_rewards)).to(self.device).unsqueeze(1)
-        )
-        next_actions = torch.FloatTensor(np.asarray(next_actions)).to(self.device)
         assert len(states.shape) >= 2
         assert len(actions.shape) == 2
         assert len(rewards.shape) == 2 and rewards.shape[1] == 1
-        assert len(next_rewards.shape) == 2 and next_rewards.shape[1] == 1
         assert len(next_states.shape) >= 2
         # # Step 1 train the world model.
         self.world_model.train_world(
             states=states,
             actions=actions,
-            rewards=rewards,
-            next_states=next_states,
-            next_actions=next_actions,
-            next_rewards=next_rewards,
+            next_states=next_states
         )
+        self.world_model.train_reward(next_states=next_states, actions=actions, rewards=rewards)
 
     def train_policy(self, experiences):
         """
@@ -224,14 +213,14 @@ class DynaSAC:
         assert len(rewards.shape) == 2 and rewards.shape[1] == 1
         assert len(next_states.shape) >= 2
         # Step 2 train as usual
-        self._train_policy(
-            states=states,
-            actions=actions,
-            rewards=rewards,
-            next_states=next_states,
-            dones=dones,
-            weights=torch.ones(rewards.shape).to(self.device),
-        )
+        # self._train_policy(
+        #     states=states,
+        #     actions=actions,
+        #     rewards=rewards,
+        #     next_states=next_states,
+        #     dones=dones,
+        #     weights=torch.ones(rewards.shape).to(self.device),
+        # )
         # Step 3 Dyna add more data
         self._dyna_generate_and_train(next_states=next_states)
 
@@ -251,41 +240,119 @@ class DynaSAC:
             # This part is controversial. But random actions is empirically better.
             rand_acts = np.random.uniform(-1, 1, (pred_state.shape[0], self.action_num))
             pred_acts = torch.FloatTensor(rand_acts).to(self.device)
-            pred_next_state, _, means, variances = self.world_model.pred_next_states(
-                pred_state, pred_acts
-            )
-            pred_reward, _ = self.world_model.pred_rewards(pred_state, pred_acts)
+            # pred_acts,_,_ = self.actor_net.sample(pred_state)
 
-            # # Quantification of certainty.
-            uncert = sampling(means, variances)
-            # # Normalizing.
-            # unc_min = torch.min(uncert)
-            # unc_max = torch.max(uncert)
-            # uncert -= unc_min
-            # uncert /= (unc_max - unc_min)
-            uncert = uncert.unsqueeze(dim=1)
-            print(uncert.shape)
-            # pred_reward[pred_reward < 0.001] = 0.001
-            # uncert[uncert < 0.001] = 0.001
-            # uncert[uncert > 0.999] = 0.999
-            # Higher std means higher uncertainty. Add such uncertainty to reward.
-            # pred_reward = torch.log(pred_reward) + torch.log(uncert / (1-uncert))
-            weights.append(uncert)
+            p_states, p_rewards = self.query(pred_state.cpu().detach().numpy(), pred_acts.cpu().detach().numpy())
+            pred_next_state = torch.FloatTensor(np.array(p_states)).to(self.device)
+            pred_reward = torch.FloatTensor(np.array(p_rewards)).to(self.device).unsqueeze(dim=1)
+
+            # pred_next_state, _, means, variances = self.world_model.pred_next_states(
+            #     pred_state, pred_acts
+            # )
+            # pred_reward = self.world_model.pred_rewards(pred_next_state)
+            #
+            # # # # Quantification of certainty.
+            # uncert = self.sampling(means, variances)
+            # uncert = uncert.unsqueeze(dim=1).to(self.device)
+            # weights.append(uncert)
+
             pred_states.append(pred_state)
             pred_actions.append(pred_acts.detach())
             pred_rs.append(pred_reward.detach())
             pred_n_states.append(pred_next_state.detach())
 
             pred_state = pred_next_state.detach()
+
         pred_states = torch.vstack(pred_states)
         pred_actions = torch.vstack(pred_actions)
         pred_rs = torch.vstack(pred_rs)
         pred_n_states = torch.vstack(pred_n_states)
-        pred_weights = torch.vstack(weights)
-        print(pred_weights.shape)
+        # pred_weights = torch.vstack(weights)
         # Pay attention to here! It is dones in the Cares RL Code!
         pred_dones = torch.FloatTensor(np.zeros(pred_rs.shape)).to(self.device)
         # states, actions, rewards, next_states, not_dones
         self._train_policy(
-            pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, pred_weights
+            pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, None
         )
+
+    def query(self, states, us):
+        def angle_normalize(h):
+            return ((h + np.pi) % (2 * np.pi)) - np.pi
+
+        pred_states = []
+        pred_rewards = []
+
+        for i in range(states.shape[0]):
+            # Convert cos/sin to theta.
+            u = us[i]
+            state = states[i]
+            th = math.atan2(state[1], state[0])
+            thdot = state[2]
+
+            g = 10.0
+            m = 1.0
+            l = 1.0
+            dt = 0.05
+            u = np.clip(u, -2.0, 2.0)[0]
+            costs = angle_normalize(th) ** 2 + 0.1 * thdot ** 2 + 0.001 * (u ** 2)
+            newthdot = thdot + (3 * g / (2 * l) * np.sin(th) + 3.0 / (m * l ** 2) * u) * dt
+            newthdot = np.clip(newthdot, -8, 8)
+            newth = th + newthdot * dt
+
+            obs = np.array([np.cos(newth), np.sin(newth), newthdot], dtype=np.float32)
+
+            pred_states.append(obs)
+            pred_rewards.append(-costs)
+
+        return pred_states, pred_rewards
+
+    def sampling(self, pred_means, pred_vars):
+        """
+        High std means low uncertainty. Therefore, divided by 1
+
+        :param pred_means:
+        :param pred_vars:
+        :return:
+        """
+        # 5 models, each sampled 10 times = 50,
+        sample1 = torch.distributions.Normal(pred_means[0], pred_vars[0]).sample(
+            [10])
+        rwd_sample1 = self.world_model.pred_rewards(sample1)
+
+        sample2 = torch.distributions.Normal(pred_means[1], pred_vars[1]).sample(
+            [10])
+        rwd_sample2 =  self.world_model.pred_rewards(sample2)
+
+        sample3 = torch.distributions.Normal(pred_means[2], pred_vars[2]).sample(
+            [10])
+        rwd_sample3 = self.world_model.pred_rewards(sample3)
+
+        sample4 = torch.distributions.Normal(pred_means[3], pred_vars[3]).sample(
+            [10])
+        rwd_sample4 = self.world_model.pred_rewards(sample4)
+
+        sample5 = torch.distributions.Normal(pred_means[4], pred_vars[4]).sample(
+            [10])
+        rwd_sample5 = self.world_model.pred_rewards(sample5)
+
+        samples = torch.cat((rwd_sample1, rwd_sample2, rwd_sample3, rwd_sample4, rwd_sample5))
+        # samples = torch.cat((sample1, sample2, sample3, sample4, sample5))
+        # Samples = [5 * 10, 10 predictions, 11 state dims]
+        # print(samples.shape)
+        stds = torch.var(samples, dim=0)
+        # print(stds.shape)
+        # [10 predictions, 11 state dims]
+        total_stds = torch.mean(stds, dim=1)
+
+        # Clip for sigmoid
+        # total_stds[total_stds < 0.1] = 0.0
+        # total_stds[total_stds > 4.0] = 4.0
+
+        total_stds = F.sigmoid(total_stds) #/ 2 + 0.5  # 0.5 - 1.0
+        # total_stds = 1 / total_stds
+        # total_stds = total_stds / torch.mean(total_stds)  # if very uncertain,
+        # high std, encouraged.
+        # total_stds = total_stds - torch.min(total_stds)
+        # uncert = total_stds
+        uncert = 1.5 - total_stds
+        return uncert.detach()

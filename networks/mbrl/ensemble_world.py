@@ -1,59 +1,61 @@
+import logging
 import math
 import random
 import sys
-import logging
-import torch
-import torch.utils
+
 import numpy as np
-from torch import optim
+import torch
 import torch.nn.functional as F
-from cares_reinforcement_learning.util.helpers import normalize_obs_deltas
-from cares_reinforcement_learning.networks.World_Models.simple_dynamics import (
-    Simple_Dynamics,
-)
+import torch.utils
+from torch import optim
+
+from networks.mbrl.simple_dynamics import SimpleDynamics
+from networks.mbrl.simple_reward_2 import SimpleReward
+
+from utils.helpers import normalize_observations_deltas
 
 
-class EnsembleDynamics:
-    """
-    Ensemble of dynamic models. It works like a group of
-    experts. The predicted results can be used to estimate the uncertainty.
-
-    :param (int) observation_size -- dimension of states
-    :param (int) num_actions -- dimension of actions
-    :param (int) num_models -- number of world models in this ensemble.
-    :param (int) hidden_size -- size of neurons in hidden layers.
-    """
-
+class EnsembleWorldAndOneReward:
     def __init__(
-        self, observation_size, num_actions, num_models, hidden_size=128, lr=0.001
+            self,
+            observation_size: int,
+            num_actions: int,
+            num_models: int,
+            lr: float,
+            device: str,
+            hidden_size: int = 128,
     ):
-        self.device = None
         self.num_models = num_models
         self.observation_size = observation_size
         self.num_actions = num_actions
+
+        self.reward_network = SimpleReward(
+            observation_size=observation_size,
+            num_actions=num_actions,
+            hidden_size=hidden_size,
+        )
+        self.reward_optimizer = optim.Adam(self.reward_network.parameters(), lr=lr)
+
         self.models = [
-            Simple_Dynamics(
+            SimpleDynamics(
                 observation_size=observation_size,
                 num_actions=num_actions,
                 hidden_size=hidden_size,
             )
             for _ in range(self.num_models)
         ]
-        self.optimizers = [
-            optim.Adam(self.models[i].parameters(), lr=lr)
-            for i in range(self.num_models)
-        ]
+
+        self.optimizers = [optim.Adam(self.models[i].parameters(), lr=lr) for i in range(self.num_models)]
+
         self.statistics = {}
 
-    def to(self, device):
-        """
-        A function that take all networks to a designate device.
-        """
+        # Bring all reward prediction and dynamic rediction networks to device.
         self.device = device
+        self.reward_network.to(self.device)
         for model in self.models:
-            model.dyna_network.to(device)
+            model.to(device)
 
-    def set_statistics(self, statistics):
+    def set_statistics(self, statistics: dict) -> None:
         """
         Update all statistics for normalization for all world models and the
         ensemble itself.
@@ -68,22 +70,16 @@ class EnsembleDynamics:
         for model in self.models:
             model.statistics = statistics
 
-    def pred_next_states(self, obs, actions):
-        """
-        Predict the next state based on current state and action, using an
-        ensemble of world models. The world model is probablisitic. It is
-        trained with Gaussian NLL loss.
+    def pred_rewards(self, observation: torch.Tensor):
+        pred_rewards = self.reward_network(observation)
+        return pred_rewards
 
-        :param (Tensors) obs -- dimension of states
-        :param (Tensors) actions -- dimension of actions
-
-        :return (Tensors) random picked next state predicitons
-        :return (Tensors) all next state predicitons
-        :return (Tensors) all normalized delta' means for uncertainty
-        :return (Tensors) all normalized delta' vars for uncertainty
-        """
+    def pred_next_states(
+            self, observation: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         assert (
-            obs.shape[1] + actions.shape[1] == self.observation_size + self.num_actions
+                observation.shape[1] + actions.shape[1]
+                == self.observation_size + self.num_actions
         )
         means = []
         norm_means = []
@@ -91,7 +87,7 @@ class EnsembleDynamics:
         # Iterate over the neural networks and get the predictions
         for model in self.models:
             # Predict delta
-            mean, n_mean, n_var = model.dyna_network.forward(obs, actions)
+            mean, n_mean, n_var = model.forward(observation, actions)
             means.append(mean)
             norm_means.append(n_mean)
             norm_vars.append(n_var)
@@ -107,45 +103,60 @@ class EnsembleDynamics:
         if len(not_nans) == 0:
             logging.info("Predicting all Nans")
             sys.exit()
+        # Random Take next state.
         rand_ind = random.randint(0, len(not_nans) - 1)
         prediction = predictions_means[not_nans[rand_ind]]
-        # NOTE: Already Done: next = current + delta
-        prediction += obs
+        # next = current + delta
+        prediction += observation
         all_predictions = torch.stack(means)
         for j in range(all_predictions.shape[0]):
-            all_predictions[j] += obs
+            all_predictions[j] += observation
         return prediction, all_predictions, predictions_norm_means, predictions_vars
 
-    def train_world(self, states, actions, next_states):
-        """
-        This function decides how to train dynamic. Different models in an
-        ensemble is trained with different data.
+    def train_world(
+            self,
+            states: torch.Tensor,
+            actions: torch.Tensor,
+            next_states: torch.Tensor,
+    ) -> None:
 
-        :param (Tensors) input states:
-        :param (Tensors) input actions:
-        :param (Tensors) input next_states:
-        """
         assert len(states.shape) >= 2
         assert len(actions.shape) == 2
         assert (
-            states.shape[1] + actions.shape[1]
-            == self.num_actions + self.observation_size
+                states.shape[1] + actions.shape[1]
+                == self.num_actions + self.observation_size
         )
         # For each model, train with different data.
         mini_batch_size = int(math.floor(states.shape[0] / self.num_models))
+
         for i in range(self.num_models):
-            sub_states = states[i * mini_batch_size : (i + 1) * mini_batch_size]
-            sub_actions = actions[i * mini_batch_size : (i + 1) * mini_batch_size]
-            sub_n_states = next_states[i * mini_batch_size : (i + 1) * mini_batch_size]
+            sub_states = states[i * mini_batch_size: (i + 1) * mini_batch_size]
+            sub_actions = actions[i * mini_batch_size: (i + 1) * mini_batch_size]
+            sub_next_states = next_states[i * mini_batch_size: (i + 1) * mini_batch_size]
+            sub_target = sub_next_states - sub_states
 
-            target = sub_n_states - sub_states
-            delta_targets_normalized = normalize_obs_deltas(target, self.statistics)
+            delta_targets_normalized = normalize_observations_deltas(sub_target, self.statistics)
             _, n_mean, n_var = self.models[i].forward(sub_states, sub_actions)
-
-            model_loss = F.gaussian_nll_loss(
-                input=n_mean, target=delta_targets_normalized, var=n_var
-            ).mean()
+            model_loss = F.gaussian_nll_loss(input=n_mean, target=delta_targets_normalized, var=n_var).mean()
 
             self.optimizers[i].zero_grad()
             model_loss.backward()
             self.optimizers[i].step()
+
+    def train_reward(
+            self,
+            next_states: torch.Tensor,
+            actions: torch.Tensor,
+            rewards: torch.Tensor,
+    ) -> None:
+        assert len(next_states.shape) >= 2
+        assert len(actions.shape) == 2
+        assert (
+                next_states.shape[1] + actions.shape[1]
+                == self.num_actions + self.observation_size
+        )
+        self.reward_optimizer.zero_grad()
+        rwd_mean = self.reward_network.forward(next_states)
+        reward_loss = F.mse_loss(rwd_mean, rewards)
+        reward_loss.backward()
+        self.reward_optimizer.step()

@@ -48,31 +48,42 @@ class MemoryBuffer:
         (State, action, reward, next_state, next_action, next_reard)
 
         """
-        batch_size = min(batch_size, len(self.buffer) - 1)
         max_length = len(self.buffer) - 1
         batch_size = min(batch_size, max_length)
         # A list of candidate indices includes all indices.
         candi_indices = list(range(max_length))
-        sampled = []  # randomly sampled indices that is okay.
+        sampled_indices = []  # randomly sampled indices that is okay.
+        # In this way, the sampling time depends on the batch size rather than buffer size.
+        first_sample = True  # Not check duplicate for first time sample.
         while True:
             # Sample size based on how many still needed.
-            idxs = random.sample(candi_indices, batch_size - len(sampled))
+            idxs = random.sample(candi_indices, batch_size - len(sampled_indices))
             for i in idxs:
-                # Only takes in the non-terminate.
-                if self.buffer[i][4] is False:
-                    sampled.append(i)
-                # Remove anyway since it is either already sampled or is a terminate
-                candi_indices.remove(i)
-                if len(sampled) == batch_size:
+                # Check if it is already sampled.
+                already_sampled = False
+                # Only check if it is not first time in the while loop.
+                if not first_sample:
+                    # compare with each item in the sampled.
+                    for j in sampled_indices:
+                        if j == i:
+                            already_sampled = True
+                if (self.buffer[i][4] is False) and (not already_sampled):
+                    sampled_indices.append(i)
+                if len(sampled_indices) == batch_size:
                     break
-            if len(sampled) == batch_size:
+            first_sample = False
+            if len(sampled_indices) == batch_size:
                 break
 
         # Form the sampled data batch
-        experience_batch = []
-        for index in sampled:
-            experience_batch.append(self.buffer[index] + (self.buffer[index + 1][1], self.buffer[index + 1][2],))
-
+        experience_batch = [
+            self.buffer[i]
+            + (
+                self.buffer[i + 1][1],
+                self.buffer[i + 1][2],
+            )
+            for i in sampled_indices
+        ]
         transposed_batch = zip(*experience_batch)
         return transposed_batch
 

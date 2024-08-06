@@ -1,5 +1,5 @@
 import torch
-
+import torch.nn.functional as F
 
 def variational_inference(mean, var, device):
     """
@@ -69,10 +69,11 @@ def sampling(pred_means, pred_vars):
                         dim=0)
     # Samples = [5 * 10, 10 predictions, 11 state dims]
     # print(samples.shape)
-    stds = torch.std(samples, dim=0)
+    stds = torch.var(samples, dim=0)
     # print(stds.shape)
     # [10 predictions, 11 state dims]
     total_stds = torch.mean(stds, dim=1)
+    total_stds = F.sigmoid(total_stds)
     # total_stds = 1 / total_stds
     # total_stds = total_stds / torch.mean(total_stds)  # if very uncertain,
     # high std, encouraged.

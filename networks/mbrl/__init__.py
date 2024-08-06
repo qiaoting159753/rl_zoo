@@ -1,2 +1,2 @@
-from .ensemble_world import EnsembleDynamics
-from .ensemble_integrated import EnsembleWorldReward
+from .ensemble_world import EnsembleWorldAndOneReward
+# from .ensemble_integrated import EnsembleWorldReward

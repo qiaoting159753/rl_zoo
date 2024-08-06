@@ -61,6 +61,7 @@ class Actor(nn.Module):
         x = F.relu(self.linear1(obs))
         x = F.relu(self.linear2(x))
         mu = self.mean_linear(x)
+
         log_std = self.log_std_linear(x)
 
         # Bound the action to finite interval.
