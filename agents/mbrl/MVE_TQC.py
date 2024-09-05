@@ -12,11 +12,14 @@ import os
 import numpy as np
 import torch
 
-from agents.utils import soft_update_params, quantile_huber_loss_f
+from utils import soft_update_params, quantile_huber_loss_f
 from utils.memory import MemoryBuffer
 
 
 class MVE_TQC:
+    """
+
+    """
     def __init__(
             self,
             env,
@@ -141,7 +144,7 @@ class MVE_TQC:
     def _update_actor(self, states):
         new_action, log_pi, _ = self.actor_net(states)
         # mean_qf_pi = self.critic_net(states, new_action).mean(2).mean(1, keepdim=True)
-        mean_qf_pi = self._fake_critic(actions=new_action, states=states)
+        # mean_qf_pi = self._fake_critic(actions=new_action, states=states)
         actor_loss = (self.alpha * log_pi - mean_qf_pi).mean()
         self.actor_net_optimiser.zero_grad()
         actor_loss.backward()

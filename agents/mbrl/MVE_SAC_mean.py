@@ -11,9 +11,7 @@ import numpy as np
 import torch
 from utils.memory import MemoryBuffer
 
-from networks.mbrl import (
-    EnsembleWorldRewardDone,
-)
+from agents.networks.world_models.ensembles import EnsembleWorldRewardDone
 
 
 class MVE_SAC_mean:
@@ -152,7 +150,6 @@ class MVE_SAC_mean:
             for n in range(self.horizon):
                 all_vars[n] /= total_vars
             q_target = torch.sum(all_vars * all_means, dim=0)
-
 
         q_values_one, q_values_two = self.critic_net(states, actions)
         critic_loss_one = ((q_values_one - q_target).pow(2)).mean()

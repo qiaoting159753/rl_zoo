@@ -1,10 +1,10 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from utils.helpers import weight_init
+from utils import weight_init
 
 
-class SASDone(nn.Module):
+class Simple_SAS_Done(nn.Module):
     def __init__(self, observation_size: int, num_actions: int, hidden_size: int):
         """
         Note, This reward function is limited to 0 ~ 1 for dm_control.

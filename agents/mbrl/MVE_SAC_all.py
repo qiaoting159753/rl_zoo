@@ -11,9 +11,7 @@ import numpy as np
 import torch
 from utils.memory import MemoryBuffer
 
-from networks.mbrl import (
-    EnsembleWorldRewardDone,
-)
+from agents.networks.world_models.ensembles import EnsembleWorldRewardDone
 
 
 class MVE_SAC_all:

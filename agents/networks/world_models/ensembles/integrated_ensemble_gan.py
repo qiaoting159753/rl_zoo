@@ -9,7 +9,7 @@ from torch import optim
 from torch.autograd import Variable
 import numpy as np
 from utils.helpers import normalize_observations_deltas
-from .z_ensemble_integrated import IntegratedWorldModel
+from .ensemble_integrated import IntegratedWorldModel
 
 
 class Discriminator(nn.Module):

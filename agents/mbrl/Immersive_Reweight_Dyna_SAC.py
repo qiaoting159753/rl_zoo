@@ -7,9 +7,10 @@ import math
 import copy
 import numpy as np
 import torch
-from networks.mbrl import EnsembleWorldAndOneReward
+from agents.networks.world_models.ensembles import EnsembleWorldAndOneReward
 from envs.openai.openai_pendulum import PendulumEnv
 import torch.nn.functional as F
+
 
 class Immersive_Reweighting_Dyna_SAC:
     """
@@ -121,8 +122,8 @@ class Immersive_Reweighting_Dyna_SAC:
 
         q_values_one, q_values_two = self.critic_net(states, actions)
         # critic_loss_one = F.mse_loss(q_values_one, q_target)
-        td_error1 = (q_target - q_values_one)#  * weights
-        td_error2 = (q_target - q_values_two)#  * weights
+        td_error1 = (q_target - q_values_one)  # * weights
+        td_error2 = (q_target - q_values_two)  # * weights
         critic_loss_one = 0.5 * (td_error1.pow(2) * weights).mean()
         critic_loss_two = 0.5 * (td_error2.pow(2) * weights).mean()
         critic_loss_total = critic_loss_one + critic_loss_two
@@ -321,7 +322,7 @@ class Immersive_Reweighting_Dyna_SAC:
 
         sample2 = torch.distributions.Normal(pred_means[1], pred_vars[1]).sample(
             [10])
-        rwd_sample2 =  self.world_model.pred_rewards(sample2)
+        rwd_sample2 = self.world_model.pred_rewards(sample2)
 
         sample3 = torch.distributions.Normal(pred_means[2], pred_vars[2]).sample(
             [10])
@@ -348,7 +349,7 @@ class Immersive_Reweighting_Dyna_SAC:
         # total_stds[total_stds < 0.1] = 0.0
         # total_stds[total_stds > 4.0] = 4.0
 
-        total_stds = F.sigmoid(total_stds) #/ 2 + 0.5  # 0.5 - 1.0
+        total_stds = F.sigmoid(total_stds)  # / 2 + 0.5  # 0.5 - 1.0
         # total_stds = 1 / total_stds
         # total_stds = total_stds / torch.mean(total_stds)  # if very uncertain,
         # high std, encouraged.
