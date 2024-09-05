@@ -1,42 +1,50 @@
 import torch
 # Agents
-from agents.tqc.agent_tqc import TQC
-from agents.tqc import ME_TQC
-from agents.sac import SAC
-from agents.sac import ME_SAC
-from agents.fully_expand import Fully_Expand
+from agents.mfrl import SAC
+from agents.mfrl import TQC
+from agents.mbrl import Fully_Expand
 
 # Actors
-from agents.common import Actor
-from agents.common import HyperActor
-# Critic
-from agents.tqc import TQC_Critic
-from agents.tqc import Hyper_TQC_Critic
+from agents.networks.mfrl.common import Actor
+from agents.networks.mfrl.common import HyperActor
 
-from agents.memory_buffer import MemoryBuffer
+# Critic
+from agents.networks.mfrl.sac import SAC_Critic
+from agents.networks.mfrl.sac import Hyper_Double_SAC_Critic
+from agents.networks.mfrl.tqc import TQC_Critic
+from agents.networks.mfrl.tqc import Hyper_TQC_Critic
+
+from utils import MemoryBuffer
 from datetime import datetime
 import numpy as np
 
+from envs import DMCSEnvironment
 
-class Trainer:
-    def __init__(self, env, action_dim):
+
+class MFRL_Trainer:
+    """
+    Training and evaluation loop for Model-Free agents that does not need to train the world model.
+    """
+
+    def __init__(self, env: DMCSEnvironment, agent_name, random_goal, device, G, batch_size):
         self.agent = None
-        self.agent_selection()
+        self.agent_name = agent_name
+
+        self.env = env
+        self.agent_selection(agent_name)
 
         self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
         self.evaluation_array = [[], [], [], [], []]
         self.generate_results = True
-        self.random_goal = False
-
-        self.G = 3
-        self.batch_size = 256
-
         self.counter = 0
-        self.env = env
-        self.device = "cpu"
 
-        self.state_dim = 20
-        self.action_dim = action_dim
+        self.device = device
+        self.random_goal = random_goal
+        self.G = G
+        self.batch_size = batch_size
+
+        self.state_dim = self.env.observation_space
+        self.action_dim = self.env.action_num
 
         self.memory = MemoryBuffer()
 
@@ -70,9 +78,9 @@ class Trainer:
         if self.generate_results:
             eval_array = np.array(self.evaluation_array)
             # Save the metrics
-            file_name = "data/Kinematic" + "_" + self.date_and_time
-            np.savetxt(file_name + "_eval_rewards.csv", eval_array, delimiter=",")
-            self.agent.save_models("low_cost")
+            file_name = self.env.domain + "_" + self.env.task + "_" + self.agent_name + "_" + self.date_and_time
+            np.savetxt(file_name + ".csv", eval_array, delimiter=",")
+            self.agent.save_models(file_name)
 
     def train(self):
         for i in range(1000000):
@@ -95,63 +103,132 @@ class Trainer:
             if i % 100 == 0:
                 self.evaluate()
 
-    def agent_selection(self):
-        # state_dim: 6, action_dim: 3
-        # actor = HyperActor(observation_size=self.state_dim, num_actions=self.do_action_dim)
-        actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-        self.agent = Fully_Expand(self,
-                                  env=self.env,
-                                  actor_network=actor,
-                                  gamma=0.99,
-                                  tau=0.005,
-                                  action_num=6,
-                                  actor_lr=0.0003,
-                                  alpha_lr=0.0003,
-                                  horizon=10,
-                                  device='cpu')
+    def agent_selection(self, agent_name):
+        """
+        Create an agent
 
-        # self.agent = TQC(actor_network=actor,
-        #                  critic_network=critic,
-        #                  actor_lr=3e-4,
-        #                  critic_lr=3e-4,
-        #                  alpha_lr=3e-4,
-        #                  gamma=0.99,
-        #                  tau=0.005,
-        #                  top_quantiles_to_drop=2,
-        #                  action_num=self.action_dim,
-        #                  device=self.device,)
+        :param agent_name:
+        """
+        if agent_name == "SAC":
+            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = SAC(actor_network=actor,
+                             critic_network=critic,
+                             alpha_lr=3e-4,
+                             gamma=0.99,
+                             tau=0.005,
+                             action_dim=self.action_dim,
+                             state_dim=self.state_dim,
+                             actor_lr=3e-4,
+                             critic_lr=3e-4,
+                             device=self.device)
 
-        # self.agent = METQC(env=self.env,
-        #                    actor_network=actor,
-        #                    critic_network=critic,
-        #                    actor_lr=3e-4,
-        #                    critic_lr=3e-4,
-        #                    alpha_lr=3e-4,
-        #                    gamma=0.99,
-        #                    tau=0.005,
-        #                    top_quantiles_to_drop=2,
-        #                    action_num=self.action_dim,
-        #                    device=self.device, )
+        if agent_name == "TQC":
+            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = TQC(actor_network=actor,
+                             critic_network=critic,
+                             actor_lr=3e-4,
+                             critic_lr=3e-4,
+                             alpha_lr=3e-4,
+                             gamma=0.99,
+                             tau=0.005,
+                             top_quantiles_to_drop=2,
+                             action_num=self.action_dim,
+                             device=self.device, )
 
-        # self.agent = SAC(actor_network=actor,
-        #                  critic_network=critic,
-        #                  alpha_lr=3e-4,
-        #                  gamma=0.99,
-        #                  tau=0.005,
-        #                  reward_scale=1.0,
-        #                  action_num=self.do_action_dim,
-        #                  actor_lr=3e-4,
-        #                  critic_lr=3e-4,
-        #                  device=self.device)
+        if agent_name == "Fully_Expand":
+            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = Fully_Expand(self,
+                                      actor_network=actor,
+                                      gamma=0.99,
+                                      tau=0.005,
+                                      action_num=6,
+                                      actor_lr=0.0003,
+                                      alpha_lr=0.0003,
+                                      horizon=10,
+                                      device='cpu')
 
-        # self.agent = ME_SAC(env=env,
-        #                     actor_network=actor,
-        #                     critic_network=critic,
-        #                     alpha_lr=3e-4,
-        #                     gamma=0.99,
-        #                     tau=0.005,
-        #                     reward_scale=1.0,
-        #                     action_num=self.do_action_dim,
-        #                     actor_lr=3e-4,
-        #                     critic_lr=3e-4,
-        #                     device=self.device)
+        if agent_name == "Hyper_SAC_Critic":
+            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = Hyper_Double_SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = SAC(actor_network=actor,
+                             critic_network=critic,
+                             alpha_lr=3e-4,
+                             gamma=0.99,
+                             tau=0.005,
+                             action_dim=self.action_dim,
+                             state_dim=self.state_dim,
+                             actor_lr=3e-4,
+                             critic_lr=3e-4,
+                             device=self.device)
+
+        if agent_name == "Hyper_TQC_Critic":
+            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = Hyper_TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = TQC(actor_network=actor,
+                             critic_network=critic,
+                             actor_lr=3e-4,
+                             critic_lr=3e-4,
+                             alpha_lr=3e-4,
+                             gamma=0.99,
+                             tau=0.005,
+                             top_quantiles_to_drop=2,
+                             action_num=self.action_dim,
+                             device=self.device)
+
+        if agent_name == "Hyper_SAC_all":
+            actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = Hyper_Double_SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = SAC(actor_network=actor,
+                             critic_network=critic,
+                             alpha_lr=3e-4,
+                             gamma=0.99,
+                             tau=0.005,
+                             action_dim=self.action_dim,
+                             state_dim=self.state_dim,
+                             actor_lr=3e-4,
+                             critic_lr=3e-4,
+                             device=self.device)
+
+        if agent_name == "Hyper_TQC_all":
+            actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = Hyper_TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = TQC(actor_network=actor,
+                             critic_network=critic,
+                             actor_lr=3e-4,
+                             critic_lr=3e-4,
+                             alpha_lr=3e-4,
+                             gamma=0.99,
+                             tau=0.005,
+                             top_quantiles_to_drop=2,
+                             action_num=self.action_dim,
+                             device=self.device)
+
+        if agent_name == "Hyper_SAC_actor":
+            actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = SAC(actor_network=actor,
+                             critic_network=critic,
+                             alpha_lr=3e-4,
+                             gamma=0.99,
+                             tau=0.005,
+                             action_dim=self.action_dim,
+                             state_dim=self.state_dim,
+                             actor_lr=3e-4,
+                             critic_lr=3e-4,
+                             device=self.device)
+
+        if agent_name == "Hyper_TQC_actor":
+            actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = TQC(actor_network=actor,
+                             critic_network=critic,
+                             actor_lr=3e-4,
+                             critic_lr=3e-4,
+                             alpha_lr=3e-4,
+                             gamma=0.99,
+                             tau=0.005,
+                             top_quantiles_to_drop=2,
+                             action_num=self.action_dim,
+                             device=self.device)

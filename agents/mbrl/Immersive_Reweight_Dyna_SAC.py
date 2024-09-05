@@ -12,7 +12,7 @@ from envs.openai.openai_pendulum import PendulumEnv
 import torch.nn.functional as F
 
 
-class Immersive_Reweighting_Dyna_SAC:
+class Immersive_Reweight_Dyna_SAC:
     """
     Use the Soft Actor Critic as the Actor Critic framework.
 

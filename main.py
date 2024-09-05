@@ -1,16 +1,68 @@
-import torch
-import numpy as np
-# import torch.nn.functional as F
-# import math
-# from scipy.spatial.transform import Rotation
-# from arm.utils import matrix_to_euler_angles, matrix_to_quaternion
-# from envs.DMCS import DMCSEnvironment
+from loops import MFRL_Trainer
+from envs import DMCSEnvironment
+from utils import set_seed
 
-from envs.UR10_Kinematic_Env import UR10_Kinematic_Env
-from train_loop import Trainer
 
-if __name__ == "__main__":
-    env = UR10_Kinematic_Env()
+
+
+def main():
+    """
+    SAC
+    TQC
+    Fully_Expand
+    Hyper_SAC_Critic
+    Hyper_TQC_Critic
+    Hyper_SAC_all
+    Hyper_TQC_all
+    Hyper_SAC_actor
+    Hyper_TQC_actor
+
+    """
+    # Random Seed
+    seed = 10
+    set_seed(seed)
+
+    env = DMCSEnvironment("cheetah", "run")
+    random_goal = False  # For real robot.
+    device = "cpu"  # For mac training.
+
+    agent_name = "SAC"
+
+    action_dim = env.action_num
+    state_dim = env.observation_space
+    G = 5
+    batch_size = 256
+
+    trainer = MFRL_Trainer(env,
+                           agent_name,
+                           action_dim,
+                           state_dim,
+                           random_goal,
+                           device,
+                           G,
+                           batch_size
+                           )
+    trainer.train()
+
+
+
+
+# if __name__ == "__main__":
+#     main()
+#
+# import torch
+# import numpy as np
+# # import torch.nn.functional as F
+# # import math
+# # from scipy.spatial.transform import Rotation
+# # from arm.utils import matrix_to_euler_angles, matrix_to_quaternion
+# # from envs.DMCS import DMCSEnvironment
+#
+# from envs.UR10_Kinematic_Env import UR10_Kinematic_Env
+# from train_loop import Trainer
+
+# if __name__ == "__main__":
+#     env = UR10_Kinematic_Env()
     # trainer = Trainer(env, action_dim=6)
     # trainer.train()
 
@@ -45,41 +97,41 @@ if __name__ == "__main__":
 #
 #     print(counter)
 
-############    Verification of the Query and Step    ####################
-evaluation = [[],[],[]]
-
-for i in range(10):
-    state = env.reset()
-    for j in range(100):
-        # Parital
-        action = env.sample_action(1, 6)
-        action = action[0]
-        # Full for step.
-        next_state, reward, dones, _, info = env.step(action)
-        evaluation[0].append(info["quat_dist"])
-        evaluation[1].append(info["euler_dist"])
-        evaluation[2].append(info["euler_dist"] - info["quat_dist"])
-
-        # Partial state. Parital Action
-        state = np.expand_dims(state, axis=0)
-        action = np.expand_dims(action, axis=0)
-        state_tensor = torch.FloatTensor(state)
-        action_tensor = torch.FloatTensor(action)
-        pred_next, rd, dns = env.tensor_query(state_tensor, action_tensor)
-        pred_next = pred_next.numpy()
-        rd = rd.numpy()
-        dns = dns.numpy()
-
-        if dns[0] != dones:
-            print("lllllll")
-        # if distance > 0.001:
-        #     print(distance)
-        state = next_state
-
-eval_array = np.array(evaluation)
-# Save the metrics
-file_name = "data/Kinematic"
-np.savetxt(file_name + "_eval_rewards.csv", eval_array, delimiter=",")
+# ############    Verification of the Query and Step    ####################
+# evaluation = [[], [], []]
+#
+# for i in range(10):
+#     state = env.reset()
+#     for j in range(100):
+#         # Parital
+#         action = env.sample_action(1, 6)
+#         action = action[0]
+#         # Full for step.
+#         next_state, reward, dones, _, info = env.step(action)
+#         evaluation[0].append(info["quat_dist"])
+#         evaluation[1].append(info["euler_dist"])
+#         evaluation[2].append(info["euler_dist"] - info["quat_dist"])
+#
+#         # Partial state. Parital Action
+#         state = np.expand_dims(state, axis=0)
+#         action = np.expand_dims(action, axis=0)
+#         state_tensor = torch.FloatTensor(state)
+#         action_tensor = torch.FloatTensor(action)
+#         pred_next, rd, dns = env.tensor_query(state_tensor, action_tensor)
+#         pred_next = pred_next.numpy()
+#         rd = rd.numpy()
+#         dns = dns.numpy()
+#
+#         if dns[0] != dones:
+#             print("lllllll")
+#         # if distance > 0.001:
+#         #     print(distance)
+#         state = next_state
+#
+# eval_array = np.array(evaluation)
+# # Save the metrics
+# file_name = "data/Kinematic"
+# np.savetxt(file_name + "_eval_rewards.csv", eval_array, delimiter=",")
 
 # from envs.mujoco_env import Arm_Mujoco
 
@@ -115,9 +167,9 @@ np.savetxt(file_name + "_eval_rewards.csv", eval_array, delimiter=",")
 # arm.disable_all()
 # arm._enable_all()
 
-    # fake_joints = np.array([[0.0, 0.1, 0.2, 0.3, 0.4, 0.5], [0.01, 0.02, 0.03, 0.04, 0.05, 0.06]])
-    # fake_joints = torch.FloatTensor(fake_joints)
-    # forward(fake_joints)
+# fake_joints = np.array([[0.0, 0.1, 0.2, 0.3, 0.4, 0.5], [0.01, 0.02, 0.03, 0.04, 0.05, 0.06]])
+# fake_joints = torch.FloatTensor(fake_joints)
+# forward(fake_joints)
 
 # port_handler = dxl.PortHandler("/dev/ttyUSB0")
 # port_handler.openPort()

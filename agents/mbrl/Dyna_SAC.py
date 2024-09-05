@@ -10,6 +10,7 @@ import torch
 import torch.nn.functional as F
 from utils import sampling
 
+
 class Dyna_SAC:
     """
     Use the Soft Actor Critic as the Actor Critic framework.
@@ -17,19 +18,19 @@ class Dyna_SAC:
     """
 
     def __init__(
-        self,
-        actor_network,
-        critic_network,
-        world_network,
-        gamma,
-        tau,
-        action_num,
-        actor_lr,
-        critic_lr,
-        alpha_lr,
-        num_samples,
-        horizon,
-        device,
+            self,
+            actor_network,
+            critic_network,
+            world_network,
+            gamma,
+            tau,
+            action_num,
+            actor_lr,
+            critic_lr,
+            alpha_lr,
+            num_samples,
+            horizon,
+            device,
     ):
         self.type = "mbrl"
         # Switches
@@ -106,7 +107,7 @@ class Dyna_SAC:
                 next_states, next_actions
             )
             target_q_values = (
-                torch.minimum(target_q_one, target_q_two) - self._alpha * next_log_pi
+                    torch.minimum(target_q_one, target_q_two) - self._alpha * next_log_pi
             )
             q_target = rewards + self.gamma * (1 - dones) * target_q_values
         q_target = q_target.detach()
@@ -114,8 +115,8 @@ class Dyna_SAC:
 
         q_values_one, q_values_two = self.critic_net(states, actions)
         # critic_loss_one = F.mse_loss(q_values_one, q_target)
-        td_error1 = (q_target - q_values_one)  * weights
-        td_error2 = (q_target - q_values_two)  * weights
+        td_error1 = (q_target - q_values_one) * weights
+        td_error2 = (q_target - q_values_two) * weights
         critic_loss_one = 0.5 * (td_error1.pow(2)).mean()
         critic_loss_two = 0.5 * (td_error2.pow(2)).mean()
         critic_loss_total = critic_loss_one + critic_loss_two
@@ -137,7 +138,7 @@ class Dyna_SAC:
 
         # update the temperature
         alpha_loss = -(
-            self.log_alpha * (first_log_p + self.target_entropy).detach()
+                self.log_alpha * (first_log_p + self.target_entropy).detach()
         ).mean()
         self.log_alpha_optimizer.zero_grad()
         alpha_loss.backward()
@@ -145,7 +146,7 @@ class Dyna_SAC:
 
         if self.learn_counter % self.policy_update_freq == 0:
             for target_param, param in zip(
-                self.target_critic_net.parameters(), self.critic_net.parameters()
+                    self.target_critic_net.parameters(), self.critic_net.parameters()
             ):
                 target_param.data.copy_(
                     param.data * self.tau + target_param.data * (1.0 - self.tau)
