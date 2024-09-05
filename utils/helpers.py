@@ -34,7 +34,7 @@ def weight_init(m):
         m.bias.data.fill_(0.0)
 
 
-def normalize_observations(obs, statistics):
+def normalize_observation(observation, statistics):
     """
     This normalization is applied to world models inputs.
     Normalize the states based on the statistics from experience replay.
@@ -43,10 +43,11 @@ def normalize_observations(obs, statistics):
         obs -- input states
         statistics -- statistics from experience replay (no default)
     """
-    return (obs - statistics["observation_mean"]) / statistics["observation_std"]
+    return (observation - statistics["observation_mean"]) / statistics[
+        "observation_std"
+    ]
 
-
-def unnormalize_observations_deltas(normalized_deltas, statistics):
+def denormalize_observation_delta(normalized_delta, statistics):
     """
     This denormlizing is applied to world models predicitons to restore the range of state difference between next and
     current.
@@ -55,16 +56,15 @@ def unnormalize_observations_deltas(normalized_deltas, statistics):
         obs -- input states
         statistics -- statistics from experience replay (no default)
     """
-    return (normalized_deltas * statistics["delta_std"]) + statistics["delta_mean"]
+    return (normalized_delta * statistics["delta_std"]) + statistics["delta_mean"]
 
-
-def normalize_observations_deltas(deltas, statistics):
+def normalize_observation_delta(delta, statistics):
     """
     This normalization is applied to world models' target lables. The world model is predicting the difference between
     current states and next states. This normalization is applied to the deltas.
 
     """
-    return (deltas - statistics["delta_mean"]) / statistics["delta_std"]
+    return (delta - statistics["delta_mean"]) / statistics["delta_std"]
 
 
 def denormalize(action, max_action_value, min_action_value):
@@ -115,13 +115,36 @@ def compare_models(model_1, model_2):
                 )
     return models_differ == 0
 
-def soft_update(local_model, target_model, tau):
-    """
-    Update one network toward another a little.
 
-    :param local_model:
-    :param target_model:
-    :param tau:
-    """
-    for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
-        target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
+def prioritized_approximate_loss(x, min_priority, alpha):
+    return torch.where(
+        x.abs() < min_priority,
+        (min_priority**alpha) * 0.5 * x.pow(2),
+        min_priority * x.abs().pow(1.0 + alpha) / (1.0 + alpha),
+    ).mean()
+
+
+def huber(x, min_priority):
+    return torch.where(x < min_priority, 0.5 * x.pow(2), min_priority * x).mean()
+
+
+def quantile_huber_loss_f(quantiles, samples):
+    pairwise_delta = (
+        samples[:, None, None, :] - quantiles[:, :, :, None]
+    )  # batch x nets x quantiles x samples
+    abs_pairwise_delta = torch.abs(pairwise_delta)
+    huber_loss = torch.where(
+        abs_pairwise_delta > 1, abs_pairwise_delta - 0.5, pairwise_delta**2 * 0.5
+    )
+
+    n_quantiles = quantiles.shape[2]
+
+    tau = (
+        torch.arange(n_quantiles, device=pairwise_delta.get_device()).float()
+        / n_quantiles
+        + 1 / 2 / n_quantiles
+    )
+    loss = (
+        torch.abs(tau[None, None, :, None] - (pairwise_delta < 0).float()) * huber_loss
+    ).mean()
+    return loss
