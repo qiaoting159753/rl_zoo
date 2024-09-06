@@ -9,13 +9,13 @@ import torch.nn.functional as F
 import torch.utils
 from torch import optim
 
-from cares_reinforcement_learning.networks.world_models.probabilistic_dynamics import (
+from agents.networks.world_models.deterministic import (
     Probabilistic_Dynamics,
 )
-from cares_reinforcement_learning.networks.world_models.simple_ns_reward import (
+from agents.networks.world_models.simple import (
     Simple_NS_Reward,
 )
-from cares_reinforcement_learning.util.helpers import normalize_observation_delta
+from utils.helpers import normalize_observation_delta
 
 
 class Ensemble_Dyna_One_NS_Reward:

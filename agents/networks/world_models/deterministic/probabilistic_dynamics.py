@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch.utils
 from torch import nn
 
-from cares_reinforcement_learning.util.helpers import (
+from utils.helpers import (
     denormalize_observation_delta,
     normalize_observation,
     weight_init,

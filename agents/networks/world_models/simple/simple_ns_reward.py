@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from cares_reinforcement_learning.util.helpers import weight_init
+from utils.helpers import weight_init
 
 
 class Simple_NS_Reward(nn.Module):

@@ -38,8 +38,9 @@ class MFRL_Trainer:
                  episode_steps: int,
                  maximum_steps: int,
                  evaluate_interval: int,
-                 generate_results: bool):
-
+                 generate_results: bool,
+                 seed: int):
+        self.seed = seed
         self.generate_results = generate_results
         self.maximum_steps = maximum_steps
         self.episode_steps = episode_steps
@@ -90,7 +91,7 @@ class MFRL_Trainer:
             logging.info(eval_array.shape)
             data_folder = "statistics/"
             # Save the metrics
-            file_name = data_folder + self.env.domain + "_" + \
+            file_name = data_folder + str(self.seed) + "_" + self.env.domain + "_" + \
                         self.env.task + "_" + self.agent_name + "_" + self.date_and_time
             np.savetxt(file_name + ".csv", eval_array, delimiter=",")
 

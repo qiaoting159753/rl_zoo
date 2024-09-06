@@ -31,13 +31,14 @@ class MBRL_Trainer:
                  random_goal: bool,
                  device: str,
                  G: int,
-                 model_G:float,
+                 model_G: float,
                  batch_size: int,
                  episode_steps: int,
                  maximum_steps: int,
                  evaluate_interval: int,
-                 generate_results: bool):
-
+                 generate_results: bool,
+                 seed: int):
+        self.seed = seed
         self.generate_results = generate_results
         self.maximum_steps = maximum_steps
         self.episode_steps = episode_steps
@@ -83,12 +84,12 @@ class MBRL_Trainer:
             record_rewards[j] = total_rewards
         record_rewards[10] = self.counter  # Index
         self.evaluation_array.append(record_rewards)
-        logging.info("------------------ Evaluation: " + str(np.mean(record_rewards[:10])) + " ------------------")
+        print("------------------ Evaluation: " + str(np.mean(record_rewards[:10])) + " ------------------")
         if self.generate_results:
             eval_array = np.array(self.evaluation_array)
             data_folder = "statistics/"
             # Save the metrics
-            file_name = data_folder + self.env.domain + "_" + \
+            file_name = data_folder + str(self.seed) + "_" + self.env.domain + "_" + \
                         self.env.task + "_" + self.agent_name + "_" + self.date_and_time
             np.savetxt(file_name + ".csv", eval_array, delimiter=",")
 
@@ -127,7 +128,7 @@ class MBRL_Trainer:
                 state = next_state
                 if done:
                     break
-            logging.info("---- Training: " + str(epi_reward) + " ----")
+            print("---- Training: " + str(epi_reward) + " ----")
             if need_evaluate:
                 self.evaluate()
                 need_evaluate = False

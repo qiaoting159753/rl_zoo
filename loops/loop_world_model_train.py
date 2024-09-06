@@ -34,8 +34,9 @@ class World_Model_Trainer:
                  G: int,
                  batch_size: int,
                  episode_steps: int,
-                 maximum_steps: int):
-
+                 maximum_steps: int,
+                 seed: int):
+        self.seed = seed
         self.maximum_steps = maximum_steps
         self.episode_steps = episode_steps
         self.agent = None
