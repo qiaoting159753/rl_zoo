@@ -10,7 +10,7 @@ def main():
     Step 3: Set Training parameters.
     Step 4: Decide Loop: MFRL/MBRL/WM
     """
-    seeds = [15, 25, 35, 45, 55]
+    seeds = [10, 25, 35, 45, 55]
     for seed in seeds:
         # Random Seed
         set_seed(seed)

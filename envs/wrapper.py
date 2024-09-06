@@ -11,6 +11,7 @@ class Environment:
     """
     Abstract of Environment contains name and state, action size.
     """
+
     def __init__(self, domain_name, task_name):
         self.domain = domain_name
         self.task = task_name
@@ -35,6 +36,7 @@ class DMCSEnvironment(Environment):
     Deepmind Control Suite.
 
     """
+
     def __init__(self, domain, task) -> None:
         super().__init__(domain_name=domain, task_name=task)
         self.task = task
@@ -92,11 +94,6 @@ class DMCSEnvironment(Environment):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # cv2.imwrite("original_" + self.domain + "_" + self.task + ".png", frame)
         return frame
-
-
-
-
-
 
 # class OpenAIEnvrionment:
 #     """
