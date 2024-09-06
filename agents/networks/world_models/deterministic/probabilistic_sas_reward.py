@@ -1,7 +1,8 @@
+
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
-from utils import weight_init
+from cares_reinforcement_learning.util.helpers import weight_init
 
 
 class Probabilistic_SAS_Reward(nn.Module):

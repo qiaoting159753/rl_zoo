@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 from utils import soft_update_params, quantile_huber_loss_f
-from utils.memory import MemoryBuffer
+from utils.memory import PrioritizedReplayBuffer
 
 
 class MVE_TQC:

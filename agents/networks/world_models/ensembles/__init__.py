@@ -1,3 +1,6 @@
 from .ensemble_all import EnsembleWorldRewardDone
 from .ensemble_integrated import IntegratedWorldModel
-from .ensemble_world import EnsembleWorldAndOneReward
+
+from .ensemble_dyna_ensemble_sas_rwd import Ensemble_Dyna_Ensemble_SAS_Reward
+from .ensemble_dyna_one_ns_rwd import Ensemble_Dyna_One_NS_Reward
+from .ensemble_dyna_one_sas_rwd import Ensemble_Dyna_One_SAS_Reward

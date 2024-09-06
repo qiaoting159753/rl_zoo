@@ -9,13 +9,20 @@ import torch.nn.functional as F
 import torch.utils
 from torch import optim
 
-from networks.mbrl.simple.z_simple_dynamics import SimpleDynamics
-from networks.mbrl.simple.z_simple_reward_2 import SimpleReward
+from cares_reinforcement_learning.networks.world_models.probabilistic_dynamics import (
+    Probabilistic_Dynamics,
+)
+from cares_reinforcement_learning.networks.world_models.simple_sas_reward import (
+    Simple_SAS_Reward,
+)
+from cares_reinforcement_learning.util.helpers import normalize_observation_delta
 
-from utils.helpers import normalize_observation_delta
 
+class Ensemble_Dyna_One_SAS_Reward:
+    """
+    World Model
 
-class EnsembleWorldAndOneReward:
+    """
     def __init__(
             self,
             observation_size: int,
@@ -29,7 +36,7 @@ class EnsembleWorldAndOneReward:
         self.observation_size = observation_size
         self.num_actions = num_actions
 
-        self.reward_network = SimpleReward(
+        self.reward_network = Simple_SAS_Reward(
             observation_size=observation_size,
             num_actions=num_actions,
             hidden_size=hidden_size,
@@ -37,7 +44,7 @@ class EnsembleWorldAndOneReward:
         self.reward_optimizer = optim.Adam(self.reward_network.parameters(), lr=lr)
 
         self.models = [
-            SimpleDynamics(
+            Probabilistic_Dynamics(
                 observation_size=observation_size,
                 num_actions=num_actions,
                 hidden_size=hidden_size,
@@ -70,8 +77,8 @@ class EnsembleWorldAndOneReward:
         for model in self.models:
             model.statistics = statistics
 
-    def pred_rewards(self, observation: torch.Tensor):
-        pred_rewards = self.reward_network(observation)
+    def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation:torch.Tensor):
+        pred_rewards = self.reward_network(observation, action, next_observation)
         return pred_rewards
 
     def pred_next_states(
@@ -126,7 +133,7 @@ class EnsembleWorldAndOneReward:
                 states.shape[1] + actions.shape[1]
                 == self.num_actions + self.observation_size
         )
-        # For each model, train with different statistics.
+        # For each model, train with different data.
         mini_batch_size = int(math.floor(states.shape[0] / self.num_models))
 
         for i in range(self.num_models):
@@ -145,18 +152,14 @@ class EnsembleWorldAndOneReward:
 
     def train_reward(
             self,
-            next_states: torch.Tensor,
+            states: torch.Tensor,
             actions: torch.Tensor,
+            next_states: torch.Tensor,
             rewards: torch.Tensor,
     ) -> None:
         assert len(next_states.shape) >= 2
-        assert len(actions.shape) == 2
-        assert (
-                next_states.shape[1] + actions.shape[1]
-                == self.num_actions + self.observation_size
-        )
         self.reward_optimizer.zero_grad()
-        rwd_mean = self.reward_network.forward(next_states)
+        rwd_mean = self.reward_network(states, actions, next_states)
         reward_loss = F.mse_loss(rwd_mean, rewards)
         reward_loss.backward()
         self.reward_optimizer.step()

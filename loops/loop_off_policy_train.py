@@ -14,7 +14,7 @@ from agents.networks.mfrl.sac import Hyper_Double_SAC_Critic
 from agents.networks.mfrl.tqc import TQC_Critic
 from agents.networks.mfrl.tqc import Hyper_TQC_Critic
 
-from utils import MemoryBuffer
+from utils import PrioritizedReplayBuffer
 from datetime import datetime
 import numpy as np
 
@@ -26,7 +26,18 @@ class MFRL_Trainer:
     Training and evaluation loop for Model-Free agents that does not need to train the world model.
     """
 
-    def __init__(self, env: DMCSEnvironment, agent_name, random_goal, device, G, batch_size):
+    def __init__(self,
+                 env: DMCSEnvironment,
+                 agent_name: str,
+                 random_goal: bool,
+                 device: str,
+                 G: int,
+                 batch_size: int,
+                 episode_steps: int,
+                 maximum_steps: int):
+
+        self.maximum_steps = maximum_steps
+        self.episode_steps = episode_steps
         self.agent = None
         self.agent_name = agent_name
 
@@ -46,18 +57,21 @@ class MFRL_Trainer:
         self.state_dim = self.env.observation_space
         self.action_dim = self.env.action_num
 
-        self.memory = MemoryBuffer()
+        self.memory = PrioritizedReplayBuffer()
 
     def evaluate(self):
+        """
+        Evaluate the agents
+
+        """
         total_rewards = 0.0
         dones = 0
         total_dist = 0.0
         total_steps = 0
         total_qs = 0.0
-
         for _ in range(10):
             state = self.env.reset()
-            for _ in range(10):
+            for _ in range(self.episode_steps):
                 action = self.agent.select_action_from_policy(state, evaluation=True)
                 next_state, reward, done, dist, _ = self.env.step(action)
                 total_dist += dist
@@ -68,7 +82,7 @@ class MFRL_Trainer:
                     dones += 1
                     break
         avg_reward = total_rewards / total_steps
-        print("-----------Evaluation: " + str(avg_reward))
+        print("------ Evaluation: " + str(total_rewards / 10) + " ------")
         self.evaluation_array[0].append(self.counter)
         self.evaluation_array[1].append(avg_reward)
         self.evaluation_array[2].append(dones)
@@ -83,10 +97,14 @@ class MFRL_Trainer:
             self.agent.save_models(file_name)
 
     def train(self):
-        for i in range(1000000):
+        """
+        Train the MFRL Agent.
+
+        """
+        for i in range(self.maximum_steps):
             state = self.env.reset()
             epi_reward = 0.0
-            for _ in range(10):
+            for _ in range(self.episode_steps):
                 action = self.agent.select_action_from_policy(state)
                 # Do action is for the environment.
                 next_state, reward, done, _, _ = self.env.step(action)
@@ -100,7 +118,8 @@ class MFRL_Trainer:
                 state = next_state
                 if done:
                     break
-            if i % 100 == 0:
+            print("------ Training: " + str(epi_reward) + " ------")
+            if i % 10000 == 0:
                 self.evaluate()
 
     def agent_selection(self, agent_name):

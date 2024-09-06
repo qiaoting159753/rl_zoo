@@ -9,12 +9,12 @@ This code runs automatic entropy tuning
 import copy
 import numpy as np
 import torch
-from utils.memory import MemoryBuffer
+from utils.memory import PrioritizedReplayBuffer
 
 from agents.networks.world_models.ensembles import EnsembleWorldRewardDone
 
 
-class MVE_SAC_mean:
+class STEVE_SAC_Critic_mean:
     """
     Model- Value Expansion.
     """

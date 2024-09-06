@@ -7,7 +7,7 @@ import math
 import copy
 import numpy as np
 import torch
-from agents.networks.world_models.ensembles import EnsembleWorldAndOneReward
+from agents.networks.world_models.ensembles import Ensemble_Dyna_One_SAS_Reward
 from envs.openai.openai_pendulum import PendulumEnv
 import torch.nn.functional as F
 
@@ -22,7 +22,7 @@ class Immersive_Reweight_Dyna_SAC:
             self,
             actor_network,
             critic_network,
-            world_network: EnsembleWorldAndOneReward,
+            world_network: Ensemble_Dyna_One_SAS_Reward,
             gamma,
             tau,
             action_num,

@@ -8,19 +8,17 @@ import torch.nn.functional as F
 import torch.utils
 from torch import optim
 
-from agents.networks.world_models.deterministic.probabilistic_dynamics import (
+from cares_reinforcement_learning.networks.world_models.probabilistic_dynamics import (
     Probabilistic_Dynamics,
 )
-from agents.networks.world_models.deterministic.probabilistic_sas_reward import (
+from cares_reinforcement_learning.networks.world_models.probabilistic_sas_reward import (
     Probabilistic_SAS_Reward,
 )
-from agents.networks.world_models.simple.simple_sas_done import (
-    Simple_SAS_Done,
-)
-from utils.helpers import normalize_observation_delta
+
+from cares_reinforcement_learning.util.helpers import normalize_observation_delta
 
 
-class EnsembleWorldRewardDone:
+class Ensemble_Dyna_Ensemble_SAS_Reward:
     """
     This class consist of an ensemble of all components for critic update.
     Q_label = REWARD + gamma * (1 - DONES) * Q(NEXT_STATES).
@@ -45,7 +43,7 @@ class EnsembleWorldRewardDone:
         self.device = device
 
         self.world_models = [Probabilistic_Dynamics(observation_size=observation_size, num_actions=num_actions,
-                                                   hidden_size=hidden_size) for _ in range(self.num_world_models)]
+                                                    hidden_size=hidden_size) for _ in range(self.num_world_models)]
         self.reward_models = [Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
                                                        hidden_size=hidden_size) for _ in range(self.num_reward_models)]
         self.world_optimizers = [optim.Adam(self.world_models[i].parameters(), lr=lr) for i in
@@ -54,15 +52,11 @@ class EnsembleWorldRewardDone:
                                   range(self.num_reward_models)]
 
         # Bring all reward prediction and dynamic rediction networks to device.
-        for reward_model in self.world_models:
+        for reward_model in self.reward_models:
             reward_model.to(self.device)
         for world_model in self.world_models:
             world_model.to(self.device)
 
-        self.done_model = Simple_SAS_Done(observation_size=observation_size, num_actions=num_actions,
-                                  hidden_size=hidden_size)
-        self.done_optimizers = optim.Adam(self.done_model.parameters(), lr=lr)
-        self.done_model.to(self.device)
         self.statistics = {}
 
     def set_statistics(self, statistics: dict) -> None:
@@ -189,7 +183,7 @@ class EnsembleWorldRewardDone:
                 states.shape[1] + actions.shape[1]
                 == self.num_actions + self.observation_size
         )
-        # For each model, train with different statistics.
+        # For each model, train with different data.
         mini_batch_size = int(math.floor(states.shape[0] / self.num_world_models))
 
         for i in range(self.num_world_models):
@@ -232,15 +226,3 @@ class EnsembleWorldRewardDone:
             reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=sub_rewards, var=rwd_var).mean()
             reward_loss.backward()
             self.reward_optimizers[i].step()
-
-    # def train_done(
-    #         self,
-    #         states: torch.Tensor,
-    #         actions: torch.Tensor,
-    #         dones: torch.Tensor,
-    # ) -> None:
-    #     self.reward_optimizer.zero_grad()
-    #     prob_dones = self.reward_network.forward(states, actions)
-    #     reward_loss = F.binary_cross_entropy(prob_dones, dones)
-    #     reward_loss.backward()
-    #     self.reward_optimizer.step()

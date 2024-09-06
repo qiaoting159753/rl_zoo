@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch.utils
 from torch import nn
 
-from utils import (
+from cares_reinforcement_learning.util.helpers import (
     denormalize_observation_delta,
     normalize_observation,
     weight_init,
@@ -66,6 +66,7 @@ class Probabilistic_Dynamics(nn.Module):
         x = F.relu(x)
         normalized_mean = self.mean_layer(x)
         logvar = self.logvar_layer(x)
+
         logvar = torch.tanh(logvar)
         normalized_var = torch.exp(logvar)
         # Always denormalized delta

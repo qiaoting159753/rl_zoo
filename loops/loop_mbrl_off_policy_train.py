@@ -1,28 +1,29 @@
 import torch
+
 # Agents
-from agents.mbrl import Dyna_SAC
+from agents.mbrl import Dyna_SAC_NS
+from agents.mbrl import Dyna_SAC_SAS
+from agents.mbrl import Dyna_TQC
 from agents.mbrl import Immersive_Reweight_Dyna_SAC
+from agents.mbrl import Immersive_Reweight_Dyna_TQC
+
+from agents.mbrl import STEVE_SAC_actor
+from agents.mbrl import STEVE_SAC_Critic_all
+from agents.mbrl import STEVE_SAC_Critic_mean
+from agents.mbrl import STEVE_TQC_Actor
+from agents.mbrl import STEVE_TQC_Critic
+
 
 # Actors and Critics
 from agents.networks.mfrl.common import Actor
 from agents.networks.mfrl.sac import SAC_Critic
 from agents.networks.mfrl.tqc import TQC_Critic
 
-from utils import MemoryBuffer
+from utils import PrioritizedReplayBuffer
 from datetime import datetime
 import numpy as np
 
 from envs import DMCSEnvironment
-
-# Dyna_SAC
-# Dyna_TQC
-# Dyna_SAC_Immersive_Reweight
-# Dyna_TQC_Immersive_Reweight
-# MVE_SAC_mean
-# MVE_SAC_all
-# MVE_TQC_mean
-# MVE_TQC_all
-
 
 
 class MBRL_Trainer:
@@ -30,7 +31,27 @@ class MBRL_Trainer:
     Training and evaluation loop for Model-Based agents that does not need to train the world model.
     """
 
-    def __init__(self, env: DMCSEnvironment, agent_name, random_goal, device, G, batch_size):
+    def __init__(self,
+                 env: DMCSEnvironment,
+                 agent_name: str,
+                 random_goal: bool,
+                 device: str,
+                 G: int,
+                 model_G: int,
+                 batch_size: int,
+                 episode_steps: int,
+                 maximum_steps: int,
+                 horizon: int,
+                 branch_factor:int,
+                 ):
+
+        self.horizon = horizon
+        self.brach_factor = branch_factor
+
+        self.maximum_steps = maximum_steps
+        self.episode_steps = episode_steps
+        self.model_G = model_G
+
         self.agent = None
         self.agent_name = agent_name
 
@@ -50,7 +71,7 @@ class MBRL_Trainer:
         self.state_dim = self.env.observation_space
         self.action_dim = self.env.action_num
 
-        self.memory = MemoryBuffer()
+        self.memory = PrioritizedReplayBuffer()
 
     def evaluate(self):
         """
@@ -65,7 +86,7 @@ class MBRL_Trainer:
 
         for _ in range(10):
             state = self.env.reset()
-            for _ in range(10):
+            for _ in range(self.episode_steps):
                 action = self.agent.select_action_from_policy(state, evaluation=True)
                 next_state, reward, done, dist, _ = self.env.step(action)
                 total_dist += dist
@@ -76,7 +97,7 @@ class MBRL_Trainer:
                     dones += 1
                     break
         avg_reward = total_rewards / total_steps
-        print("-----------Evaluation: " + str(avg_reward))
+        print("------ Evaluation: " + str(total_rewards / 10) + " ------")
         self.evaluation_array[0].append(self.counter)
         self.evaluation_array[1].append(avg_reward)
         self.evaluation_array[2].append(dones)
@@ -91,10 +112,13 @@ class MBRL_Trainer:
             self.agent.save_models(file_name)
 
     def train(self):
-        for i in range(1000000):
+        """
+        Train the MBRL Agent
+        """
+        for i in range(self.maximum_steps):
             state = self.env.reset()
             epi_reward = 0.0
-            for _ in range(10):
+            for _ in range(self.episode_steps):
                 action = self.agent.select_action_from_policy(state)
                 # Do action is for the environment.
                 next_state, reward, done, _, _ = self.env.step(action)
@@ -108,7 +132,9 @@ class MBRL_Trainer:
                 state = next_state
                 if done:
                     break
-            if i % 100 == 0:
+            # Print Training Rewards.
+            print("------ Training: " + str(epi_reward) + " ------")
+            if i % 10000 == 0:
                 self.evaluate()
 
     def agent_selection(self, agent_name):
@@ -121,23 +147,67 @@ class MBRL_Trainer:
         sac_critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
         tqc_critic = TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
 
+        action_dim = self.action_dim,
+        state_dim = self.state_dim,
+        actor_lr = 3e-4,
+        critic_lr = 3e-4,
 
-        if agent_name == "Dyna_SAC":
+        if agent_name == "Dyna_SAC_NS":
+            Dyna_SAC_NS()
+            self.agent = Dyna_SAC_NS(actor_network = actor, critic_network = sac_critic,
+                world_network: EnsembleWorldAndOneNSReward,
+                gamma = 0.99,
+                tau: 0.005,
+                action_num: int,
+                actor_lr: float,
+                critic_lr: float,
+                alpha_lr = 3e-4,
+                num_samples = self.brach_factor,
+                horizon = self.horizon,
+                device = self.device,
+            )
+            def __init__(
+                    self,
+                    actor_network: torch.nn.Module,
+                    critic_network: torch.nn.Module,
+                    world_network: EnsembleWorldAndOneNSReward,
+                    gamma: float,
+                    tau: float,
+                    action_num: int,
+                    actor_lr: float,
+                    critic_lr: float,
+                    alpha_lr: float,
+                    num_samples: int,
+                    horizon: int,
+                    device: torch.device,
+            ):
+
+        if agent_name == "Dyna_SAC_SAS":
             print("Dyna")
 
         if agent_name == "Dyna_TQC":
             print("Dyna")
 
-        if agent_name == "Dyna_SAC_Immersive_Reweight":
+        if agent_name == "Immersive_Reweight_Dyna_SAC":
             print("Dyna")
 
-        if agent_name == "Dyna_SAC_Immersive_Reweight":
+        if agent_name == "Immersive_Reweight_Dyna_TQC":
             print("Dyna")
 
-        if agent_name == "Dyna_SAC_Immersive_Reweight":
+        if agent_name == "STEVE_SAC_actor":
             print("Dyna")
 
+        if agent_name == "STEVE_SAC_critic_all":
+            print("Dyna")
 
+        if agent_name == "STEVE_SAC_critic_mean":
+            print("Dyna")
+
+        if agent_name == "STEVE_TQC_actor":
+            print("Dyna")
+
+        if agent_name == "STEVE_TQC_critic":
+            print("Dyna")
 
 
 
