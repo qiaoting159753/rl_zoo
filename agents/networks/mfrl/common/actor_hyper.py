@@ -1,7 +1,7 @@
 import torch
 from torch import nn
-from agents.utils import SquashedNormal
-from agents.utils import HyperMLP
+from utils import SquashedNormal
+from utils.common import HyperMLP
 
 
 class HyperActor(nn.Module):

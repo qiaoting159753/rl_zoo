@@ -1,8 +1,10 @@
-import torch
 # Agents
+import torch
+import logging
+
 from agents.mfrl import SAC
 from agents.mfrl import TQC
-from agents.mbrl import Fully_Expand
+from agents.mfrl import Fully_Expand
 
 # Actors
 from agents.networks.mfrl.common import Actor
@@ -34,19 +36,19 @@ class MFRL_Trainer:
                  G: int,
                  batch_size: int,
                  episode_steps: int,
-                 maximum_steps: int):
+                 maximum_steps: int,
+                 evaluate_interval: int,
+                 generate_results: bool):
 
+        self.generate_results = generate_results
         self.maximum_steps = maximum_steps
         self.episode_steps = episode_steps
-        self.agent = None
-        self.agent_name = agent_name
-
         self.env = env
-        self.agent_selection(agent_name)
-
         self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
-        self.evaluation_array = [[], [], [], [], []]
-        self.generate_results = True
+
+        self.evaluate_interval = evaluate_interval
+        self.evaluation_array = []
+
         self.counter = 0
 
         self.device = device
@@ -54,78 +56,76 @@ class MFRL_Trainer:
         self.G = G
         self.batch_size = batch_size
 
-        self.state_dim = self.env.observation_space
-        self.action_dim = self.env.action_num
+        self.state_dim = env.observation_space
+        self.action_dim = env.action_num
 
+        self.agent = None
+        self.agent_name = agent_name
+        self.agent_selection(agent_name)
         self.memory = PrioritizedReplayBuffer()
 
     def evaluate(self):
         """
         Evaluate the agents
-
         """
-        total_rewards = 0.0
-        dones = 0
-        total_dist = 0.0
         total_steps = 0
-        total_qs = 0.0
-        for _ in range(10):
+        record_rewards = np.zeros((11,))
+        for j in range(10):
             state = self.env.reset()
+            total_rewards = 0.0
             for _ in range(self.episode_steps):
                 action = self.agent.select_action_from_policy(state, evaluation=True)
-                next_state, reward, done, dist, _ = self.env.step(action)
-                total_dist += dist
+                next_state, reward, done, _ = self.env.step(action)
                 total_steps += 1
                 total_rewards += reward
                 state = next_state
                 if done:
-                    dones += 1
                     break
-        avg_reward = total_rewards / total_steps
-        print("------ Evaluation: " + str(total_rewards / 10) + " ------")
-        self.evaluation_array[0].append(self.counter)
-        self.evaluation_array[1].append(avg_reward)
-        self.evaluation_array[2].append(dones)
-        self.evaluation_array[3].append(total_dist)
-        self.evaluation_array[4].append(total_qs / total_steps)
-
+            record_rewards[j] = total_rewards
+        record_rewards[10] = self.counter  # Index
+        self.evaluation_array.append(record_rewards)
+        logging.info("------------------ Evaluation: " + str(np.mean(record_rewards[:10])) + " ------------------")
         if self.generate_results:
             eval_array = np.array(self.evaluation_array)
+            logging.info(eval_array.shape)
+            data_folder = "statistics/"
             # Save the metrics
-            file_name = self.env.domain + "_" + self.env.task + "_" + self.agent_name + "_" + self.date_and_time
+            file_name = data_folder + self.env.domain + "_" + \
+                        self.env.task + "_" + self.agent_name + "_" + self.date_and_time
             np.savetxt(file_name + ".csv", eval_array, delimiter=",")
-            self.agent.save_models(file_name)
 
     def train(self):
         """
         Train the MFRL Agent.
-
         """
-        for i in range(self.maximum_steps):
+        need_evaluate = False
+        for _ in range(self.maximum_steps):
             state = self.env.reset()
             epi_reward = 0.0
             for _ in range(self.episode_steps):
                 action = self.agent.select_action_from_policy(state)
                 # Do action is for the environment.
-                next_state, reward, done, _, _ = self.env.step(action)
+                next_state, reward, done, _ = self.env.step(action)
                 # Small action is for training.
                 self.memory.add(state, action, reward, next_state, done)
                 epi_reward += reward
                 if len(self.memory) > self.batch_size:
                     for _ in range(self.G):
                         self.agent.train_policy(self.memory, batch_size=self.batch_size)
-                        self.counter += 1
+                self.counter += 1
+                if self.counter % self.evaluate_interval == 0:
+                    need_evaluate = True
                 state = next_state
                 if done:
                     break
-            print("------ Training: " + str(epi_reward) + " ------")
-            if i % 10000 == 0:
+            print("---- Training: " + str(epi_reward) + " ----")
+            if need_evaluate:
                 self.evaluate()
+                need_evaluate = False
 
     def agent_selection(self, agent_name):
         """
         Create an agent
-
         :param agent_name:
         """
         if agent_name == "SAC":
@@ -133,18 +133,21 @@ class MFRL_Trainer:
             critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
             self.agent = SAC(actor_network=actor,
                              critic_network=critic,
+                             action_num=self.action_dim,
                              alpha_lr=3e-4,
                              gamma=0.99,
                              tau=0.005,
-                             action_dim=self.action_dim,
-                             state_dim=self.state_dim,
                              actor_lr=3e-4,
                              critic_lr=3e-4,
-                             device=self.device)
+                             device=torch.device(self.device),
+                             reward_scale=1.0)
 
         if agent_name == "TQC":
             actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = TQC_Critic(observation_size=self.state_dim,
+                                num_actions=self.action_dim,
+                                num_quantiles=25,
+                                num_critics=5)
             self.agent = TQC(actor_network=actor,
                              critic_network=critic,
                              actor_lr=3e-4,
@@ -154,7 +157,8 @@ class MFRL_Trainer:
                              tau=0.005,
                              top_quantiles_to_drop=2,
                              action_num=self.action_dim,
-                             device=self.device, )
+                             device=self.device
+                             )
 
         if agent_name == "Fully_Expand":
             actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
@@ -173,18 +177,21 @@ class MFRL_Trainer:
             critic = Hyper_Double_SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
             self.agent = SAC(actor_network=actor,
                              critic_network=critic,
+                             action_num=self.action_dim,
                              alpha_lr=3e-4,
                              gamma=0.99,
                              tau=0.005,
-                             action_dim=self.action_dim,
-                             state_dim=self.state_dim,
                              actor_lr=3e-4,
                              critic_lr=3e-4,
-                             device=self.device)
+                             device=torch.device(self.device),
+                             reward_scale=1.0)
 
         if agent_name == "Hyper_TQC_Critic":
             actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = Hyper_TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = Hyper_TQC_Critic(observation_size=self.state_dim,
+                                      num_actions=self.action_dim,
+                                      num_quantiles=25,
+                                      num_critics=5)
             self.agent = TQC(actor_network=actor,
                              critic_network=critic,
                              actor_lr=3e-4,
@@ -201,18 +208,21 @@ class MFRL_Trainer:
             critic = Hyper_Double_SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
             self.agent = SAC(actor_network=actor,
                              critic_network=critic,
+                             action_num=self.action_dim,
                              alpha_lr=3e-4,
                              gamma=0.99,
                              tau=0.005,
-                             action_dim=self.action_dim,
-                             state_dim=self.state_dim,
                              actor_lr=3e-4,
                              critic_lr=3e-4,
-                             device=self.device)
+                             device=torch.device(self.device),
+                             reward_scale=1.0)
 
         if agent_name == "Hyper_TQC_all":
             actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = Hyper_TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = Hyper_TQC_Critic(observation_size=self.state_dim,
+                                      num_actions=self.action_dim,
+                                      num_quantiles=25,
+                                      num_critics=5)
             self.agent = TQC(actor_network=actor,
                              critic_network=critic,
                              actor_lr=3e-4,
@@ -229,18 +239,21 @@ class MFRL_Trainer:
             critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
             self.agent = SAC(actor_network=actor,
                              critic_network=critic,
+                             action_num=self.action_dim,
                              alpha_lr=3e-4,
                              gamma=0.99,
                              tau=0.005,
-                             action_dim=self.action_dim,
-                             state_dim=self.state_dim,
                              actor_lr=3e-4,
                              critic_lr=3e-4,
-                             device=self.device)
+                             device=torch.device(self.device),
+                             reward_scale=1.0)
 
         if agent_name == "Hyper_TQC_actor":
             actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            critic = TQC_Critic(observation_size=self.state_dim,
+                                num_actions=self.action_dim,
+                                num_quantiles=25,
+                                num_critics=5)
             self.agent = TQC(actor_network=actor,
                              critic_network=critic,
                              actor_lr=3e-4,

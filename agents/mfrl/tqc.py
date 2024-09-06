@@ -12,11 +12,14 @@ import os
 import numpy as np
 import torch
 
-from agents.utils import soft_update_params, quantile_huber_loss_f
-from utils.memory import MemoryBuffer
+from utils import PrioritizedReplayBuffer
+from utils import helpers as hlp
 
 
 class TQC:
+    """
+    TQC
+    """
     def __init__(
         self,
         actor_network: torch.nn.Module,
@@ -31,6 +34,7 @@ class TQC:
         device: str,
     ):
         self.type = "policy"
+
         # this may be called policy_net in other implementations
         self.actor_net = actor_network.to(device)
 
@@ -96,8 +100,25 @@ class TQC:
     def alpha(self) -> float:
         return self.log_alpha.exp()
 
-    def _update_critics(self, states, actions, rewards, next_states, dones):
+    def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:
+        self.learn_counter += 1
+
+        experiences = memory.sample_uniform(batch_size)
+        states, actions, rewards, next_states, dones, _ = experiences
+
         batch_size = len(states)
+
+        # Convert into tensor
+        states = torch.FloatTensor(np.asarray(states)).to(self.device)
+        actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
+        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+        dones = torch.LongTensor(np.asarray(dones)).to(self.device)
+
+        # Reshape to batch_size x whatever
+        rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+        dones = dones.unsqueeze(0).reshape(batch_size, 1)
+
         with torch.no_grad():
             next_actions, next_log_pi, _ = self.actor_net(next_states)
 
@@ -117,18 +138,20 @@ class TQC:
             )
 
         q_values = self.critic_net(states, actions)
-        critic_loss_total = quantile_huber_loss_f(q_values, q_target)
+        critic_loss_total = hlp.quantile_huber_loss_f(q_values, q_target)
 
+        # Update the Critic
         self.critic_net_optimiser.zero_grad()
         critic_loss_total.backward()
         self.critic_net_optimiser.step()
 
-    def _update_actor(self, states):
+        # --- Policy and alpha loss ---
         new_action, log_pi, _ = self.actor_net(states)
 
         mean_qf_pi = self.critic_net(states, new_action).mean(2).mean(1, keepdim=True)
         actor_loss = (self.alpha * log_pi - mean_qf_pi).mean()
 
+        # Update the Actor
         self.actor_net_optimiser.zero_grad()
         actor_loss.backward()
         self.actor_net_optimiser.step()
@@ -140,33 +163,13 @@ class TQC:
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
 
-    def train_policy(self, memory: MemoryBuffer, batch_size: int) -> None:
-        self.learn_counter += 1
-
-        experiences = memory.sample_uniform(batch_size)
-        states, actions, rewards, next_states, dones, _ = experiences
-
-        batch_size = len(states)
-
-        # Convert into tensor
-        states = torch.FloatTensor(np.asarray(states)).to(self.device)
-        actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
-        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
-        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        dones = torch.LongTensor(np.asarray(dones)).to(self.device)
-
-        # Reshape to batch_size x whatever
-        rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
-        dones = dones.unsqueeze(0).reshape(batch_size, 1)
-
-        # Update the Critics
-        self._update_critics(states, actions, rewards, next_states, dones)
-
-        # Update the Actor
-        self._update_actor(states)
-
         if self.learn_counter % self.policy_update_freq == 0:
-            soft_update_params(self.critic_net, self.target_critic_net, self.tau)
+            for target_param, param in zip(
+                self.target_critic_net.parameters(), self.critic_net.parameters()
+            ):
+                target_param.data.copy_(
+                    param.data * self.tau + target_param.data * (1.0 - self.tau)
+                )
 
     def save_models(self, filename: str, filepath: str = "models") -> None:
         path = f"{filepath}/models" if filepath != "models" else filepath

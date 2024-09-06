@@ -1,152 +1,154 @@
 """
-A MBRL class that implemented all MBRL algorithms for SAC.
+Original Paper: https://arxiv.org/abs/1812.05905
+Code based on: https://github.com/pranz24/pytorch-soft-actor-critic/blob/master/sac.py.
+
+This code runs automatic entropy tuning
 """
+
 import copy
+import logging
+import os
+
 import numpy as np
 import torch
+import torch.nn.functional as F
+
+from utils import PrioritizedReplayBuffer
 
 
 class SAC:
     """
-    A MBRL class that implemented all MBRL algorithms for SAC.
+    Soft Actor-Critic
     """
-
-    def __init__(self, actor_network, critic_network, gamma, tau,
-                 state_dim, action_dim, actor_lr, critic_lr, alpha_lr, device):
-
-        super().__init__()
-        self.learn_counter = None
-        self.policy_update_freq = 1
-        self.type = "mfrl"
-
-        # Other Variables
-        self.action_dim = action_dim
-        self.state_dim = state_dim
-        self.gamma = gamma
-        self.tau = tau
+    def __init__(
+        self,
+        actor_network: torch.nn.Module,
+        critic_network: torch.nn.Module,
+        gamma: float,
+        tau: float,
+        reward_scale: float,
+        action_num: int,
+        actor_lr: float,
+        critic_lr: float,
+        alpha_lr: float,
+        device: torch.device,
+    ):
+        self.type = "policy"
         self.device = device
 
+        # this may be called policy_net in other implementations
         self.actor_net = actor_network.to(device)
+
+        # this may be called soft_q_net in other implementations
         self.critic_net = critic_network.to(device)
         self.target_critic_net = copy.deepcopy(self.critic_net).to(device)
 
-        self.log_alpha = torch.tensor(np.log(1.0)).float().to(device)
+        self.gamma = gamma
+        self.tau = tau
+        self.reward_scale = reward_scale
+
+        self.learn_counter = 0
+        self.policy_update_freq = 1
+
+        self.target_entropy = -action_num
+
+        self.actor_net_optimiser = torch.optim.Adam(
+            self.actor_net.parameters(), lr=actor_lr
+        )
+        self.critic_net_optimiser = torch.optim.Adam(
+            self.critic_net.parameters(), lr=critic_lr
+        )
+
+        # Temperature (alpha) for the entropy loss
+        # Set to initial alpha to 1.0 according to other baselines.
+        init_temperature = 1.0
+        self.log_alpha = torch.tensor(np.log(init_temperature)).to(device)
         self.log_alpha.requires_grad = True
-        self.target_entropy = -action_dim
+        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=alpha_lr)
 
-        # optimizers
-        self.actor_optimizer = torch.optim.Adam(self.actor_net.parameters(),
-                                                lr=actor_lr)
-        self.critic_optimizer = torch.optim.Adam(self.critic_net.parameters(),
-                                                 lr=critic_lr)
-        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha],
-                                                    lr=alpha_lr)
-
-    @property
-    def alpha(self):
-        """
-        Control updating speed between rewards and other networks.
-        :return:
-        """
-        return self.log_alpha.exp()
-
-    # Only interact with the environment.
-    def select_action_from_policy(self, state, evaluation=False,
-                                  noise_scale=0):
-        """
-        Make decisions with the trained policy.
+    # pylint: disable-next=unused-argument
+    def select_action_from_policy(
+        self, state: np.ndarray, evaluation: bool = False, noise_scale: float = 0
+    ) -> np.ndarray:
         # note that when evaluating this algorithm we need to select mu as action
-        # _, _, action = self.actor_net.sample(state_tensor)
-
-        :param evaluation:
-        :param state:
-        :param obs:
-        :param sample:
-        :return:
-        """
-        assert len(state.shape) == 1
         self.actor_net.eval()
-        state_tensor = torch.FloatTensor(state).to(self.device).unsqueeze(
-            dim=0)
-        # Evaluation
-        if evaluation:
-            _, _, action, _ = self.actor_net.forward(state_tensor)
-        # Exploration
-        else:
-            action, _, _, _ = self.actor_net.forward(state_tensor)
-        assert action.ndim == 2 and action.shape[0] == 1
-        action = action.detach()
-        action = action.cpu().data.numpy().flatten()
+        with torch.no_grad():
+            state_tensor = torch.FloatTensor(state)
+            state_tensor = state_tensor.unsqueeze(0).to(self.device)
+            if evaluation:
+                (_, _, action) = self.actor_net(state_tensor)
+            else:
+                (action, _, _) = self.actor_net(state_tensor)
+            action = action.cpu().data.numpy().flatten()
         self.actor_net.train()
         return action
 
-    def update_critic(self, obs, actions, rewards, next_obs, not_dones):
-        """
-        Update the critic first, the critic have to learn the correct action.
-        :param obs:
-        :param actions:
-        :param rewards:
-        :param next_obs:
-        :param not_dones:
-        """
+    @property
+    def alpha(self) -> torch.Tensor:
+        return self.log_alpha.exp()
+
+    def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:
+        self.learn_counter += 1
+
+        experiences = memory.sample_uniform(batch_size)
+        states, actions, rewards, next_states, dones, _ = experiences
+
+        batch_size = len(states)
+
+        # Convert into tensor
+        states = torch.FloatTensor(np.asarray(states)).to(self.device)
+        actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
+        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+        dones = torch.LongTensor(np.asarray(dones)).to(self.device)
+
+        # Reshape to batch_size x whatever
+        rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+        dones = dones.unsqueeze(0).reshape(batch_size, 1)
+
         with torch.no_grad():
-            next_actions, next_log_pi, _, _ = self.actor_net.sample(next_obs)
-            q_1, q_2 = self.target_critic_net(next_obs, next_actions)
-            # The world model error penalty term should be added here.
-            t_q = torch.minimum(q_1, q_2) - self.alpha * next_log_pi
-            target_q = rewards + self.gamma * not_dones * t_q
-        # target_q = target_q.detach()
-        assert (len(target_q.shape) == 2) and (target_q.shape[1] == 1)
+            next_actions, next_log_pi, _ = self.actor_net(next_states)
+            target_q_values_one, target_q_values_two = self.target_critic_net(
+                next_states, next_actions
+            )
+            target_q_values = (
+                torch.minimum(target_q_values_one, target_q_values_two)
+                - self.alpha * next_log_pi
+            )
 
-        current_q1, current_q2 = self.critic_net(obs, actions)
-        td_error1 = target_q - current_q1
-        td_error2 = target_q - current_q2
-        # loss_1, loss_2 = self.critic_net.loss(obs, actions, target_q)
-        critic1_loss = 0.5 * (td_error1.pow(2)).mean()
-        critic2_loss = 0.5 * (td_error2.pow(2)).mean()
-        critic_loss = critic1_loss + critic2_loss
-        # Optimize the critic
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
+            q_target = (
+                rewards * self.reward_scale + self.gamma * (1 - dones) * target_q_values
+            )
 
-    def update_actor_and_alpha(self, obs):
-        """
+        q_values_one, q_values_two = self.critic_net(states, actions)
 
-        Update the actor with respect to critics.
-        :param obs:
-        """
-        # Can generate more times.No TD structure. No world model needed?
-        # Still can expand the Q value? How to?
-        # MFRL
-        action, first_log_pi, _, _ = self.actor_net.sample(obs)
-        actor_q1, actor_q2 = self.critic_net(obs, action)
-        actor_q = torch.min(actor_q1, actor_q2)
-        # Q - alpha * log = V
-        actor_loss = -(actor_q - self.alpha.detach() * first_log_pi).mean()
-        # optimize the actor.
-        self.actor_optimizer.zero_grad()
+        critic_loss_one = F.mse_loss(q_values_one, q_target)
+        critic_loss_two = F.mse_loss(q_values_two, q_target)
+        critic_loss_total = critic_loss_one + critic_loss_two
+
+        # Update the Critic
+        self.critic_net_optimiser.zero_grad()
+        critic_loss_total.backward()
+        self.critic_net_optimiser.step()
+
+        pi, log_pi, _ = self.actor_net(states)
+        qf1_pi, qf2_pi = self.critic_net(states, pi)
+        min_qf_pi = torch.minimum(qf1_pi, qf2_pi)
+
+        actor_loss = ((self.alpha * log_pi) - min_qf_pi).mean()
+
+        # Update the Actor
+        self.actor_net_optimiser.zero_grad()
         actor_loss.backward()
-        self.actor_optimizer.step()
-        # optimize the temperature alpha.
+        self.actor_net_optimiser.step()
+
+        # update the temperature (alpha)
+        alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
+
         self.log_alpha_optimizer.zero_grad()
-        alpha_loss = -(self.log_alpha * (
-                first_log_pi + self.target_entropy).detach()).mean()
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
 
-    def train_with_true(self, states, actions, rewards, next_states, not_dones):
-        """
-        Train with the transitions.
-
-        :param transitions:
-        """
-        # Update current Q network
-        self.update_critic(states, actions, rewards, next_states, not_dones)
-        # Update Actor
-        self.update_actor_and_alpha(states)
-
-        # Update target Q network
         if self.learn_counter % self.policy_update_freq == 0:
             for target_param, param in zip(
                 self.target_critic_net.parameters(), self.critic_net.parameters()
@@ -154,20 +156,21 @@ class SAC:
                 target_param.data.copy_(
                     param.data * self.tau + target_param.data * (1.0 - self.tau)
                 )
-    def train_policy(self, transitions):
-        """
-        Train with true transition and then dyna generated transitions.
-        :param transitions:
-        """
-        # Train with normal samples.
-        states, actions, rewards, next_states, not_dones, _, _ = transitions
 
-        assert len(states.shape) >= 2
-        assert len(actions.shape) == 2
-        assert len(rewards.shape) == 2 and rewards.shape[1] == 1
-        assert len(next_states.shape) >= 2
-        assert len(not_dones.shape) == 2 and not_dones.shape[1] == 1
+    def save_models(self, filename: str, filepath: str = "models") -> None:
+        path = f"{filepath}/models" if filepath != "models" else filepath
+        dir_exists = os.path.exists(path)
 
-        self.train_with_true(states, actions, rewards, next_states, not_dones)
+        if not dir_exists:
+            os.makedirs(path)
 
-        self.learn_counter += 1
+        torch.save(self.actor_net.state_dict(), f"{path}/{filename}_actor.pht")
+        torch.save(self.critic_net.state_dict(), f"{path}/{filename}_critic.pht")
+        logging.info("models has been saved...")
+
+    def load_models(self, filepath: str, filename: str) -> None:
+        path = f"{filepath}/models" if filepath != "models" else filepath
+
+        self.actor_net.load_state_dict(torch.load(f"{path}/{filename}_actor.pht"))
+        self.critic_net.load_state_dict(torch.load(f"{path}/{filename}_critic.pht"))
+        logging.info("models has been loaded...")

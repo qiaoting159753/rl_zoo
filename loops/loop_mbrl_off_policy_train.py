@@ -1,5 +1,4 @@
-import torch
-
+import logging
 # Agents
 from agents.mbrl import Dyna_SAC_NS
 from agents.mbrl import Dyna_SAC_SAS
@@ -26,112 +25,112 @@ class MBRL_Trainer:
     """
     Training and evaluation loop for Model-Based agents that does not need to train the world model.
     """
-
     def __init__(self,
                  env: DMCSEnvironment,
                  agent_name: str,
                  random_goal: bool,
                  device: str,
                  G: int,
-                 model_G: int,
+                 model_G:float,
                  batch_size: int,
                  episode_steps: int,
                  maximum_steps: int,
-                 horizon: int,
-                 branch_factor: int,
-                 ):
+                 evaluate_interval: int,
+                 generate_results: bool):
 
-        self.horizon = horizon
-        self.brach_factor = branch_factor
-
+        self.generate_results = generate_results
         self.maximum_steps = maximum_steps
         self.episode_steps = episode_steps
-        self.model_G = model_G
-
-        self.agent = None
-        self.agent_name = agent_name
-
         self.env = env
-        self.agent_selection(agent_name)
-
         self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
-        self.evaluation_array = [[], [], [], [], []]
-        self.generate_results = True
+
+        self.evaluate_interval = evaluate_interval
+        self.evaluation_array = []
+
         self.counter = 0
 
         self.device = device
         self.random_goal = random_goal
         self.G = G
+        self.model_G = model_G
         self.batch_size = batch_size
 
-        self.state_dim = self.env.observation_space
-        self.action_dim = self.env.action_num
+        self.state_dim = env.observation_space
+        self.action_dim = env.action_num
 
+        self.agent = None
+        self.agent_name = agent_name
+        self.agent_selection(agent_name)
         self.memory = PrioritizedReplayBuffer()
 
     def evaluate(self):
         """
-        Evaluate the MBRL agent
-
+        Evaluate the agents
         """
-        total_rewards = 0.0
-        dones = 0
-        total_dist = 0.0
         total_steps = 0
-        total_qs = 0.0
-
-        for _ in range(10):
+        record_rewards = np.zeros((11,))
+        for j in range(10):
             state = self.env.reset()
+            total_rewards = 0.0
             for _ in range(self.episode_steps):
                 action = self.agent.select_action_from_policy(state, evaluation=True)
-                next_state, reward, done, dist, _ = self.env.step(action)
-                total_dist += dist
+                next_state, reward, done, _ = self.env.step(action)
                 total_steps += 1
                 total_rewards += reward
                 state = next_state
                 if done:
-                    dones += 1
                     break
-        avg_reward = total_rewards / total_steps
-        print("------ Evaluation: " + str(total_rewards / 10) + " ------")
-        self.evaluation_array[0].append(self.counter)
-        self.evaluation_array[1].append(avg_reward)
-        self.evaluation_array[2].append(dones)
-        self.evaluation_array[3].append(total_dist)
-        self.evaluation_array[4].append(total_qs / total_steps)
-
+            record_rewards[j] = total_rewards
+        record_rewards[10] = self.counter  # Index
+        self.evaluation_array.append(record_rewards)
+        logging.info("------------------ Evaluation: " + str(np.mean(record_rewards[:10])) + " ------------------")
         if self.generate_results:
             eval_array = np.array(self.evaluation_array)
+            data_folder = "statistics/"
             # Save the metrics
-            file_name = self.env.domain + "_" + self.env.task + "_" + self.agent_name + "_" + self.date_and_time
+            file_name = data_folder + self.env.domain + "_" + \
+                        self.env.task + "_" + self.agent_name + "_" + self.date_and_time
             np.savetxt(file_name + ".csv", eval_array, delimiter=",")
-            self.agent.save_models(file_name)
 
     def train(self):
         """
-        Train the MBRL Agent
+        Train the MFRL Agent.
         """
-        for i in range(self.maximum_steps):
+        need_evaluate = False
+        for _ in range(self.maximum_steps):
             state = self.env.reset()
             epi_reward = 0.0
             for _ in range(self.episode_steps):
                 action = self.agent.select_action_from_policy(state)
                 # Do action is for the environment.
-                next_state, reward, done, _, _ = self.env.step(action)
+                next_state, reward, done, _ = self.env.step(action)
                 # Small action is for training.
                 self.memory.add(state, action, reward, next_state, done)
                 epi_reward += reward
                 if len(self.memory) > self.batch_size:
                     for _ in range(self.G):
                         self.agent.train_policy(self.memory, batch_size=self.batch_size)
-                        self.counter += 1
+
+                if self.model_G > 1.0:
+                    for _ in range(int(self.model_G)):
+                        # self.agent.train_world_model()
+                        print("Train world model")
+                else:
+                    # For every a few steps
+                    if self.counter % (int(1.0/self.model_G)) == 0:
+                        # self.agent.train_world_model()
+                        print("Train world model")
+
+                self.counter += 1
+                if self.counter % self.evaluate_interval == 0:
+                    need_evaluate = True
                 state = next_state
                 if done:
                     break
-            # Print Training Rewards.
-            print("------ Training: " + str(epi_reward) + " ------")
-            if i % 10000 == 0:
+            logging.info("---- Training: " + str(epi_reward) + " ----")
+            if need_evaluate:
                 self.evaluate()
+                need_evaluate = False
 
     def agent_selection(self, agent_name):
         """

@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from agents.utils import HyperMLP
+from utils import HyperMLP
 
 
 class Hyper_TQC_Critic(nn.Module):

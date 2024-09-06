@@ -5,6 +5,57 @@ from torch.distributions.transformed_distribution import TransformedDistribution
 from torch.distributions.transforms import TanhTransform
 from torch.nn import functional as F
 
+class HyperMLP(nn.Module):
+    def __init__(self, input_size: int, output_size: int):
+        super().__init__()
+
+        self.obs_act_size = input_size
+        self.first_layer = 64
+        self.output_size = output_size
+
+        # Input: 9, Output: 64 * (9 + 1)
+        self.Q1_1 = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, self.obs_act_size * self.first_layer + self.first_layer),
+        )
+
+        self.Q1 = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, self.first_layer ** 2 + self.first_layer),
+        )
+
+        self.Q1_2 = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, self.first_layer * output_size + output_size),
+        )
+
+    def forward(self, obs_action):
+        q1_wb_1 = self.Q1_1(obs_action)
+        q1_w_1 = q1_wb_1[:, :self.obs_act_size * self.first_layer]
+        q1_b_1 = q1_wb_1[:, self.obs_act_size * self.first_layer:].unsqueeze(dim=2)
+        q1_w_1 = torch.unflatten(q1_w_1, dim=1, sizes=(self.first_layer, self.obs_act_size))
+        x_1 = obs_action.unsqueeze(dim=2)
+        x_1 = torch.matmul(q1_w_1, x_1) + q1_b_1
+        x_1 = F.relu(x_1)
+
+        q1_wb = self.Q1(obs_action)
+        q1_w = q1_wb[:, :self.first_layer ** 2]
+        q1_b = q1_wb[:, self.first_layer ** 2:].unsqueeze(dim=2)
+        q1_w = torch.unflatten(q1_w, dim=1, sizes=(self.first_layer, self.first_layer))
+        x_1 = torch.matmul(q1_w, x_1) + q1_b
+        x_1 = F.relu(x_1)
+
+        q1_wb_2 = self.Q1_2(obs_action)
+        q1_w_2 = q1_wb_2[:, :self.first_layer * self.output_size]
+        q1_b_2 = q1_wb_2[:, self.first_layer * self.output_size:].unsqueeze(dim=2)
+        q1_w_2 = torch.unflatten(q1_w_2, dim=1, sizes=(self.output_size, self.first_layer))
+        x_1 = torch.matmul(q1_w_2, x_1) + q1_b_2
+        x_1 = x_1.squeeze(dim=2)
+        return x_1
+
 
 # Standard Multilayer Perceptron (MLP) network
 class MLP(nn.Module):

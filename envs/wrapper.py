@@ -36,7 +36,7 @@ class DMCSEnvironment(Environment):
 
     """
     def __init__(self, domain, task) -> None:
-        super().__init__()
+        super().__init__(domain_name=domain, task_name=task)
         self.task = task
         logging.info(f"Training on Domain {domain}")
         self.domain = domain

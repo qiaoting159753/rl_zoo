@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from agents.utils import SquashedNormal
+from utils import SquashedNormal
 
 
 class Actor(nn.Module):
@@ -8,11 +8,11 @@ class Actor(nn.Module):
     """torch.distributions implementation of an diagonal Gaussian policy."""
 
     def __init__(
-        self,
-        observation_size: int,
-        num_actions: int,
-        hidden_size: list[int] = None,
-        log_std_bounds: list[int] = None,
+            self,
+            observation_size: int,
+            num_actions: int,
+            hidden_size: list[int] = None,
+            log_std_bounds: list[int] = None,
     ):
         super().__init__()
         if hidden_size is None:
@@ -34,7 +34,7 @@ class Actor(nn.Module):
         self.log_std_linear = nn.Linear(self.hidden_size[1], num_actions)
 
     def forward(
-        self, state: torch.Tensor
+            self, state: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         x = self.act_net(state)
         mu = self.mean_linear(x)

@@ -11,7 +11,7 @@ import os
 import numpy as np
 import torch
 
-from utils.memory import MemoryBuffer
+from utils import PrioritizedReplayBuffer
 
 
 class Fully_Expand:
@@ -117,7 +117,7 @@ class Fully_Expand:
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
 
-    def train_policy(self, memory: MemoryBuffer, batch_size: int) -> None:
+    def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:
         self.learn_counter += 1
         experiences = memory.sample_uniform(batch_size)
         states, _, _, _, _, _ = experiences

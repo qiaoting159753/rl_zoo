@@ -3,7 +3,7 @@ import numpy as np
 import math
 import random
 import torch
-from envs.env_arm_utils import a, alph, d, matrix_to_quaternion
+from .env_arm_utils import a, alph, d, matrix_to_quaternion
 from .ur10_forward_kinematics import Forward_Kinematics
 import pyquaternion
 from pyquaternion import Quaternion

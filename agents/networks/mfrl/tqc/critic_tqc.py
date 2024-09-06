@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from agents.utils import MLP
+from utils import MLP
 
 
 class TQC_Critic(nn.Module):
