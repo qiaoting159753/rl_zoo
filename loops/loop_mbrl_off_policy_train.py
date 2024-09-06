@@ -3,16 +3,12 @@ import torch
 # Agents
 from agents.mbrl import Dyna_SAC_NS
 from agents.mbrl import Dyna_SAC_SAS
-from agents.mbrl import Dyna_TQC
 from agents.mbrl import Immersive_Reweight_Dyna_SAC
-from agents.mbrl import Immersive_Reweight_Dyna_TQC
-
-from agents.mbrl import STEVE_SAC_actor
-from agents.mbrl import STEVE_SAC_Critic_all
 from agents.mbrl import STEVE_SAC_Critic_mean
-from agents.mbrl import STEVE_TQC_Actor
-from agents.mbrl import STEVE_TQC_Critic
 
+# World Models
+from agents.networks.world_models.ensembles import Ensemble_Dyna_One_SAS_Reward
+from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
 
 # Actors and Critics
 from agents.networks.mfrl.common import Actor
@@ -42,7 +38,7 @@ class MBRL_Trainer:
                  episode_steps: int,
                  maximum_steps: int,
                  horizon: int,
-                 branch_factor:int,
+                 branch_factor: int,
                  ):
 
         self.horizon = horizon
@@ -144,70 +140,77 @@ class MBRL_Trainer:
         :param agent_name:
         """
         actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-        sac_critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-        tqc_critic = TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-
-        action_dim = self.action_dim,
-        state_dim = self.state_dim,
-        actor_lr = 3e-4,
-        critic_lr = 3e-4,
+        sas_world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
+                                                       num_actions=self.action_dim,
+                                                       num_models=5,
+                                                       lr=0.001,
+                                                       device=self.device)
 
         if agent_name == "Dyna_SAC_NS":
-            Dyna_SAC_NS()
-            self.agent = Dyna_SAC_NS(actor_network = actor, critic_network = sac_critic,
-                world_network: EnsembleWorldAndOneNSReward,
-                gamma = 0.99,
-                tau: 0.005,
-                action_num: int,
-                actor_lr: float,
-                critic_lr: float,
-                alpha_lr = 3e-4,
-                num_samples = self.brach_factor,
-                horizon = self.horizon,
-                device = self.device,
+            sac_critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            ns_world_model = Ensemble_Dyna_One_NS_Reward(observation_size=self.state_dim,
+                                                         num_actions=self.action_dim,
+                                                         num_models=5,
+                                                         lr=0.001,
+                                                         device=self.device)
+
+            self.agent = Dyna_SAC_NS(
+                actor_network=actor,
+                critic_network=sac_critic,
+                world_network=ns_world_model,
+                gamma=0.99,
+                tau=0.005,
+                action_num=self.action_dim,
+                actor_lr=3e-4,
+                critic_lr=3e-4,
+                alpha_lr=3e-4,
+                num_samples=self.brach_factor,
+                horizon=self.horizon
             )
-            def __init__(
-                    self,
-                    actor_network: torch.nn.Module,
-                    critic_network: torch.nn.Module,
-                    world_network: EnsembleWorldAndOneNSReward,
-                    gamma: float,
-                    tau: float,
-                    action_num: int,
-                    actor_lr: float,
-                    critic_lr: float,
-                    alpha_lr: float,
-                    num_samples: int,
-                    horizon: int,
-                    device: torch.device,
-            ):
 
         if agent_name == "Dyna_SAC_SAS":
-            print("Dyna")
-
-        if agent_name == "Dyna_TQC":
-            print("Dyna")
+            sac_critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = Dyna_SAC_SAS(
+                actor_network=actor,
+                critic_network=sac_critic,
+                world_network=sas_world_model,
+                gamma=0.99,
+                tau=0.005,
+                action_num=self.action_dim,
+                actor_lr=3e-4,
+                critic_lr=3e-4,
+                alpha_lr=3e-4,
+                num_samples=self.brach_factor,
+                horizon=self.horizon
+            )
 
         if agent_name == "Immersive_Reweight_Dyna_SAC":
-            print("Dyna")
+            sac_critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = Immersive_Reweight_Dyna_SAC(
+                actor_network=actor,
+                critic_network=sac_critic,
+                world_network=sas_world_model,
+                gamma=0.99,
+                tau=0.005,
+                action_num=self.action_dim,
+                actor_lr=3e-4,
+                critic_lr=3e-4,
+                alpha_lr=3e-4,
+                num_samples=self.brach_factor,
+                horizon=self.horizon
+            )
 
-        if agent_name == "Immersive_Reweight_Dyna_TQC":
-            print("Dyna")
-
-        if agent_name == "STEVE_SAC_actor":
-            print("Dyna")
-
-        if agent_name == "STEVE_SAC_critic_all":
-            print("Dyna")
-
-        if agent_name == "STEVE_SAC_critic_mean":
-            print("Dyna")
-
-        if agent_name == "STEVE_TQC_actor":
-            print("Dyna")
-
-        if agent_name == "STEVE_TQC_critic":
-            print("Dyna")
-
-
-
+        if agent_name == "STEVE_SAC_Critic_mean":
+            sac_critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+            self.agent = STEVE_SAC_Critic_mean(
+                actor_network=actor,
+                critic_network=sac_critic,
+                world_network=sas_world_model,
+                gamma=0.99,
+                tau=0.005,
+                action_num=self.action_dim,
+                actor_lr=3e-4,
+                critic_lr=3e-4,
+                alpha_lr=3e-4,
+                horizon=self.horizon
+            )
