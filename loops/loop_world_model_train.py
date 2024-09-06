@@ -2,7 +2,7 @@ import torch
 # Agents
 from agents.mfrl import SAC
 from agents.mfrl import TQC
-from agents.mbrl import Fully_Expand
+from agents.mfrl import Fully_Expand
 
 # Actors
 from agents.networks.mfrl.common import Actor
@@ -21,7 +21,7 @@ import numpy as np
 from envs import DMCSEnvironment
 
 
-class WorldModel_Trainer:
+class World_Model_Trainer:
     """
     Training and evaluation loop for Model-Free agents that does not need to train the world model.
     """
