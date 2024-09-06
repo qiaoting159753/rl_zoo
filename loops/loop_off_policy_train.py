@@ -118,7 +118,7 @@ class MFRL_Trainer:
                 state = next_state
                 if done:
                     break
-            print("---- Training: " + str(epi_reward) + " ----")
+            logging.info("---- Training: " + str(epi_reward) + " ----")
             if need_evaluate:
                 self.evaluate()
                 need_evaluate = False
