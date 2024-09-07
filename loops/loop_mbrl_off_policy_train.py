@@ -71,7 +71,8 @@ class MBRL_Trainer:
         self.agent_selection(agent_name)
         self.memory = PrioritizedReplayBuffer()
 
-        self.directory = "/root/rl_zoo_data/"
+        # self.directory = "/root/rl_zoo_data/"
+        self.directory = "statistic/"
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 

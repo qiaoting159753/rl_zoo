@@ -1,127 +1,151 @@
+import os
 import torch
-# Agents
-from agents.mfrl import SAC
-from agents.mfrl import TQC
-from agents.mfrl import Fully_Expand
-
-# Actors
-from agents.networks.mfrl.common import Actor
-from agents.networks.mfrl.common import HyperActor
-
-# Critic
-from agents.networks.mfrl.sac import SAC_Critic
-from agents.networks.mfrl.sac import Hyper_Double_SAC_Critic
-from agents.networks.mfrl.tqc import TQC_Critic
-from agents.networks.mfrl.tqc import Hyper_TQC_Critic
-
-from utils import PrioritizedReplayBuffer
-from datetime import datetime
+import logging
 import numpy as np
+from tqdm import trange
+from datetime import datetime
+from tqdm.contrib.logging import logging_redirect_tqdm
+logging.basicConfig(level=logging.INFO)
+
+# Agents
+from agents.networks.mfrl.common import Actor
+from agents.networks.mfrl.sac import SAC_Critic
+from agents.mfrl import SAC
+from utils import PrioritizedReplayBuffer
 
 from envs import DMCSEnvironment
 
+# World Models
+from agents.networks.world_models.ensembles import Ensemble_Dyna_One_SAS_Reward
+from agents.networks.world_models.deterministic import Probabilistic_Dynamics
+from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
+from agents.networks.world_models.ensembles import Ensemble_Dyna_Ensemble_SAS_Reward
+from agents.networks.world_models.ensembles import En
 
-class World_Model_Trainer:
+
+class MBRL_Trainer:
     """
-    Training and evaluation loop for Model-Free agents that does not need to train the world model.
+    Training and evaluation loop for Model-Based agents that does not need to train the world model.
     """
 
     def __init__(self,
                  env: DMCSEnvironment,
-                 agent_name: str,
+                 world_model_name: str,
+                 on_policy: bool,
                  random_goal: bool,
                  device: str,
                  G: int,
+                 model_G: float,
                  batch_size: int,
                  episode_steps: int,
                  maximum_steps: int,
+                 evaluate_interval: int,
+                 generate_results: bool,
                  seed: int):
+        self.world_model_name = world_model_name
+        self.on_policy = on_policy
         self.seed = seed
+        self.generate_results = generate_results
         self.maximum_steps = maximum_steps
         self.episode_steps = episode_steps
-        self.agent = None
-        self.agent_name = agent_name
-
         self.env = env
-        self.agent_selection(agent_name)
-
         self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
-        self.evaluation_array = [[], [], [], [], []]
-        self.generate_results = True
-        self.counter = 0
 
+        self.evaluate_interval = evaluate_interval
+        self.evaluation_array = []
+
+        self.counter = 0
         self.device = device
         self.random_goal = random_goal
         self.G = G
+        self.model_G = model_G
         self.batch_size = batch_size
 
-        self.state_dim = self.env.observation_space
-        self.action_dim = self.env.action_num
+        self.state_dim = env.observation_space
+        self.action_dim = env.action_num
 
+        self.agent = None
         self.memory = PrioritizedReplayBuffer()
+
+        self.directory = "/root/rl_zoo_data/"
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
 
     def evaluate(self):
         """
         Evaluate the agents
-
         """
-        total_rewards = 0.0
-        dones = 0
-        total_dist = 0.0
-        total_steps = 0
-        total_qs = 0.0
-        for _ in range(10):
-            state = self.env.reset()
+        record_rewards = np.zeros((11,))
+        record_rewards[10] = self.counter  # Index
+        for j in range(10):
+            s = self.env.reset()
+            total_rewards = 0.0
             for _ in range(self.episode_steps):
-                action = self.agent.select_action_from_policy(state, evaluation=True)
-                next_state, reward, done, dist, _ = self.env.step(action)
-                total_dist += dist
-                total_steps += 1
-                total_rewards += reward
-                state = next_state
+                a = self.agent.select_action_from_policy(s, evaluation=True)
+                ns, rwd, done, _ = self.env.step(a)
+                total_rewards += rwd
+                s = ns
                 if done:
-                    dones += 1
                     break
-        avg_reward = total_rewards / total_steps
-        print("------ Evaluation: " + str(total_rewards / 10) + " ------")
-        self.evaluation_array[0].append(self.counter)
-        self.evaluation_array[1].append(avg_reward)
-        self.evaluation_array[2].append(dones)
-        self.evaluation_array[3].append(total_dist)
-        self.evaluation_array[4].append(total_qs / total_steps)
-
+            record_rewards[j] = total_rewards
+        self.evaluation_array.append(record_rewards)
+        logging.info(f"--Evaluation ({self.counter}/{self.maximum_steps}): " + str(np.mean(record_rewards[:10])) + "--")
         if self.generate_results:
             eval_array = np.array(self.evaluation_array)
+            data_folder = self.directory
             # Save the metrics
-            file_name = self.env.domain + "_" + self.env.task + "_" + self.agent_name + "_" + self.date_and_time
+            file_name = data_folder + str(self.seed) + "_" + self.env.domain + "_" + \
+                        self.env.task + "_" + self.agent_name + "_" + self.date_and_time
             np.savetxt(file_name + ".csv", eval_array, delimiter=",")
-            self.agent.save_models(file_name)
 
     def train(self):
         """
         Train the MFRL Agent.
-
         """
-        for i in range(self.maximum_steps):
-            state = self.env.reset()
-            epi_reward = 0.0
-            for _ in range(self.episode_steps):
-                action = self.agent.select_action_from_policy(state)
+        with logging_redirect_tqdm():
+            need_evaluate = False
+            need_reset = True
+            for _ in trange(self.maximum_steps):
+                if need_reset:
+                    epi_reward = 0.0
+                    step_counter = 0
+                    state = self.env.reset()
+                    need_reset = False
+                if self.on_policy:
+                    action = self.agent.select_action_from_policy(state)
+                else:
+                    action = self.env.sample_action()
+
                 # Do action is for the environment.
-                next_state, reward, done, _, _ = self.env.step(action)
+                next_state, reward, done, _ = self.env.step(action)
                 # Small action is for training.
                 self.memory.add(state, action, reward, next_state, done)
+                state = next_state
+                step_counter += 1
                 epi_reward += reward
                 if len(self.memory) > self.batch_size:
                     for _ in range(self.G):
                         self.agent.train_policy(self.memory, batch_size=self.batch_size)
-                        self.counter += 1
-                state = next_state
-                if done:
-                    break
-            print("------ Training: " + str(epi_reward) + " ------")
-            if i % 10000 == 0:
-                self.evaluate()
+                    self.counter += 1
+
+                    if self.model_G > 1.0:
+                        for _ in range(int(self.model_G)):
+                            # self.agent.train_world_model()
+                            print("Train world model")
+                    else:
+                        # For every a few steps
+                        if self.counter % (int(1.0/self.model_G)) == 0:
+                            # self.agent.train_world_model()
+                            print("Train world model")
+
+                if self.counter % self.evaluate_interval == 0:
+                    need_evaluate = True
+                if done or ((step_counter % self.episode_steps) == 0):
+                    logging.info("Training: " + str(epi_reward))
+                    need_reset = True
+                    if need_evaluate:
+                        self.evaluate()
+                        need_evaluate = False
 
     def agent_selection(self, agent_name):
         """
@@ -129,126 +153,35 @@ class World_Model_Trainer:
 
         :param agent_name:
         """
-        if agent_name == "SAC":
-            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-            self.agent = SAC(actor_network=actor,
-                             critic_network=critic,
-                             alpha_lr=3e-4,
-                             gamma=0.99,
-                             tau=0.005,
-                             action_dim=self.action_dim,
-                             state_dim=self.state_dim,
-                             actor_lr=3e-4,
-                             critic_lr=3e-4,
-                             device=self.device)
+        actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
+        critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
+        self.agent = SAC(actor_network=actor,
+                         critic_network=critic,
+                         action_num=self.action_dim,
+                         alpha_lr=3e-4,
+                         gamma=0.99,
+                         tau=0.005,
+                         actor_lr=3e-4,
+                         critic_lr=3e-4,
+                         device=torch.device(self.device),
+                         reward_scale=1.0)
 
-        if agent_name == "TQC":
-            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-            self.agent = TQC(actor_network=actor,
-                             critic_network=critic,
-                             actor_lr=3e-4,
-                             critic_lr=3e-4,
-                             alpha_lr=3e-4,
-                             gamma=0.99,
-                             tau=0.005,
-                             top_quantiles_to_drop=2,
-                             action_num=self.action_dim,
-                             device=self.device, )
+        if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
+            self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
+                                                           num_actions=self.action_dim,
+                                                           num_models=5,
+                                                           lr=0.001,
+                                                           device=self.device)
 
-        if agent_name == "Fully_Expand":
-            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-            self.agent = Fully_Expand(self,
-                                      actor_network=actor,
-                                      gamma=0.99,
-                                      tau=0.005,
-                                      action_num=6,
-                                      actor_lr=0.0003,
-                                      alpha_lr=0.0003,
-                                      horizon=10,
-                                      device='cpu')
-
-        if agent_name == "Hyper_SAC_Critic":
-            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = Hyper_Double_SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-            self.agent = SAC(actor_network=actor,
-                             critic_network=critic,
-                             alpha_lr=3e-4,
-                             gamma=0.99,
-                             tau=0.005,
-                             action_dim=self.action_dim,
-                             state_dim=self.state_dim,
-                             actor_lr=3e-4,
-                             critic_lr=3e-4,
-                             device=self.device)
-
-        if agent_name == "Hyper_TQC_Critic":
-            actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = Hyper_TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-            self.agent = TQC(actor_network=actor,
-                             critic_network=critic,
-                             actor_lr=3e-4,
-                             critic_lr=3e-4,
-                             alpha_lr=3e-4,
-                             gamma=0.99,
-                             tau=0.005,
-                             top_quantiles_to_drop=2,
-                             action_num=self.action_dim,
-                             device=self.device)
-
-        if agent_name == "Hyper_SAC_all":
-            actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = Hyper_Double_SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-            self.agent = SAC(actor_network=actor,
-                             critic_network=critic,
-                             alpha_lr=3e-4,
-                             gamma=0.99,
-                             tau=0.005,
-                             action_dim=self.action_dim,
-                             state_dim=self.state_dim,
-                             actor_lr=3e-4,
-                             critic_lr=3e-4,
-                             device=self.device)
-
-        if agent_name == "Hyper_TQC_all":
-            actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = Hyper_TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-            self.agent = TQC(actor_network=actor,
-                             critic_network=critic,
-                             actor_lr=3e-4,
-                             critic_lr=3e-4,
-                             alpha_lr=3e-4,
-                             gamma=0.99,
-                             tau=0.005,
-                             top_quantiles_to_drop=2,
-                             action_num=self.action_dim,
-                             device=self.device)
-
-        if agent_name == "Hyper_SAC_actor":
-            actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-            self.agent = SAC(actor_network=actor,
-                             critic_network=critic,
-                             alpha_lr=3e-4,
-                             gamma=0.99,
-                             tau=0.005,
-                             action_dim=self.action_dim,
-                             state_dim=self.state_dim,
-                             actor_lr=3e-4,
-                             critic_lr=3e-4,
-                             device=self.device)
-
-        if agent_name == "Hyper_TQC_actor":
-            actor = HyperActor(observation_size=self.state_dim, num_actions=self.action_dim)
-            critic = TQC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-            self.agent = TQC(actor_network=actor,
-                             critic_network=critic,
-                             actor_lr=3e-4,
-                             critic_lr=3e-4,
-                             alpha_lr=3e-4,
-                             gamma=0.99,
-                             tau=0.005,
-                             top_quantiles_to_drop=2,
-                             action_num=self.action_dim,
-                             device=self.device)
+        if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
+            self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
+                                                           num_actions=self.action_dim,
+                                                           num_models=5,
+                                                           lr=0.001,
+                                                           device=self.device)
+        if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
+            self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
+                                                           num_actions=self.action_dim,
+                                                           num_models=5,
+                                                           lr=0.001,
+                                                           device=self.device)

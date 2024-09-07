@@ -12,7 +12,7 @@
 # from networks.mbrl.simple.z_simple_rewards import SimpleReward
 #
 #
-# class IntegratedWorldModel:
+# class Ensemble_Integrated:
 #     """
 #     A integrated world model aims to train the reward prediciton and next state
 #     prediciton together.

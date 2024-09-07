@@ -8,10 +8,10 @@ import torch.nn.functional as F
 import torch.utils
 from torch import optim
 
-from agents.networks.world_models.deterministic.probabilistic_dynamics import (
+from agents.networks.world_models.deterministic.probabilistic_dynamic import (
     Probabilistic_Dynamics,
 )
-from agents.networks.world_models.deterministic.probabilistic_sas_reward import (
+from agents.networks.world_models.simple.probabilistic_sas_reward import (
     Probabilistic_SAS_Reward,
 )
 from agents.networks.world_models.simple.simple_sas_done import (
@@ -20,7 +20,7 @@ from agents.networks.world_models.simple.simple_sas_done import (
 from utils.helpers import normalize_observation_delta
 
 
-class EnsembleWorldRewardDone:
+class Ensemble_Dyna_Reward_Done:
     """
     This class consist of an ensemble of all components for critic update.
     Q_label = REWARD + gamma * (1 - DONES) * Q(NEXT_STATES).
