@@ -1,4 +1,10 @@
+import os
 import logging
+from tqdm import trange
+from tqdm.contrib.logging import logging_redirect_tqdm
+
+logging.basicConfig(level=logging.INFO)
+
 # Agents
 from agents.mbrl import Dyna_SAC_NS
 from agents.mbrl import Dyna_SAC_SAS
@@ -25,6 +31,7 @@ class MBRL_Trainer:
     """
     Training and evaluation loop for Model-Based agents that does not need to train the world model.
     """
+
     def __init__(self,
                  env: DMCSEnvironment,
                  agent_name: str,
@@ -64,30 +71,32 @@ class MBRL_Trainer:
         self.agent_selection(agent_name)
         self.memory = PrioritizedReplayBuffer()
 
+        self.directory = "/root/rl_zoo_data/"
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
+
     def evaluate(self):
         """
         Evaluate the agents
         """
-        total_steps = 0
         record_rewards = np.zeros((11,))
+        record_rewards[10] = self.counter  # Index
         for j in range(10):
-            state = self.env.reset()
+            s = self.env.reset()
             total_rewards = 0.0
             for _ in range(self.episode_steps):
-                action = self.agent.select_action_from_policy(state, evaluation=True)
-                next_state, reward, done, _ = self.env.step(action)
-                total_steps += 1
-                total_rewards += reward
-                state = next_state
+                a = self.agent.select_action_from_policy(s, evaluation=True)
+                ns, rwd, done, _ = self.env.step(a)
+                total_rewards += rwd
+                s = ns
                 if done:
                     break
             record_rewards[j] = total_rewards
-        record_rewards[10] = self.counter  # Index
         self.evaluation_array.append(record_rewards)
-        print("------------------ Evaluation: " + str(np.mean(record_rewards[:10])) + " ------------------")
+        logging.info("------------------ Evaluation: " + str(np.mean(record_rewards[:10])) + " ------------------")
         if self.generate_results:
             eval_array = np.array(self.evaluation_array)
-            data_folder = "statistics/"
+            data_folder = self.directory
             # Save the metrics
             file_name = data_folder + str(self.seed) + "_" + self.env.domain + "_" + \
                         self.env.task + "_" + self.agent_name + "_" + self.date_and_time
@@ -97,41 +106,46 @@ class MBRL_Trainer:
         """
         Train the MFRL Agent.
         """
-        need_evaluate = False
-        for _ in range(self.maximum_steps):
-            state = self.env.reset()
-            epi_reward = 0.0
-            for _ in range(self.episode_steps):
+        with logging_redirect_tqdm():
+            need_evaluate = False
+            need_reset = True
+            for _ in trange(self.maximum_steps):
+                if need_reset:
+                    epi_reward = 0.0
+                    step_counter = 0
+                    state = self.env.reset()
+                    need_reset = False
                 action = self.agent.select_action_from_policy(state)
                 # Do action is for the environment.
                 next_state, reward, done, _ = self.env.step(action)
                 # Small action is for training.
                 self.memory.add(state, action, reward, next_state, done)
+                state = next_state
+                step_counter += 1
                 epi_reward += reward
                 if len(self.memory) > self.batch_size:
                     for _ in range(self.G):
                         self.agent.train_policy(self.memory, batch_size=self.batch_size)
+                    self.counter += 1
 
-                if self.model_G > 1.0:
-                    for _ in range(int(self.model_G)):
-                        # self.agent.train_world_model()
-                        print("Train world model")
-                else:
-                    # For every a few steps
-                    if self.counter % (int(1.0/self.model_G)) == 0:
-                        # self.agent.train_world_model()
-                        print("Train world model")
+                    if self.model_G > 1.0:
+                        for _ in range(int(self.model_G)):
+                            # self.agent.train_world_model()
+                            print("Train world model")
+                    else:
+                        # For every a few steps
+                        if self.counter % (int(1.0/self.model_G)) == 0:
+                            # self.agent.train_world_model()
+                            print("Train world model")
 
-                self.counter += 1
                 if self.counter % self.evaluate_interval == 0:
                     need_evaluate = True
-                state = next_state
-                if done:
-                    break
-            print("---- Training: " + str(epi_reward) + " ----")
-            if need_evaluate:
-                self.evaluate()
-                need_evaluate = False
+                if done or ((step_counter % self.episode_steps) == 0):
+                    logging.info("---- Training: " + str(epi_reward) + " ----")
+                    need_reset = True
+                    if need_evaluate:
+                        self.evaluate()
+                        need_evaluate = False
 
     def agent_selection(self, agent_name):
         """
