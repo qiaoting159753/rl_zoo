@@ -41,31 +41,110 @@ class World_Model_Trainer:
                  generate_results: bool,
                  seed: int,
                  directory: str):
-
-        self.directory = directory
-        self.world_model_name = world_model_name
-        self.on_policy = on_policy
-        self.seed = seed
-        self.generate_results = generate_results
-        self.maximum_steps = maximum_steps
-        self.episode_steps = episode_steps
-        self.env = env
-        self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
-
-        self.evaluate_interval = evaluate_interval
-        self.evaluation_array = []
-
+        # Training
         self.counter = 0
-        self.device = device
-        self.random_goal = random_goal
         self.G = G
         self.model_G = model_G
         self.batch_size = batch_size
+        self.maximum_steps = maximum_steps
+        self.episode_steps = episode_steps
 
+        # Environment
+        self.env = env
         self.state_dim = env.observation_space
         self.action_dim = env.action_num
+        self.random_goal = random_goal
 
+        # Save data
+        self.evaluate_interval = evaluate_interval
+        self.evaluation_array = []
+        self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
+        self.directory = directory
+        self.seed = seed
+        self.generate_results = generate_results
+
+        # Agent and world model.
+        self.world_model_name = world_model_name
+        self.agent = None
+        self.world_model = None
+        self.on_policy = on_policy
         self.memory = PrioritizedReplayBuffer()
+        self.device = device
+        self.agent_selection()
+
+    def evaluate(self):
+        """
+        Evaluation
+        """
+        # Evaluate 10 times
+        l2_one_step_errors = []
+        l2_multi_step_errors = []
+        l1_one_step_errors = []
+        l1_multi_step_errors = []
+        l1_one_rwd_errors = []
+        l1_multi_rwd_errors = []
+
+        gt_s = self.env.reset()
+        multi_state = torch.FloatTensor(gt_s).to(self.device).unsqueeze(dim=0)
+        for _ in range(self.episode_steps):
+            if self.on_policy:
+                action = self.agent.select_action_from_policy(gt_s)
+            else:
+                action = self.env.sample_action()
+            gt_ns, gt_rwd, gt_done, _ = self.env.step(action)
+
+            # Converting to tensor
+            tensor_action = torch.FloatTensor(action).to(self.device).unsqueeze(dim=0)
+            tensor_state = torch.FloatTensor(gt_s).to(self.device).unsqueeze(dim=0)
+            # One step prediction
+            pred_ns, _, _, _ = self.world_model.pred_next_states(observation=tensor_state,
+                                                                 actions=tensor_action)
+
+            one_pred_rewards, _, _ = self.world_model.pred_rewards(observation=tensor_state,
+                                                                   action=tensor_action,
+                                                                   next_observation=pred_ns)
+
+            # Multi-step prediction with different actions.
+            if self.on_policy:
+                np_multi_state = multi_state.detach().squeeze().cpu().numpy()
+                multi_action = self.agent.select_action_from_policy(np_multi_state)
+            else:
+                multi_action = action
+            multi_tensor_action = torch.FloatTensor(multi_action).to(self.device).unsqueeze(dim=0)
+            # Make accumulative multi-step predictions.
+            multi_state_pred, _, _, _ = self.world_model.pred_next_states(observation=multi_state,
+                                                                          actions=multi_tensor_action)
+
+            multi_pred_rewards, _, _ = self.world_model.pred_rewards(observation=multi_state,
+                                                                     action=multi_tensor_action,
+                                                                     next_observation=multi_state_pred)
+
+            # MSE. L1 of dynamics
+            np_pred_ns = pred_ns.detach().squeeze().cpu().numpy()
+            one_step_mse = (np.square(np_pred_ns - gt_ns)).mean()
+            one_step_l1 = (abs(np_pred_ns - gt_ns)).mean()
+            l1_one_step_errors.append(one_step_l1)
+            l2_one_step_errors.append(one_step_mse)
+
+            np_multi_state = multi_state_pred.detach().squeeze().cpu().numpy()
+            multi_step_mse = (np.square(np_multi_state - gt_ns)).mean()
+            multi_step_l1 = (abs(np_multi_state - gt_ns)).mean()
+            l1_multi_step_errors.append(multi_step_l1)
+            l2_multi_step_errors.append(multi_step_mse)
+
+            # L1 of Rewards
+            np_one_pred_rewards = one_pred_rewards.detach().squeeze().cpu().numpy()
+            np_multi_pred_rewards = multi_pred_rewards.detach().squeeze().cpu().numpy()
+            l1_one_rwd_error = abs(np_one_pred_rewards - gt_rwd)
+            l1_multi_rwd_error = abs(np_multi_pred_rewards - gt_rwd)
+            l1_one_rwd_errors.append(l1_one_rwd_error)
+            l1_multi_rwd_errors.append(l1_multi_rwd_error)
+
+            #################    Uncertainty Estimation and Quantification    ################
+
+            gt_s = gt_ns
+            if gt_done:
+                break
 
     def train(self):
         """
@@ -84,33 +163,49 @@ class World_Model_Trainer:
                     action = self.agent.select_action_from_policy(state)
                 else:
                     action = self.env.sample_action()
-
                 # Do action is for the environment.
                 next_state, reward, done, _ = self.env.step(action)
                 # Small action is for training.
                 self.memory.add(state, action, reward, next_state, done)
-                state = next_state
-                step_counter += 1
                 epi_reward += reward
+                step_counter += 1
+                state = next_state
+                # Training
                 if len(self.memory) > self.batch_size:
-                    for _ in range(self.G):
-                        self.agent.train_policy(self.memory, batch_size=self.batch_size)
+                    # first time update world model statistics
+                    if len(self.memory) == (self.batch_size + 1):
+                        statistics = self.memory.get_statistics()
+                        self.world_model.set_statistics(statistics)
+                    # Train the agent only when on-policy.
+                    if self.on_policy:
+                        for _ in range(self.G):
+                            self.agent.train_policy(self.memory, batch_size=self.batch_size)
                     self.counter += 1
+                    # Train the world model every time.
                     if self.model_G > 1.0:
                         for _ in range(int(self.model_G)):
-                            # self.agent.train_world_model()
-                            print("Train world model")
+                            self.agent.train_world_model(memory=self.memory,
+                                                         batch_size=self.batch_size,
+                                                         world_model=self.world_model)
                     else:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
-                            # self.agent.train_world_model()
-                            print("Train world model")
-
+                            self.agent.train_world_model(memory=self.memory,
+                                                         batch_size=self.batch_size,
+                                                         world_model=self.world_model)
+                # Evaluating
                 if self.counter % self.evaluate_interval == 0:
                     need_evaluate = True
+                # End of Episode
                 if done or ((step_counter % self.episode_steps) == 0):
-                    logging.info("Training: " + str(epi_reward))
+                    # Reset at next
+                    logging.info(f"Training:{epi_reward}")
                     need_reset = True
+                    # Update World Model Statistics.
+                    if len(self.memory) > self.batch_size:
+                        statistics = self.memory.get_statistics()
+                        self.world_model.set_statistics(statistics)
+                    # Evaluation
                     if need_evaluate:
                         self.evaluate()
                         need_evaluate = False
@@ -132,19 +227,6 @@ class World_Model_Trainer:
                          device=torch.device(self.device),
                          reward_scale=1.0)
 
-        if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
-            self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
-                                                            num_actions=self.action_dim,
-                                                            num_models=5,
-                                                            lr=0.001,
-                                                            device=self.device)
-
-        if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
-            self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
-                                                            num_actions=self.action_dim,
-                                                            num_models=5,
-                                                            lr=0.001,
-                                                            device=self.device)
         if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
             self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
                                                             num_actions=self.action_dim,

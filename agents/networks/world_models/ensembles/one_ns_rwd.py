@@ -78,7 +78,7 @@ class Ensemble_Dyna_One_NS_Reward:
 
     def pred_rewards(self, observation: torch.Tensor):
         pred_rewards = self.reward_network(observation)
-        return pred_rewards
+        return pred_rewards, None, None
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor

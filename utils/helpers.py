@@ -18,6 +18,7 @@ def create_path_from_format_string(
 ) -> str:
     """
     Create a path from a format string
+    :param algorithm:
     :param format_str: The format string to use
     :param domain: The domain of the environment
     :param task: The task of the environment

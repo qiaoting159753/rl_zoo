@@ -78,8 +78,15 @@ class Ensemble_Dyna_One_SAS_Reward:
             model.statistics = statistics
 
     def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation:torch.Tensor):
+        """
+        Predict reward based on SAS
+        :param observation:
+        :param action:
+        :param next_observation:
+        :return:
+        """
         pred_rewards = self.reward_network(observation, action, next_observation)
-        return pred_rewards
+        return pred_rewards, None, None
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor

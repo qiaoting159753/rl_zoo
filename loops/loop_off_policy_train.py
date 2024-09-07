@@ -45,31 +45,33 @@ class MFRL_Trainer:
                  generate_results: bool,
                  seed: int,
                  directory):
-        self.directory = directory
-        self.seed = seed
-        self.generate_results = generate_results
-        self.maximum_steps = maximum_steps
-        self.episode_steps = episode_steps
+        # Environment
         self.env = env
-        self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
-
-        self.evaluate_interval = evaluate_interval
-        self.evaluation_array = []
-
-        self.counter = 0
-
-        self.device = device
         self.random_goal = random_goal
-        self.G = G
-        self.batch_size = batch_size
-
         self.state_dim = env.observation_space
         self.action_dim = env.action_num
 
+        # Agents
+        self.device = device
         self.agent = None
         self.agent_name = agent_name
         self.agent_selection(agent_name)
         self.memory = PrioritizedReplayBuffer()
+
+        # Training
+        self.seed = seed
+        self.maximum_steps = maximum_steps
+        self.episode_steps = episode_steps
+        self.G = G
+        self.batch_size = batch_size
+        self.counter = 0
+        self.evaluate_interval = evaluate_interval
+
+        # Save Data
+        self.evaluation_array = []
+        self.directory = directory
+        self.generate_results = generate_results
+        self.date_and_time = datetime.now().strftime('%y_%m_%d_%H_%M_%S')
 
     def evaluate(self):
         """
