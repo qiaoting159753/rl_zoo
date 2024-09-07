@@ -19,7 +19,6 @@ def main():
         env = DMCSEnvironment("cheetah", "run")
         # Training
         G = 1
-        model_G = 0.2
         batch_size = 256
         episode_steps = 1000
         evaluate_interval = 10000
@@ -30,6 +29,7 @@ def main():
         device = "cpu"  # For mac training.
         agent_name = "SAC"
         # MBRL
+        model_G = 0.2
         horizon = 5
         branch_factor = 10
 

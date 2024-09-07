@@ -3,20 +3,12 @@ from torch import nn
 
 
 class SAC_Critic(nn.Module):
-    def __init__(
-        self,
-        observation_size: int,
-        num_actions: int,
-        hidden_size: list[int] = None,
-    ):
+    def __init__(self, observation_size: int, num_actions: int):
         super().__init__()
-        if hidden_size is None:
-            hidden_size = [256, 256]
 
-        self.hidden_size = hidden_size
+        self.hidden_size = [256, 256]
 
         # Q1 architecture
-        # pylint: disable-next=invalid-name
         self.Q1 = nn.Sequential(
             nn.Linear(observation_size + num_actions, self.hidden_size[0]),
             nn.ReLU(),
@@ -26,7 +18,6 @@ class SAC_Critic(nn.Module):
         )
 
         # Q2 architecture
-        # pylint: disable-next=invalid-name
         self.Q2 = nn.Sequential(
             nn.Linear(observation_size + num_actions, self.hidden_size[0]),
             nn.ReLU(),

@@ -7,21 +7,10 @@ class Actor(nn.Module):
     # DiagGaussianActor
     """torch.distributions implementation of an diagonal Gaussian policy."""
 
-    def __init__(
-            self,
-            observation_size: int,
-            num_actions: int,
-            hidden_size: list[int] = None,
-            log_std_bounds: list[int] = None,
-    ):
+    def __init__(self, observation_size: int, num_actions: int):
         super().__init__()
-        if hidden_size is None:
-            hidden_size = [256, 256, 256, 256]
-        if log_std_bounds is None:
-            log_std_bounds = [-20, 2]
-
-        self.hidden_size = hidden_size
-        self.log_std_bounds = log_std_bounds
+        self.hidden_size = [256, 256]
+        self.log_std_bounds = [-20, 2]
 
         self.act_net = nn.Sequential(
             nn.Linear(observation_size, self.hidden_size[0]),
@@ -34,7 +23,7 @@ class Actor(nn.Module):
         self.log_std_linear = nn.Linear(self.hidden_size[1], num_actions)
 
     def forward(
-            self, state: torch.Tensor
+        self, state: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         x = self.act_net(state)
         mu = self.mean_linear(x)
