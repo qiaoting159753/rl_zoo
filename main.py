@@ -29,7 +29,7 @@ def main():
         # Agent
         # Change THIS PART WHEN ON SCHOOL #
         directory = "statistic/"
-        # self.directory = "/root/rl_zoo_data/"
+        # directory = "/root/rl_zoo_data/"
         if not os.path.exists(directory):
             os.makedirs(directory)
         device = "cpu"  # For mac training.
