@@ -1,4 +1,3 @@
-import os
 import torch
 import logging
 import numpy as np
@@ -22,7 +21,7 @@ from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_Ensemble_SAS_Reward
 
 
-class MBRL_Trainer:
+class World_Model_Trainer:
     """
     Training and evaluation loop for Model-Based agents that does not need to train the world model.
     """
@@ -40,8 +39,10 @@ class MBRL_Trainer:
                  maximum_steps: int,
                  evaluate_interval: int,
                  generate_results: bool,
-                 seed: int):
+                 seed: int,
+                 directory: str):
 
+        self.directory = directory
         self.world_model_name = world_model_name
         self.on_policy = on_policy
         self.seed = seed
@@ -65,11 +66,6 @@ class MBRL_Trainer:
         self.action_dim = env.action_num
 
         self.memory = PrioritizedReplayBuffer()
-        # self.directory = "/root/rl_zoo_data/"
-        self.directory = "statistic/"
-        if not os.path.exists(self.directory):
-            os.makedirs(self.directory)
-        self.agent_selection()
 
     def train(self):
         """

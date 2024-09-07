@@ -1,6 +1,7 @@
-from loops import MFRL_Trainer, MBRL_Trainer
+from loops import MFRL_Trainer, MBRL_Trainer, World_Model_Trainer
 from envs import DMCSEnvironment
 from utils import set_seed
+import os
 
 
 def main():
@@ -26,7 +27,13 @@ def main():
         # Loop
         loop_name = "MFRL"
         # Agent
+        # Change THIS PART WHEN ON SCHOOL #
+        directory = "statistic/"
+        # self.directory = "/root/rl_zoo_data/"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
         device = "cpu"  # For mac training.
+
         agent_name = "SAC"
         # MBRL
         model_G = 0.2
@@ -45,7 +52,8 @@ def main():
                                    episode_steps=episode_steps,
                                    maximum_steps=maximum_steps,
                                    generate_results=True,
-                                   seed=seed)
+                                   seed=seed,
+                                   directory=directory)
         if loop_name == "MBRL":
             trainer = MBRL_Trainer(env=env,
                                    agent_name=agent_name,
@@ -58,7 +66,26 @@ def main():
                                    branch_factor=branch_factor,
                                    episode_steps=episode_steps,
                                    maximum_steps=maximum_steps,
-                                   seed=seed)
+                                   seed=seed,
+                                   directory=directory,
+                                   generate_results=True,
+                                   evaluate_interval=evaluate_interval)
+
+        if loop_name == "World_Model":
+            trainer = World_Model_Trainer(env=env,
+                                          evaluate_interval=evaluate_interval,
+                                          world_model_name=agent_name,
+                                          random_goal=random_goal,
+                                          device=device,
+                                          on_policy=False,
+                                          G=G,
+                                          model_G=model_G,
+                                          batch_size=batch_size,
+                                          episode_steps=episode_steps,
+                                          maximum_steps=maximum_steps,
+                                          generate_results=True,
+                                          seed=seed,
+                                          directory=directory)
         # Call training.
         trainer.train()
 

@@ -1,8 +1,8 @@
 # from .ensemble_all import Ensemble_Dyna_Reward_Done
 
-from .ensemble_dyna_ensemble_sas_rwd_integrated import IntegratedWorldModel
+from .ensemble_sas_rwd_integrated import IntegratedWorldModel
 
 
-from .ensemble_dyna_ensemble_sas_rwd_separated import Ensemble_Dyna_Ensemble_SAS_Reward
-from .ensemble_dyna_one_ns_rwd import Ensemble_Dyna_One_NS_Reward
-from .ensemble_dyna_one_sas_rwd import Ensemble_Dyna_One_SAS_Reward
+from .ensemble_sas_rwd_separated import Ensemble_Dyna_Ensemble_SAS_Reward
+from .one_ns_rwd import Ensemble_Dyna_One_NS_Reward
+from .one_sas_rwd import Ensemble_Dyna_One_SAS_Reward

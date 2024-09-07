@@ -1,4 +1,3 @@
-import os
 import logging
 from tqdm import trange
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -39,12 +38,19 @@ class MBRL_Trainer:
                  device: str,
                  G: int,
                  model_G: float,
+                 horizon: int,
+                 branch_factor: int,
                  batch_size: int,
                  episode_steps: int,
                  maximum_steps: int,
                  evaluate_interval: int,
                  generate_results: bool,
-                 seed: int):
+                 seed: int,
+                 directory: str):
+
+        self.horizon = horizon
+        self.branch_factor = branch_factor
+        self.directory = directory
         self.seed = seed
         self.generate_results = generate_results
         self.maximum_steps = maximum_steps
@@ -71,11 +77,6 @@ class MBRL_Trainer:
         self.agent_selection(agent_name)
         self.memory = PrioritizedReplayBuffer()
 
-        # self.directory = "/root/rl_zoo_data/"
-        self.directory = "statistic/"
-        if not os.path.exists(self.directory):
-            os.makedirs(self.directory)
-
     def evaluate(self):
         """
         Evaluate the agents
@@ -97,9 +98,8 @@ class MBRL_Trainer:
         logging.info(f"--Evaluation ({self.counter}/{self.maximum_steps}): " + str(np.mean(record_rewards[:10])) + "--")
         if self.generate_results:
             eval_array = np.array(self.evaluation_array)
-            data_folder = self.directory
             # Save the metrics
-            file_name = data_folder + str(self.seed) + "_" + self.env.domain + "_" + \
+            file_name = self.directory + str(self.seed) + "_" + self.env.domain + "_" + \
                         self.env.task + "_" + self.agent_name + "_" + self.date_and_time
             np.savetxt(file_name + ".csv", eval_array, delimiter=",")
 
