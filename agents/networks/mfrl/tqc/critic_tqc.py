@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from cares_reinforcement_learning.util.common import MLP
+from utils.common import MLP
 
 
 class TQC_Critic(nn.Module):
