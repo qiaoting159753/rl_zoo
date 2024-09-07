@@ -174,3 +174,17 @@ class SAC:
         self.actor_net.load_state_dict(torch.load(f"{path}/{filename}_actor.pht"))
         self.critic_net.load_state_dict(torch.load(f"{path}/{filename}_critic.pht"))
         logging.info("models has been loaded...")
+
+    def train_world_model(self, memory: PrioritizedReplayBuffer, batch_size: int, world_model):
+        experiences = memory.sample_uniform(batch_size)
+        states, actions, rewards, next_states, _, _ = experiences
+        batch_size = len(states)
+        # Convert into tensor
+        states = torch.FloatTensor(np.asarray(states)).to(self.device)
+        actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
+        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+        # Reshape to batch_size x whatever
+        rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+        world_model.train_world(states, actions, next_states)
+        world_model.train_reward(states, actions, next_states, rewards)

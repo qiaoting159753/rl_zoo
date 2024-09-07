@@ -5,7 +5,9 @@ import numpy as np
 from tqdm import trange
 from datetime import datetime
 from tqdm.contrib.logging import logging_redirect_tqdm
+
 logging.basicConfig(level=logging.INFO)
+from envs import DMCSEnvironment
 
 # Agents
 from agents.networks.mfrl.common import Actor
@@ -13,14 +15,11 @@ from agents.networks.mfrl.sac import SAC_Critic
 from agents.mfrl import SAC
 from utils import PrioritizedReplayBuffer
 
-from envs import DMCSEnvironment
-
 # World Models
 from agents.networks.world_models.ensembles import Ensemble_Dyna_One_SAS_Reward
 from agents.networks.world_models.deterministic import Probabilistic_Dynamics
 from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_Ensemble_SAS_Reward
-from agents.networks.world_models.ensembles import En
 
 
 class MBRL_Trainer:
@@ -42,6 +41,7 @@ class MBRL_Trainer:
                  evaluate_interval: int,
                  generate_results: bool,
                  seed: int):
+
         self.world_model_name = world_model_name
         self.on_policy = on_policy
         self.seed = seed
@@ -64,39 +64,12 @@ class MBRL_Trainer:
         self.state_dim = env.observation_space
         self.action_dim = env.action_num
 
-        self.agent = None
         self.memory = PrioritizedReplayBuffer()
-
-        self.directory = "/root/rl_zoo_data/"
+        # self.directory = "/root/rl_zoo_data/"
+        self.directory = "statistic/"
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
-
-    def evaluate(self):
-        """
-        Evaluate the agents
-        """
-        record_rewards = np.zeros((11,))
-        record_rewards[10] = self.counter  # Index
-        for j in range(10):
-            s = self.env.reset()
-            total_rewards = 0.0
-            for _ in range(self.episode_steps):
-                a = self.agent.select_action_from_policy(s, evaluation=True)
-                ns, rwd, done, _ = self.env.step(a)
-                total_rewards += rwd
-                s = ns
-                if done:
-                    break
-            record_rewards[j] = total_rewards
-        self.evaluation_array.append(record_rewards)
-        logging.info(f"--Evaluation ({self.counter}/{self.maximum_steps}): " + str(np.mean(record_rewards[:10])) + "--")
-        if self.generate_results:
-            eval_array = np.array(self.evaluation_array)
-            data_folder = self.directory
-            # Save the metrics
-            file_name = data_folder + str(self.seed) + "_" + self.env.domain + "_" + \
-                        self.env.task + "_" + self.agent_name + "_" + self.date_and_time
-            np.savetxt(file_name + ".csv", eval_array, delimiter=",")
+        self.agent_selection()
 
     def train(self):
         """
@@ -127,14 +100,13 @@ class MBRL_Trainer:
                     for _ in range(self.G):
                         self.agent.train_policy(self.memory, batch_size=self.batch_size)
                     self.counter += 1
-
                     if self.model_G > 1.0:
                         for _ in range(int(self.model_G)):
                             # self.agent.train_world_model()
                             print("Train world model")
                     else:
                         # For every a few steps
-                        if self.counter % (int(1.0/self.model_G)) == 0:
+                        if self.counter % (int(1.0 / self.model_G)) == 0:
                             # self.agent.train_world_model()
                             print("Train world model")
 
@@ -147,11 +119,9 @@ class MBRL_Trainer:
                         self.evaluate()
                         need_evaluate = False
 
-    def agent_selection(self, agent_name):
+    def agent_selection(self):
         """
         Create an agent
-
-        :param agent_name:
         """
         actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
         critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
@@ -168,20 +138,20 @@ class MBRL_Trainer:
 
         if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
             self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
-                                                           num_actions=self.action_dim,
-                                                           num_models=5,
-                                                           lr=0.001,
-                                                           device=self.device)
+                                                            num_actions=self.action_dim,
+                                                            num_models=5,
+                                                            lr=0.001,
+                                                            device=self.device)
 
         if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
             self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
-                                                           num_actions=self.action_dim,
-                                                           num_models=5,
-                                                           lr=0.001,
-                                                           device=self.device)
+                                                            num_actions=self.action_dim,
+                                                            num_models=5,
+                                                            lr=0.001,
+                                                            device=self.device)
         if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
             self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
-                                                           num_actions=self.action_dim,
-                                                           num_models=5,
-                                                           lr=0.001,
-                                                           device=self.device)
+                                                            num_actions=self.action_dim,
+                                                            num_models=5,
+                                                            lr=0.001,
+                                                            device=self.device)
