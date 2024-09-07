@@ -93,7 +93,7 @@ class MBRL_Trainer:
                     break
             record_rewards[j] = total_rewards
         self.evaluation_array.append(record_rewards)
-        logging.info("------------------ Evaluation: " + str(np.mean(record_rewards[:10])) + " ------------------")
+        logging.info(f"--Evaluation ({self.counter}/{self.maximum_steps}): " + str(np.mean(record_rewards[:10])) + "--")
         if self.generate_results:
             eval_array = np.array(self.evaluation_array)
             data_folder = self.directory
@@ -141,7 +141,7 @@ class MBRL_Trainer:
                 if self.counter % self.evaluate_interval == 0:
                     need_evaluate = True
                 if done or ((step_counter % self.episode_steps) == 0):
-                    logging.info("---- Training: " + str(epi_reward) + " ----")
+                    logging.info("Training: " + str(epi_reward))
                     need_reset = True
                     if need_evaluate:
                         self.evaluate()
