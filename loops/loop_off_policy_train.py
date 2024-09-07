@@ -1,3 +1,4 @@
+import os
 # Agents
 import torch
 import logging
@@ -68,6 +69,11 @@ class MFRL_Trainer:
         self.agent_selection(agent_name)
         self.memory = PrioritizedReplayBuffer()
 
+        self.directory = "/root/rl_zoo_data/"
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
+
+
     def evaluate(self):
         """
         Evaluate the agents
@@ -89,7 +95,7 @@ class MFRL_Trainer:
         logging.info("------------------ Evaluation: " + str(np.mean(record_rewards[:10])) + " ------------------")
         if self.generate_results:
             eval_array = np.array(self.evaluation_array)
-            data_folder = "statistics/"
+            data_folder = self.directory
             # Save the metrics
             file_name = data_folder + str(self.seed) + "_" + self.env.domain + "_" + \
                         self.env.task + "_" + self.agent_name + "_" + self.date_and_time
