@@ -15,22 +15,17 @@ from agents.networks.world_models.deterministic import (
 from agents.networks.world_models.simple import (
     Simple_NS_Reward,
 )
+from agents.networks.world_models import World_Model
 from utils.helpers import normalize_observation_delta
 
 
-class Ensemble_Dyna_One_NS_Reward:
+class Ensemble_Dyna_One_NS_Reward(World_Model):
     """
     Spec
     """
-    def __init__(
-            self,
-            observation_size: int,
-            num_actions: int,
-            num_models: int,
-            lr: float,
-            device: str,
-            hidden_size: int = 128,
-    ):
+    def __init__(self, observation_size: int, num_actions: int, num_models: int, lr: float, device: str,
+                 hidden_size: int = 128):
+        super().__init__(observation_size, num_actions, num_models, lr, device, hidden_size)
         self.num_models = num_models
         self.observation_size = observation_size
         self.num_actions = num_actions

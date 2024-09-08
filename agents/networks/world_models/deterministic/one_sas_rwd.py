@@ -14,25 +14,21 @@ from agents.networks.world_models.deterministic import (
 from agents.networks.world_models.deterministic import (
     Probabilistic_SAS_Reward,
 )
+from agents.networks.world_models import World_Model
 
 from utils.helpers import normalize_observation_delta
 from utils import denormalize_observation_delta
 
 
-class One_Dyna_One_SAS_Reward:
+class One_Dyna_One_SAS_Reward(World_Model):
     """
     This class consist of an ensemble of all components for critic update.
     Q_label = REWARD + gamma * (1 - DONES) * Q(NEXT_STATES).
     """
 
-    def __init__(
-            self,
-            observation_size: int,
-            num_actions: int,
-            l_r: float,
-            device: str,
-            hidden_size: int = 128,
-    ):
+    def __init__(self, observation_size: int, num_actions: int, l_r: float, device: str, num_models: int, lr: float,
+                 hidden_size: int = 128):
+        super().__init__(observation_size, num_actions, num_models, lr, device, hidden_size)
         self.observation_size = observation_size
         self.num_actions = num_actions
         self.device = device

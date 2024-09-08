@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torch.utils
 from torch import optim
 
-from networks.mbrl.simple.z_simple_dynamics import SimpleDynamics
+from agents.networks.world_models.deterministic import Simple_Dynamics
 from networks.mbrl.simple.z_simple_reward_2 import SimpleReward
 
 from utils.helpers import normalize_observation_delta
