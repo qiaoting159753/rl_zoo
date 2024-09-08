@@ -17,12 +17,15 @@ from agents.networks.world_models.simple import (
 )
 from utils.helpers import normalize_observation_delta
 
+from utils import denormalize_observation_delta
+
 
 class Ensemble_Dyna_One_SAS_Reward:
     """
     World Model
 
     """
+
     def __init__(
             self,
             observation_size: int,
@@ -77,7 +80,7 @@ class Ensemble_Dyna_One_SAS_Reward:
         for model in self.models:
             model.statistics = statistics
 
-    def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation:torch.Tensor):
+    def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor):
         """
         Predict reward based on SAS
         :param observation:
@@ -170,3 +173,30 @@ class Ensemble_Dyna_One_SAS_Reward:
         reward_loss = F.mse_loss(rwd_mean, rewards)
         reward_loss.backward()
         self.reward_optimizer.step()
+
+    def estimate_uncertainty(
+            self, observation: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[float, float]:
+        """
+        Estimate uncertainty.
+
+        :param observation:
+        :param actions:
+        """
+        sample_times = 100
+        _, _, mean, var = self.pred_next_states(observation, actions)
+        # # Sample next state several times, and estimate reward uncertianty.
+        sample1 = torch.distributions.Normal(mean, var).sample([sample_times])
+        sample1 = sample1.squeeze()
+        tempa = []
+        for lm in range(self.num_models):
+            tempa.append(sample1[:, lm, :])
+        sample1 = torch.vstack(tempa)
+        sample1i = denormalize_observation_delta(sample1, self.statistics)
+        sample1i += observation
+        dyna_uncert = torch.sum(torch.var(sample1i, dim=0)).item()
+        multi_observation = torch.repeat_interleave(observation, self.num_models * sample_times, dim=0)
+        multi_reward = torch.repeat_interleave(actions, self.num_models * sample_times, dim=0)
+        reward, _, _ = self.pred_rewards(multi_observation, multi_reward, sample1i)
+        rwd_uncert = torch.var(reward).item()
+        return dyna_uncert, rwd_uncert

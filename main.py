@@ -16,7 +16,7 @@ def main():
         # Random Seed
         set_seed(seed)
         # Environment
-        random_goal = False  # For real robot.
+        random_goal = True  # For real robot.
         env = DMCSEnvironment("cheetah", "run")
         env.set_seed(seed)
         # Training
@@ -29,7 +29,7 @@ def main():
         loop_name = "World_Model"
         # Agent
         # CHANGE THIS PART WHEN ON SCHOOL #
-        directory = "statistic/"
+        directory = "statistics/"
         # directory = "/root/rl_zoo_data/"
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -76,7 +76,7 @@ def main():
                                           world_model_name=agent_name,
                                           random_goal=random_goal,
                                           device=device,
-                                          on_policy=False,
+                                          on_policy=True,
                                           G=G,
                                           model_G=model_G,
                                           batch_size=batch_size,

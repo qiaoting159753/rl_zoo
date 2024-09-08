@@ -226,3 +226,34 @@ class Ensemble_Dyna_Ensemble_SAS_Reward:
             reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=sub_rewards, var=rwd_var).mean()
             reward_loss.backward()
             self.reward_optimizers[i].step()
+
+    def estimate_uncertainty(
+            self, observation: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[float, float]:
+        """
+        Estimate uncertainty.
+
+        :param observation:
+        :param actions:
+        """
+        sample_times = 10
+        _, _, mean, var = self.pred_next_states(observation, actions)
+        print(mean.shape)
+        print(var.shape)
+
+        # dyna_uncert = torch.sum(var.squeeze()).item()
+        # # Sample next state several times, and estimate reward uncertianty.
+        # sample1 = torch.distributions.Normal(mean, var).sample([sample_times])
+        # sample1 = sample1.squeeze()
+        # sample1i = denormalize_observation_delta(sample1, self.world_model.statistics)
+        # sample1i += observation
+        # multi_observation = torch.repeat_interleave(observation, sample_times, dim=0)
+        # multi_reward = torch.repeat_interleave(actions, sample_times, dim=0)
+        # reward, _, rwd_var = self.pred_rewards(multi_observation, multi_reward, sample1i)
+        # sample2 = torch.distributions.Normal(reward, rwd_var).sample([sample_times])
+        # sample2 = torch.reshape(sample2, (sample_times ** 2,))
+        # rwd_uncert = torch.var(sample2).item()
+
+        dyna_uncert = 0.0
+        rwd_uncert = 0.0
+        return dyna_uncert, rwd_uncert

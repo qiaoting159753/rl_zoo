@@ -17,6 +17,7 @@ from utils import PrioritizedReplayBuffer
 # World Models
 from agents.networks.world_models.ensembles import Ensemble_Dyna_One_SAS_Reward
 from agents.networks.world_models.deterministic import Probabilistic_Dynamics
+from agents.networks.world_models.deterministic import One_Dyna_One_SAS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_Ensemble_SAS_Reward
 
@@ -72,6 +73,8 @@ class World_Model_Trainer:
         self.device = device
         self.agent_selection()
 
+        logging.info(f"Name: {self.world_model_name}, On Policy: {on_policy}, Random Goal:{random_goal}")
+
     def evaluate(self):
         """
         Evaluation
@@ -83,6 +86,10 @@ class World_Model_Trainer:
         l1_multi_step_errors = []
         l1_one_rwd_errors = []
         l1_multi_rwd_errors = []
+        one_dyna_uncerts = []
+        one_rwd_uncerts = []
+        multi_dyna_uncerts = []
+        multi_rwd_uncerts = []
 
         gt_s = self.env.reset()
         multi_state = torch.FloatTensor(gt_s).to(self.device).unsqueeze(dim=0)
@@ -92,18 +99,15 @@ class World_Model_Trainer:
             else:
                 action = self.env.sample_action()
             gt_ns, gt_rwd, gt_done, _ = self.env.step(action)
-
             # Converting to tensor
             tensor_action = torch.FloatTensor(action).to(self.device).unsqueeze(dim=0)
             tensor_state = torch.FloatTensor(gt_s).to(self.device).unsqueeze(dim=0)
             # One step prediction
             pred_ns, _, _, _ = self.world_model.pred_next_states(observation=tensor_state,
                                                                  actions=tensor_action)
-
             one_pred_rewards, _, _ = self.world_model.pred_rewards(observation=tensor_state,
                                                                    action=tensor_action,
                                                                    next_observation=pred_ns)
-
             # Multi-step prediction with different actions.
             if self.on_policy:
                 np_multi_state = multi_state.detach().squeeze().cpu().numpy()
@@ -114,24 +118,20 @@ class World_Model_Trainer:
             # Make accumulative multi-step predictions.
             multi_state_pred, _, _, _ = self.world_model.pred_next_states(observation=multi_state,
                                                                           actions=multi_tensor_action)
-
             multi_pred_rewards, _, _ = self.world_model.pred_rewards(observation=multi_state,
                                                                      action=multi_tensor_action,
                                                                      next_observation=multi_state_pred)
-
             # MSE. L1 of dynamics
             np_pred_ns = pred_ns.detach().squeeze().cpu().numpy()
             one_step_mse = (np.square(np_pred_ns - gt_ns)).mean()
             one_step_l1 = (abs(np_pred_ns - gt_ns)).mean()
             l1_one_step_errors.append(one_step_l1)
             l2_one_step_errors.append(one_step_mse)
-
             np_multi_state = multi_state_pred.detach().squeeze().cpu().numpy()
             multi_step_mse = (np.square(np_multi_state - gt_ns)).mean()
             multi_step_l1 = (abs(np_multi_state - gt_ns)).mean()
             l1_multi_step_errors.append(multi_step_l1)
             l2_multi_step_errors.append(multi_step_mse)
-
             # L1 of Rewards
             np_one_pred_rewards = one_pred_rewards.detach().squeeze().cpu().numpy()
             np_multi_pred_rewards = multi_pred_rewards.detach().squeeze().cpu().numpy()
@@ -139,12 +139,74 @@ class World_Model_Trainer:
             l1_multi_rwd_error = abs(np_multi_pred_rewards - gt_rwd)
             l1_one_rwd_errors.append(l1_one_rwd_error)
             l1_multi_rwd_errors.append(l1_multi_rwd_error)
-
             #################    Uncertainty Estimation and Quantification    ################
+            one_dyna_uncert, one_rwd_uncert = self.world_model.estimate_uncertainty(observation=multi_state,
+                                                                                    actions=multi_tensor_action)
+            multi_dyna_uncert, multi_rwd_uncert = self.world_model.estimate_uncertainty(observation=tensor_state,
+                                                                                        actions=tensor_action)
+            one_dyna_uncerts.append(one_dyna_uncert)
+            one_rwd_uncerts.append(one_rwd_uncert)
+            multi_dyna_uncerts.append(multi_dyna_uncert)
+            multi_rwd_uncerts.append(multi_rwd_uncert)
 
             gt_s = gt_ns
             if gt_done:
                 break
+
+        l2_one_step_errors = np.array(l2_one_step_errors)
+        l2_multi_step_errors = np.array(l2_multi_step_errors)
+        l1_one_step_errors = np.array(l1_one_step_errors)
+        l1_multi_step_errors = np.array(l1_multi_step_errors)
+        l1_one_rwd_errors = np.array(l1_one_rwd_errors)
+        l1_multi_rwd_errors = np.array(l1_multi_rwd_errors)
+        one_dyna_uncerts = np.array(one_dyna_uncerts)
+        one_rwd_uncerts = np.array(one_rwd_uncerts)
+        multi_dyna_uncerts = np.array(multi_dyna_uncerts)
+        multi_rwd_uncerts = np.array(multi_rwd_uncerts)
+
+        c_1 = np.corrcoef(l2_one_step_errors, one_dyna_uncerts)
+        c_2 = np.corrcoef(l1_one_step_errors, one_dyna_uncerts)
+        c_3 = np.corrcoef(l2_multi_step_errors, multi_dyna_uncerts)
+        c_4 = np.corrcoef(l1_multi_step_errors, multi_dyna_uncerts)
+        c_5 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
+        c_6 = np.corrcoef(l1_multi_rwd_errors, multi_rwd_uncerts)
+
+        print("---------------------")
+        print(c_1[0,1])
+        print(c_2[0,1])
+        print(c_3[0,1])
+        print(c_4[0,1])
+        print(c_5[0,1])
+        print(c_6[0,1])
+
+        if self.generate_results:
+            l2_one_step_errors = np.expand_dims(l2_one_step_errors, axis=0)
+            l1_one_step_errors = np.expand_dims(l1_one_step_errors, axis=0)
+            one_dyna_uncerts = np.expand_dims(one_dyna_uncerts, axis=0)
+            l2_multi_step_errors = np.expand_dims(l2_multi_step_errors, axis=0)
+            l1_multi_step_errors = np.expand_dims(l1_multi_step_errors, axis=0)
+            multi_dyna_uncerts = np.expand_dims(multi_dyna_uncerts, axis=0)
+            l1_one_rwd_errors = np.expand_dims(l1_one_rwd_errors, axis=0)
+            one_rwd_uncerts = np.expand_dims(one_rwd_uncerts, axis=0)
+            l1_multi_rwd_errors = np.expand_dims(l1_multi_rwd_errors, axis=0)
+            multi_rwd_uncerts = np.expand_dims(multi_rwd_uncerts, axis=0)
+
+            all_data = np.concatenate((l2_one_step_errors,
+                                       l1_one_step_errors,
+                                       one_dyna_uncerts,
+                                       l2_multi_step_errors,
+                                       l1_multi_step_errors,
+                                       multi_dyna_uncerts,
+                                       l1_one_rwd_errors,
+                                       one_rwd_uncerts,
+                                       l1_multi_rwd_errors,
+                                       multi_rwd_uncerts), axis=0)
+            # Save the metrics
+            file_name = self.directory + str(self.seed) + "_" + self.env.domain + "_" + \
+                        self.env.task + "_" + self.world_model_name + "_" + self.date_and_time + ".csv"
+            with open(file_name, 'ab') as fff:
+                np.savetxt(fff, all_data, delimiter=",")
+            fff.close()
 
     def train(self):
         """
@@ -233,3 +295,9 @@ class World_Model_Trainer:
                                                             num_models=5,
                                                             lr=0.001,
                                                             device=self.device)
+
+        if self.world_model_name == "One_Dyna_One_SAS_Reward":
+            self.world_model = One_Dyna_One_SAS_Reward(observation_size=self.state_dim,
+                                                       num_actions=self.action_dim,
+                                                       l_r=0.001,
+                                                       device=self.device)
