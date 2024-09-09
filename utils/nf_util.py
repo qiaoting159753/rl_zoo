@@ -422,40 +422,6 @@ def weight_init(m):
         nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
 
 
-def compute_uncertainty(pred_means, pred_vars, solutions=1):
-    # Input : [5, 10, 11]
-    if solutions == 3:
-        print("Don't call me! Using Wrong Solutions !")
-        exit(0)
-
-    # Solution 0: Normal sampling
-    if solutions == 0:
-        # 5 models, each sampled 10 times = 50,
-        sample1 = torch.distributions.Normal(pred_means[0], pred_vars[0]).sample([10])
-        sample2 = torch.distributions.Normal(pred_means[1], pred_vars[1]).sample([10])
-        sample3 = torch.distributions.Normal(pred_means[2], pred_vars[2]).sample([10])
-        sample4 = torch.distributions.Normal(pred_means[3], pred_vars[3]).sample([10])
-        sample5 = torch.distributions.Normal(pred_means[4], pred_vars[4]).sample([10])
-        samples = torch.cat((sample1, sample2, sample3, sample4, sample5), dim=0)
-        # Samples = [5 * 10, 10 predictions, 11 state dims]
-        stds = torch.std(samples, dim=0)
-        # [10 predictions, 11 state dims]
-        total_stds = torch.mean(stds, dim=1)
-        return total_stds.detach()
-
-    # Solution 1: Epistemic
-    if solutions == 1:
-        total_stds = torch.std(pred_means, dim=0)
-        total_stds = torch.sum(total_stds, dim=1)
-        return total_stds.detach()
-
-    # Solution 2: Aleatoric
-    if solutions == 2:
-        total_stds = torch.sum(pred_vars, dim=0)
-        total_stds = torch.sum(total_stds, dim=1)
-        return total_stds.detach()
-
-
 class eval_mode(object):
     def __init__(self, *models):
         self.models = models
@@ -487,14 +453,14 @@ def accum_prod(x):
     return x_accum
 
 
-def init_weights(layer):
-    if isinstance(layer, nn.Linear):
-        torch.nn.init.xavier_uniform_(layer.weight)
-        layer.bias.data.fill_(0.01)
+# def init_weights(layer):
+#     if isinstance(layer, nn.Linear):
+#         torch.nn.init.xavier_uniform_(layer.weight)
+#         layer.bias.data.fill_(0.01)
 
 
-def normalize_obs(obs, statistics):
-    return (obs - statistics["ob_mean"]) / statistics["ob_std"]
+# def normalize_obs(obs, statistics):
+#     return (obs - statistics["ob_mean"]) / statistics["ob_std"]
 
 
 def silu(x_input):
@@ -502,17 +468,17 @@ def silu(x_input):
     return x_input * torch.sigmoid(x_input)
 
 
-def unnormalize_deltas(normalized_deltas, statistics):
-    return (normalized_deltas * statistics["delta_std"]) + statistics["delta_mean"]
+# def unnormalize_deltas(normalized_deltas, statistics):
+#     return (normalized_deltas * statistics["delta_std"]) + statistics["delta_mean"]
 
 
-def normalize_deltas(deltas, statistics):
-    return (deltas - statistics["delta_mean"]) / statistics["delta_std"]
+# def normalize_deltas(deltas, statistics):
+#     return (deltas - statistics["delta_mean"]) / statistics["delta_std"]
 
 
-def soft_update(local_model, target_model, tau):
-    for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
-        target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
+# def soft_update(local_model, target_model, tau):
+#     for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
+#         target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
 
 
 def weighted_mse_loss(input, target, weight):

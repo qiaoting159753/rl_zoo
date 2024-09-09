@@ -41,6 +41,7 @@ class Probabilistic_SAS_Reward(nn.Module):
             observation.shape[1] + actions.shape[1]
             == self.observation_size + self.num_actions
         )
+
         x = torch.cat((observation, actions, next_observation), dim=1)
         x = self.linear1(x)
         x = F.relu(x)

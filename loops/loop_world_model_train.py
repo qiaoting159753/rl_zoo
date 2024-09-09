@@ -20,7 +20,7 @@ from agents.networks.world_models.deterministic import Probabilistic_Dynamics
 from agents.networks.world_models.deterministic import One_Dyna_One_SAS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_Ensemble_SAS_Reward
-
+from agents.networks.world_models.bayesian import Bayesian_World_Model
 
 class World_Model_Trainer:
     """
@@ -93,6 +93,9 @@ class World_Model_Trainer:
 
         gt_s = self.env.reset()
         multi_state = torch.FloatTensor(gt_s).to(self.device).unsqueeze(dim=0)
+        episodic_pred_error = 0.0
+        episodic_rwd_pred_error = 0.0
+
         for _ in range(self.episode_steps):
             if self.on_policy:
                 action = self.agent.select_action_from_policy(gt_s)
@@ -124,6 +127,7 @@ class World_Model_Trainer:
             # MSE. L1 of dynamics
             np_pred_ns = pred_ns.detach().squeeze().cpu().numpy()
             one_step_mse = (np.square(np_pred_ns - gt_ns)).mean()
+            episodic_pred_error += one_step_mse
             one_step_l1 = (abs(np_pred_ns - gt_ns)).mean()
             l1_one_step_errors.append(one_step_l1)
             l2_one_step_errors.append(one_step_mse)
@@ -136,6 +140,7 @@ class World_Model_Trainer:
             np_one_pred_rewards = one_pred_rewards.detach().squeeze().cpu().numpy()
             np_multi_pred_rewards = multi_pred_rewards.detach().squeeze().cpu().numpy()
             l1_one_rwd_error = abs(np_one_pred_rewards - gt_rwd)
+            episodic_rwd_pred_error += l1_one_rwd_error
             l1_multi_rwd_error = abs(np_multi_pred_rewards - gt_rwd)
             l1_one_rwd_errors.append(l1_one_rwd_error)
             l1_multi_rwd_errors.append(l1_multi_rwd_error)
@@ -171,42 +176,48 @@ class World_Model_Trainer:
         c_5 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
         c_6 = np.corrcoef(l1_multi_rwd_errors, multi_rwd_uncerts)
 
-        print("---------------------")
-        print(c_1[0,1])
-        print(c_2[0,1])
-        print(c_3[0,1])
-        print(c_4[0,1])
-        print(c_5[0,1])
-        print(c_6[0,1])
+        all_data = np.zeros((9,))
+        all_data[0] = self.counter
+        all_data[1] = episodic_pred_error
+        all_data[2] = episodic_rwd_pred_error
+        all_data[3] = c_1[0, 1]
+        all_data[4] = c_2[0, 1]
+        all_data[5] = c_3[0, 1]
+        all_data[6] = c_4[0, 1]
+        all_data[7] = c_5[0, 1]
+        all_data[8] = c_6[0, 1]
+        self.evaluation_array.append(all_data)
 
         if self.generate_results:
-            l2_one_step_errors = np.expand_dims(l2_one_step_errors, axis=0)
-            l1_one_step_errors = np.expand_dims(l1_one_step_errors, axis=0)
-            one_dyna_uncerts = np.expand_dims(one_dyna_uncerts, axis=0)
-            l2_multi_step_errors = np.expand_dims(l2_multi_step_errors, axis=0)
-            l1_multi_step_errors = np.expand_dims(l1_multi_step_errors, axis=0)
-            multi_dyna_uncerts = np.expand_dims(multi_dyna_uncerts, axis=0)
-            l1_one_rwd_errors = np.expand_dims(l1_one_rwd_errors, axis=0)
-            one_rwd_uncerts = np.expand_dims(one_rwd_uncerts, axis=0)
-            l1_multi_rwd_errors = np.expand_dims(l1_multi_rwd_errors, axis=0)
-            multi_rwd_uncerts = np.expand_dims(multi_rwd_uncerts, axis=0)
-
-            all_data = np.concatenate((l2_one_step_errors,
-                                       l1_one_step_errors,
-                                       one_dyna_uncerts,
-                                       l2_multi_step_errors,
-                                       l1_multi_step_errors,
-                                       multi_dyna_uncerts,
-                                       l1_one_rwd_errors,
-                                       one_rwd_uncerts,
-                                       l1_multi_rwd_errors,
-                                       multi_rwd_uncerts), axis=0)
+            # l2_one_step_errors = np.expand_dims(l2_one_step_errors, axis=0)
+            # l1_one_step_errors = np.expand_dims(l1_one_step_errors, axis=0)
+            # one_dyna_uncerts = np.expand_dims(one_dyna_uncerts, axis=0)
+            # l2_multi_step_errors = np.expand_dims(l2_multi_step_errors, axis=0)
+            # l1_multi_step_errors = np.expand_dims(l1_multi_step_errors, axis=0)
+            # multi_dyna_uncerts = np.expand_dims(multi_dyna_uncerts, axis=0)
+            # l1_one_rwd_errors = np.expand_dims(l1_one_rwd_errors, axis=0)
+            # one_rwd_uncerts = np.expand_dims(one_rwd_uncerts, axis=0)
+            # l1_multi_rwd_errors = np.expand_dims(l1_multi_rwd_errors, axis=0)
+            # multi_rwd_uncerts = np.expand_dims(multi_rwd_uncerts, axis=0)
+            #
+            # all_data = np.concatenate((l2_one_step_errors,
+            #                            l1_one_step_errors,
+            #                            one_dyna_uncerts,
+            #                            l2_multi_step_errors,
+            #                            l1_multi_step_errors,
+            #                            multi_dyna_uncerts,
+            #                            l1_one_rwd_errors,
+            #                            one_rwd_uncerts,
+            #                            l1_multi_rwd_errors,
+            #                            multi_rwd_uncerts), axis=0)
             # Save the metrics
             file_name = self.directory + str(self.seed) + "_" + self.env.domain + "_" + \
                         self.env.task + "_" + self.world_model_name + "_" + self.date_and_time + ".csv"
-            with open(file_name, 'ab') as fff:
-                np.savetxt(fff, all_data, delimiter=",")
-            fff.close()
+            np.savetxt(file_name + ".csv", np.array(self.evaluation_array), delimiter=",")
+
+            # with open(file_name, 'ab') as fff:
+            #     np.savetxt(fff, all_data, delimiter=",")
+            # fff.close()
 
     def train(self):
         """
@@ -293,7 +304,7 @@ class World_Model_Trainer:
             self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
                                                             num_actions=self.action_dim,
                                                             num_models=5,
-                                                            lr=0.001,
+                                                            l_r=0.001,
                                                             device=self.device)
 
         if self.world_model_name == "One_Dyna_One_SAS_Reward":
@@ -301,3 +312,9 @@ class World_Model_Trainer:
                                                        num_actions=self.action_dim,
                                                        l_r=0.001,
                                                        device=self.device)
+
+        if self.world_model_name == "Bayesian_VI":
+            self.world_model = Bayesian_World_Model(observation_size=self.state_dim,
+                                                    num_actions=self.action_dim,
+                                                    l_r=0.001,
+                                                    device=self.device)

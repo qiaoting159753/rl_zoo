@@ -6,7 +6,7 @@ import torch.utils
 import torch.nn.functional as F
 from torch import optim
 
-from utils.nf_util import (
+from utils import (
     weight_init,
     normalize_observation,
     normalize_observation_delta,

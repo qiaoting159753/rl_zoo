@@ -23,9 +23,9 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
     """
     Spec
     """
-    def __init__(self, observation_size: int, num_actions: int, num_models: int, lr: float, device: str,
+    def __init__(self, observation_size: int, num_actions: int, num_models: int, l_r: float, device: str,
                  hidden_size: int = 128):
-        super().__init__(observation_size, num_actions, num_models, lr, device, hidden_size)
+        super().__init__(observation_size, num_actions, l_r, device, hidden_size)
         self.num_models = num_models
         self.observation_size = observation_size
         self.num_actions = num_actions
@@ -35,7 +35,7 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
             num_actions=num_actions,
             hidden_size=hidden_size,
         )
-        self.reward_optimizer = optim.Adam(self.reward_network.parameters(), lr=lr)
+        self.reward_optimizer = optim.Adam(self.reward_network.parameters(), lr=l_r)
 
         self.models = [
             Probabilistic_Dynamics(
@@ -46,7 +46,7 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
             for _ in range(self.num_models)
         ]
 
-        self.optimizers = [optim.Adam(self.models[i].parameters(), lr=lr) for i in range(self.num_models)]
+        self.optimizers = [optim.Adam(self.models[i].parameters(), lr=l_r) for i in range(self.num_models)]
 
         self.statistics = {}
 
@@ -71,13 +71,19 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
         for model in self.models:
             model.statistics = statistics
 
-    def pred_rewards(self, observation: torch.Tensor):
+    def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor):
         pred_rewards = self.reward_network(observation)
-        return pred_rewards
+        return pred_rewards, None
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Predic next.
+        :param observation:
+        :param actions:
+        :return:
+        """
         assert (
                 observation.shape[1] + actions.shape[1]
                 == self.observation_size + self.num_actions
@@ -146,6 +152,8 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
 
     def train_reward(
             self,
+            states: torch.Tensor,
+            actions: torch.Tensor,
             next_states: torch.Tensor,
             rewards: torch.Tensor,
     ) -> None:

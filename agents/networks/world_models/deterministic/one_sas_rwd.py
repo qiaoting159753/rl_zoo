@@ -26,9 +26,9 @@ class One_Dyna_One_SAS_Reward(World_Model):
     Q_label = REWARD + gamma * (1 - DONES) * Q(NEXT_STATES).
     """
 
-    def __init__(self, observation_size: int, num_actions: int, l_r: float, device: str, num_models: int, lr: float,
+    def __init__(self, observation_size: int, num_actions: int, l_r: float, device: str,
                  hidden_size: int = 128):
-        super().__init__(observation_size, num_actions, num_models, lr, device, hidden_size)
+        super().__init__(observation_size, num_actions, l_r, device, hidden_size)
         self.observation_size = observation_size
         self.num_actions = num_actions
         self.device = device

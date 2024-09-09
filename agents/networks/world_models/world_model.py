@@ -7,13 +7,11 @@ class World_Model:
     World Model
 
     """
-
     def __init__(
             self,
             observation_size: int,
             num_actions: int,
-            num_models: int,
-            lr: float,
+            l_r: float,
             device: str,
             hidden_size: int = 128,
     ):

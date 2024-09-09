@@ -34,7 +34,7 @@ def main():
         if not os.path.exists(directory):
             os.makedirs(directory)
         device = "cpu"  # For mac training.
-        agent_name = "Ensemble_Dyna_One_SAS_Reward"
+        agent_name = "Bayesian_VI"
         # MBRL
         model_G = 0.2
         horizon = 5
@@ -76,7 +76,7 @@ def main():
                                           world_model_name=agent_name,
                                           random_goal=random_goal,
                                           device=device,
-                                          on_policy=True,
+                                          on_policy=False,
                                           G=G,
                                           model_G=model_G,
                                           batch_size=batch_size,
