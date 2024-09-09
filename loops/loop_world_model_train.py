@@ -20,7 +20,8 @@ from agents.networks.world_models.deterministic import Probabilistic_Dynamics
 from agents.networks.world_models.deterministic import One_Dyna_One_SAS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_Ensemble_SAS_Reward
-from agents.networks.world_models.bayesian import Bayesian_World_Model
+from agents.networks.world_models.bayesian import Bayesian_World_Model, Bayesian_World_Model_2
+
 
 class World_Model_Trainer:
     """
@@ -176,6 +177,7 @@ class World_Model_Trainer:
         c_5 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
         c_6 = np.corrcoef(l1_multi_rwd_errors, multi_rwd_uncerts)
 
+        logging.info(f"Prediction Error: {episodic_pred_error}")
         all_data = np.zeros((9,))
         all_data[0] = self.counter
         all_data[1] = episodic_pred_error
@@ -315,6 +317,6 @@ class World_Model_Trainer:
 
         if self.world_model_name == "Bayesian_VI":
             self.world_model = Bayesian_World_Model(observation_size=self.state_dim,
-                                                    num_actions=self.action_dim,
-                                                    l_r=0.001,
-                                                    device=self.device)
+                                                      num_actions=self.action_dim,
+                                                      l_r=0.001,
+                                                      device=self.device)

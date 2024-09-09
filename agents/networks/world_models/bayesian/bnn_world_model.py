@@ -21,12 +21,12 @@ class Bayesian_World_Model(World_Model):
         self.hidden_size = hidden_size
         self.l_r = l_r
         self.device = device
-        self.world_model = bayes_linear_LR_2L(observation_size + num_actions, observation_size, hidden_size,
+        self.world_model = bayes_linear_LR_2L(observation_size + num_actions, 2 * observation_size, hidden_size,
                                               prior_sig=0.1)
         self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
                                                      hidden_size=hidden_size)
         self.reward_optimizers = optim.Adam(self.reward_model.parameters(), lr=l_r)
-        self.world_optimizers = optim.Adam(self.world_model.parameters(), lr=0.001)
+        self.world_optimizers = optim.Adam(self.world_model.parameters(), lr=0.0001)
         self.reward_model.to(self.device)
         self.world_model.to(self.device)
 
@@ -67,21 +67,20 @@ class Bayesian_World_Model(World_Model):
         Edkl_cum = 0
         for i in range(samples):
             out, tlqw, tlpw = self.world_model(x, sample=True)
-
-            # mean_pred = out[:, :self.observation_size]
-            # var_pred = out[:, self.observation_size:]
-            # var_pred = torch.tanh(var_pred)
-            # var_pred = torch.exp(var_pred)
-            # mlpdw_i = F.gaussian_nll_loss(input=mean_pred, target=y, var=var_pred).mean()
-
-            mlpdw_i = F.mse_loss(out, y).mean()
-
             Edkl_i = (tlqw - tlpw)
-            mlpdw_cum = mlpdw_cum + mlpdw_i
-            Edkl_cum = Edkl_cum + Edkl_i
 
+            mean_pred = out[:, :self.observation_size]
+            var_pred = out[:, self.observation_size:]
+            var_pred = torch.tanh(var_pred)
+            var_pred = torch.exp(var_pred)
+            mlpdw_i = F.gaussian_nll_loss(input=mean_pred, target=y, var=var_pred).mean()
+
+            # mlpdw_i = F.mse_loss(out, y).mean()
+
+            mlpdw_cum += mlpdw_i
+            Edkl_cum = Edkl_cum + Edkl_i
         mlpdw = mlpdw_cum / samples
-        Edkl = Edkl_cum / samples
+        Edkl = Edkl_cum / (samples * 20000)
         loss = Edkl + mlpdw
         loss.backward()
         self.world_optimizers.step()
@@ -104,20 +103,19 @@ class Bayesian_World_Model(World_Model):
         for _ in range(sample):
             pred, _, _ = self.world_model(x, sample=True)
 
-            # mean_pred = pred[:, :self.observation_size]
-            # var_pred = pred[:, self.observation_size:]
-            # var_pred = torch.tanh(var_pred)
-            # var_pred = torch.exp(var_pred)
-            # sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
-            # preds.append(sample1)
+            mean_pred = pred[:, :self.observation_size]
+            var_pred = pred[:, self.observation_size:]
+            var_pred = torch.tanh(var_pred)
+            var_pred = torch.exp(var_pred)
+            sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
+            preds.append(sample1)
 
-            preds.append(pred)
+            # preds.append(pred)
 
         preds = torch.vstack(preds).squeeze()
         mean_deltas = denormalize_observation_delta(preds, self.statistics)
         preds = mean_deltas + observation
         dyna_var = torch.sum(torch.var(preds, dim=0)).item()
-        # prediction = torch.mean(preds, dim=0).unsqueeze(dim=0)
         return dyna_var, 0.0
 
     def train_reward(
@@ -161,19 +159,21 @@ class Bayesian_World_Model(World_Model):
         :param observation:
         :param actions:
         """
-        sample = 10
+        sample = 3
         preds = []
         normalized_obs = normalize_observation(observation, self.statistics)
         x = torch.cat((normalized_obs, actions), dim=1)
         for i in range(sample):
             pred, _, _ = self.world_model(x, sample=True)
-            # mean_pred = pred[:, :self.observation_size]
-            # var_pred = pred[:, self.observation_size:]
-            # var_pred = torch.tanh(var_pred)
-            # var_pred = torch.exp(var_pred)
-            # sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
-            # preds.append(sample1)
-            preds.append(pred)
+            mean_pred = pred[:, :self.observation_size]
+            var_pred = pred[:, self.observation_size:]
+            var_pred = torch.tanh(var_pred)
+            var_pred = torch.exp(var_pred)
+            sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
+            preds.append(sample1)
+
+            # preds.append(pred)
+
         preds = torch.vstack(preds).squeeze()
         mean_deltas = denormalize_observation_delta(preds, self.statistics)
         preds = mean_deltas + observation
