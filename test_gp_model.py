@@ -13,9 +13,9 @@ logging.getLogger().setLevel(logging.INFO)
 domain_names = ['cheetah', 'reacher', 'walker', 'humanoid', 'cartpole', 'hopper', 'fish', 'finger', 'acrobot',
                 'ball_in_cup']
 task_names = ['run', 'hard', 'walk', 'run', 'swingup', 'hop', 'swim', 'turn_hard', 'swingup', 'catch']
-seed_list = [10, 25, 35]
-train_collect_epis = [10, 20, 50, 100]
-train_iters = [20, 50, 100, 200, 300]
+seed_list = [10, 25]
+train_collect_epis = [10, 20, 50]
+train_iters = [10, 50, 100, 200, 300]
 
 # ENV 10 * SEED 5 * COLLECT 6 * ITER 7 = 50 * 42 * 10 = 33600
 total_errors = np.zeros((len(domain_names), len(seed_list), len(train_collect_epis), len(train_iters), 10))
@@ -96,8 +96,8 @@ for i in range(len(domain_names)):
                     optimizer.step()
                 test(env, gpr, i, j, k, l)
 
-np.save(directory + "gp_errors.npy", total_errors)
-np.save(directory + "gp_corrs.npy", corr_results)
+    np.save(directory + domain_names[i] + "gp_errors.npy", total_errors)
+    np.save(directory + domain_names[i] + "gp_corrs.npy", corr_results)
 
 
 # def f(x):
