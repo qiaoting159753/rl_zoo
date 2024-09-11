@@ -1,11 +1,201 @@
-from agents.networks.world_models.bayesian import BBP_Bayes_Net_LR
+import numpy as np
+import torch
+import pyro
+import pyro.contrib.gp as gp
+assert pyro.__version__.startswith('1.9.1')
+pyro.set_rng_seed(1)
+from envs import DMCSEnvironment
+from utils import set_seed
+
+domain_names = ['cheetah', 'reacher', 'walker', 'humanoid', 'cartpole', 'hopper', 'fish', 'finger', 'acrobot',
+                'ball_in_cup']
+task_names = ['run', 'hard', 'walk', 'run', 'swingup', 'hop', 'swim', 'turn_hard', 'swingup', 'catch']
+
+seed_list = [10, 25, 35]
+train_collect_epis = [10, 20, 50, 100]
+train_iters = [10, 50, 100, 200, 400]
+
+# ENV 10 * SEED 5 * COLLECT 6 * ITER 7 = 50 * 42 * 10 = 33600
+total_errors = np.zeros((len(domain_names), len(seed_list), len(train_collect_epis), len(train_iters), 10))
+corr_results = np.zeros((len(domain_names), len(seed_list), len(train_collect_epis), len(train_iters), 10))
 
 
-net = BBP_Bayes_Net_LR()
+def test(env, gaussian_model, i_i, j_j, k_k, l_l):
+    print("Test---------------------")
+    for m_m in range(10):
+        tstate = env.reset()
+        mse_errors = 0.0
+        errors = []
+        covs = []
+        for _ in range(100):
+            t_action = env.sample_action()
+            tn_state, _, _, _ = env.step(t_action)
+            ttensor_state = torch.FloatTensor(tstate).unsqueeze(dim=0)
+            ttensor_action = torch.FloatTensor(t_action).unsqueeze(dim=0)
+            ttensor_input = torch.cat((ttensor_state, ttensor_action), dim=1)
+            tmean, tcov = gaussian_model(ttensor_input, full_cov=True)
+            covs.append(torch.sum(torch.squeeze(tcov)).detach().cpu().numpy())
+            tmean = tmean.detach().squeeze().cpu().numpy()
+            mse_loss = np.mean((tn_state - tmean) ** 2)
+            errors.append(mse_loss)
+            mse_errors += mse_loss
+            tstate = tn_state
+        errors = np.array(errors)
+        covs = np.array(covs)
+        corr = np.corrcoef(errors, covs)
+        total_errors[i_i, j_j, k_k, l_l, m_m] = mse_errors
+        corr_results[i_i, j_j, k_k, l_l, m_m] = corr[0, 1]
 
 
+for i in range(len(domain_names)):
+    for j in range(len(seed_list)):
+        set_seed(seed_list[j])
+        env = DMCSEnvironment(domain_names[i], task_names[i])
+        env.set_seed(seed_list[j])
+        state_dim = env.observation_space
+        action_dim = env.action_num
+        kernel = gp.kernels.RBF(input_dim=state_dim + action_dim)
+        for k in range(len(train_collect_epis)):
+            for l in range(len(train_iters)):
+                states = []
+                actions = []
+                next_states = []
+                for _ in range(train_collect_epis[k]):
+                    state = env.reset()
+                    for _ in range(100):
+                        action = env.sample_action()
+                        n_state, _, _, _ = env.step(action)
+                        states.append(state)
+                        next_states.append(n_state)
+                        actions.append(action)
+                        state = n_state
+                states = np.stack(states)
+                actions = np.stack(actions)
+                next_states = np.stack(next_states)
+                tensor_states = torch.FloatTensor(states)
+                tensor_actions = torch.FloatTensor(actions)
+                tensor_n_states = torch.FloatTensor(next_states)
+                tensor_x = torch.cat((tensor_states, tensor_actions), dim=1)
+                tensor_y = tensor_n_states.T
+                gpr = gp.models.GPRegression(tensor_x, tensor_y, kernel)
+                optimizer = torch.optim.Adam(gpr.parameters(), lr=0.005)
+                # losses = gp.util.train(gpr, num_steps=10)
+                loss_fn = pyro.infer.Trace_ELBO().differentiable_loss
+                for _ in range(train_iters[l]):
+                    optimizer.zero_grad()
+                    loss = loss_fn(gpr.model, gpr.guide)
+                    loss.backward()
+                    optimizer.step()
+                test(env, gpr, i, j, k, l)
+
+np.save("statistics/gp_errors.npy", total_errors)
+np.save("statistics/gp_corrs.npy", corr_results)
 
 
+# def f(x):
+#     return (6 * x - 2)**2 * torch.sin(12 * x - 4)
+#
+# def update_posterior(x_new):
+#     y = f(x_new) # evaluate f at new point.
+#     X = torch.cat([gpmodel.X, x_new]) # incorporate new evaluation
+#     y = torch.cat([gpmodel.y, y])
+#     gpmodel.set_data(X, y)
+#     # optimize the GP hyperparameters using Adam with lr=0.001
+#     optimizer = torch.optim.Adam(gpmodel.parameters(), lr=0.001)
+#     gp.util.train(gpmodel, optimizer)
+#
+# def lower_confidence_bound(x, kappa=2):
+#     mu, variance = gpmodel(x, full_cov=False, noiseless=False)
+#     sigma = variance.sqrt()
+#     return mu - kappa * sigma
+#
+#
+# def find_a_candidate(x_init, lower_bound=0, upper_bound=1):
+#     # transform x to an unconstrained domain
+#     constraint = constraints.interval(lower_bound, upper_bound)
+#
+#     unconstrained_x_init = transform_to(constraint).inv(x_init)
+#     unconstrained_x = unconstrained_x_init.clone().detach().requires_grad_(True)
+#
+#     minimizer = optim.LBFGS([unconstrained_x], line_search_fn='strong_wolfe')
+#
+#     def closure():
+#         minimizer.zero_grad()
+#         x = transform_to(constraint)(unconstrained_x)
+#         y = lower_confidence_bound(x)
+#         autograd.backward(unconstrained_x, autograd.grad(y, unconstrained_x))
+#         return y
+#     minimizer.step(closure)
+#     # after finding a candidate in the unconstrained domain,
+#     # convert it back to original domain.
+#     x = transform_to(constraint)(unconstrained_x)
+#     return x.detach()
+#
+# def next_x(lower_bound=0, upper_bound=1, num_candidates=5):
+#     candidates = []
+#     values = []
+#
+#     x_init = gpmodel.X[-1:]
+#     for i in range(num_candidates):
+#         x = find_a_candidate(x_init, lower_bound, upper_bound)
+#         y = lower_confidence_bound(x)
+#         candidates.append(x)
+#         values.append(y)
+#         x_init = x.new_empty(1).uniform_(lower_bound, upper_bound)
+#
+#     argmin = torch.min(torch.cat(values), dim=0)[1].item()
+#     return candidates[argmin]
+#
+# def plot(gs, xmin, xlabel=None, with_title=True):
+#     xlabel = "xmin" if xlabel is None else "x{}".format(xlabel)
+#     Xnew = torch.linspace(-0.1, 1.1, 100)
+#     ax1 = plt.subplot(gs[0])
+#     ax1.plot(gpmodel.X.numpy(), gpmodel.y.numpy(), "kx")  # plot all observed data
+#     with torch.no_grad():
+#         loc, var = gpmodel(Xnew, full_cov=False, noiseless=False)
+#         sd = var.sqrt()
+#         ax1.plot(Xnew.numpy(), loc.numpy(), "r", lw=2)  # plot predictive mean
+#         ax1.fill_between(Xnew.numpy(), loc.numpy() - 2*sd.numpy(), loc.numpy() + 2*sd.numpy(),
+#                          color="C0", alpha=0.3)  # plot uncertainty intervals
+#     ax1.set_xlim(-0.1, 1.1)
+#     ax1.set_title("Find {}".format(xlabel))
+#     if with_title:
+#         ax1.set_ylabel("Gaussian Process Regression")
+#
+#     ax2 = plt.subplot(gs[1])
+#     with torch.no_grad():
+#         # plot the acquisition function
+#         ax2.plot(Xnew.numpy(), lower_confidence_bound(Xnew).numpy())
+#         # plot the new candidate point
+#         ax2.plot(xmin.numpy(), lower_confidence_bound(xmin).numpy(), "^", markersize=10,
+#                  label="{} = {:.5f}".format(xlabel, xmin.item()))
+#     ax2.set_xlim(-0.1, 1.1)
+#     if with_title:
+#         ax2.set_ylabel("Acquisition Function")
+#     ax2.legend(loc=1)
+#
+# # x = torch.linspace(0, 1, 100)
+# # plt.figure(figsize=(8, 4))
+# # plt.plot(x.numpy(), f(x).numpy())
+# # plt.show()
+#
+# # initialize the model with four input points: 0.0, 0.33, 0.66, 1.0
+# X = torch.tensor([0.0, 0.33, 0.66, 1.0])
+# y = f(X)
+# gpmodel = gp.models.GPRegression(X, y, gp.kernels.Matern52(input_dim=1),
+#                                  noise=torch.tensor(0.1), jitter=1.0e-4)
+#
+#
+# plt.figure(figsize=(12, 30))
+# outer_gs = gridspec.GridSpec(5, 2)
+# optimizer = torch.optim.Adam(gpmodel.parameters(), lr=0.001)
+# gp.util.train(gpmodel, optimizer)
+# for i in range(8):
+#     xmin = next_x()
+#     gs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=outer_gs[i])
+#     plot(gs, xmin, xlabel=i+1, with_title=(i % 2 == 0))
+#     update_posterior(xmin)
+# plt.show()
 
 
 # from scipy.spatial.transform import Rotation
