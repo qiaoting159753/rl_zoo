@@ -19,6 +19,8 @@ train_iters = [10, 50, 100, 200, 400]
 total_errors = np.zeros((len(domain_names), len(seed_list), len(train_collect_epis), len(train_iters), 10))
 corr_results = np.zeros((len(domain_names), len(seed_list), len(train_collect_epis), len(train_iters), 10))
 
+# directory = "statistics/"
+directory = "/root/rl_zoo_data/"
 
 def test(env, gaussian_model, i_i, j_j, k_k, l_l):
     print("Test---------------------")
@@ -88,8 +90,8 @@ for i in range(len(domain_names)):
                     optimizer.step()
                 test(env, gpr, i, j, k, l)
 
-np.save("statistics/gp_errors.npy", total_errors)
-np.save("statistics/gp_corrs.npy", corr_results)
+np.save(directory + "gp_errors.npy", total_errors)
+np.save(directory + "gp_corrs.npy", corr_results)
 
 
 # def f(x):
