@@ -6,6 +6,7 @@ assert pyro.__version__.startswith('1.9.1')
 pyro.set_rng_seed(1)
 from envs import DMCSEnvironment
 from utils import set_seed
+import logging
 
 domain_names = ['cheetah', 'reacher', 'walker', 'humanoid', 'cartpole', 'hopper', 'fish', 'finger', 'acrobot',
                 'ball_in_cup']
@@ -23,7 +24,9 @@ corr_results = np.zeros((len(domain_names), len(seed_list), len(train_collect_ep
 directory = "/root/rl_zoo_data/"
 
 def test(env, gaussian_model, i_i, j_j, k_k, l_l):
-    print("Test---------------------")
+    logging.info("---------Test-------")
+    logging.info(domain_names[i_i] + "_" + task_names[i_i])
+    logging.info(f"seed: {j_j}, collection: {k_k}, iter: {l_l}")
     for m_m in range(10):
         tstate = env.reset()
         mse_errors = 0.0
@@ -47,7 +50,7 @@ def test(env, gaussian_model, i_i, j_j, k_k, l_l):
         corr = np.corrcoef(errors, covs)
         total_errors[i_i, j_j, k_k, l_l, m_m] = mse_errors
         corr_results[i_i, j_j, k_k, l_l, m_m] = corr[0, 1]
-
+        logging.info(f"error: {mse_errors}, corr: {corr[0,1]}")
 
 for i in range(len(domain_names)):
     for j in range(len(seed_list)):
