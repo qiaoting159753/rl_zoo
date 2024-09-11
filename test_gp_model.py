@@ -28,7 +28,7 @@ directory = "/root/rl_zoo_data/"
 def test(env, gaussian_model, i_i, j_j, k_k, l_l):
     logging.info("---------Test-------")
     logging.info(domain_names[i_i] + "_" + task_names[i_i])
-    logging.info(f"seed: {j_j}, collection: {k_k}, iter: {l_l}")
+    logging.info(f"seed: {seed_list[j_j]}, collection: {train_collect_epis[k_k]}, iter: {train_iters[l_l]}")
     for m_m in range(10):
         tstate = env.reset()
         mse_errors = 0.0
