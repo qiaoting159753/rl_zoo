@@ -91,7 +91,7 @@ class BBP_Heteroscedastic_Model(nn.Module):
         return x, KL_loss_total
 
 
-class Bayesian_World_Model_2(World_Model):
+class Bayesian_World_Model_BBB_Heter(World_Model):
     def __init__(self, observation_size: int, num_actions: int, l_r: float, device: str, hidden_size: int = 128):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size)
         self.statistics = None

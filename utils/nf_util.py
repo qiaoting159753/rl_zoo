@@ -25,6 +25,9 @@ class DiagGaussian(nn.Module):
             self.register_buffer("log_scale", torch.zeros(1, *self.shape))
         self.temperature = None  # Temperature parameter for annealed sampling
 
+    def set_loc(self, prior_tensor):
+        self.loc = nn.Parameter(prior_tensor)
+
     def forward(self, num_samples=1):
         eps = torch.randn((num_samples,) + self.shape, dtype=self.loc.dtype, device=self.loc.device)
         if self.temperature is None:
@@ -32,7 +35,8 @@ class DiagGaussian(nn.Module):
         else:
             log_scale = self.log_scale + np.log(self.temperature)
         z = self.loc + torch.exp(log_scale) * eps
-        log_p = -0.5 * self.d * np.log(2 * np.pi) - torch.sum(log_scale + 0.5 * torch.pow(eps, 2), list(range(1, self.n_dim + 1)))
+        log_p = -0.5 * self.d * np.log(2 * np.pi) - torch.sum(log_scale + 0.5 * torch.pow(eps, 2),
+                                                              list(range(1, self.n_dim + 1)))
         return z, log_p
 
     def log_prob(self, z):
@@ -40,9 +44,10 @@ class DiagGaussian(nn.Module):
             log_scale = self.log_scale
         else:
             log_scale = self.log_scale + np.log(self.temperature)
-        log_p = -0.5 * self.d * np.log(2 * np.pi) - torch.sum(log_scale + 0.5 * torch.pow((z - self.loc) / torch.exp(log_scale), 2),
+        log_p = -0.5 * self.d * np.log(2 * np.pi) - torch.sum(
+            log_scale + 0.5 * torch.pow((z - self.loc) / torch.exp(log_scale), 2),
             list(range(1, self.n_dim + 1)),
-        )
+            )
         return log_p
 
     def sample(self, num_samples=1, **kwargs):
@@ -84,6 +89,7 @@ class Permute(nn.Module):
     """
     Permutation features along the channel dimension
     """
+
     def __init__(self, num_channels, mode="shuffle"):
         """Constructor
         Args:
@@ -106,7 +112,7 @@ class Permute(nn.Module):
             z = z[:, self.perm, ...]
         elif self.mode == "swap":
             z1 = z[:, : self.num_channels // 2, ...]
-            z2 = z[:, self.num_channels // 2 :, ...]
+            z2 = z[:, self.num_channels // 2:, ...]
             z = torch.cat([z2, z1], dim=1)
         else:
             raise NotImplementedError("The mode " + self.mode + " is not implemented.")
@@ -118,13 +124,132 @@ class Permute(nn.Module):
             z = z[:, self.inv_perm, ...]
         elif self.mode == "swap":
             z1 = z[:, : (self.num_channels + 1) // 2, ...]
-            z2 = z[:, (self.num_channels + 1) // 2 :, ...]
+            z2 = z[:, (self.num_channels + 1) // 2:, ...]
             z = torch.cat([z2, z1], dim=1)
         else:
             raise NotImplementedError("The mode " + self.mode + " is not implemented.")
         log_det = torch.zeros(len(z), device=z.device)
         return z, log_det
 
+
+#################################      Functions    ##############################################
+
+def set_requires_grad(module, flag):
+    """Sets requires_grad flag of all parameters of a torch.nn.module
+
+    Args:
+      module: torch.nn.module
+      flag: Flag to set requires_grad to
+    """
+
+    for param in module.parameters():
+        param.requires_grad = flag
+
+
+def weighted_mse_loss(input, target, weight):
+    return torch.sum(weight * (input - target) ** 2)
+
+
+def silu(x_input):
+    """
+    Applies the Sigmoid Linear Unit (SiLU) function element-wise: SiLU(x) = x * sigmoid(x)
+    :param x_input:
+    :return:
+    """
+    return x_input * torch.sigmoid(x_input)
+
+
+def _get_input_degrees(in_features):
+    """Returns the degrees an input to MADE should have."""
+    return torch.arange(1, in_features + 1)
+
+
+def sum_except_batch(x, num_batch_dims=1):
+    """Sums all elements of `x` except for the first `num_batch_dims` dimensions."""
+    reduce_dims = list(range(num_batch_dims, x.ndimension()))
+    return torch.sum(x, dim=reduce_dims)
+
+
+def tile(x, n):
+    x_ = x.reshape(-1)
+    x_ = x_.repeat(n)
+    x_ = x_.reshape(n, -1)
+    x_ = x_.transpose(1, 0)
+    x_ = x_.reshape(-1)
+    return x_
+
+
+def weight_init(m):
+    """Custom weight init for Conv2D and Linear layers."""
+    if isinstance(m, nn.Linear):
+        nn.init.orthogonal_(m.weight.data)
+        if hasattr(m.bias, 'statistics'):
+            m.bias.data.fill_(0.0)
+    elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+        # delta-orthogonal init from https://arxiv.org/pdf/1806.05393.pdf
+        assert m.weight.size(2) == m.weight.size(3)
+        m.weight.data.fill_(0.0)
+        m.bias.data.fill_(0.0)
+        mid = m.weight.size(2) // 2
+        gain = nn.init.calculate_gain('relu')
+        nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
+
+
+class eval_mode(object):
+    """
+    Eva
+    """
+    def __init__(self, *models):
+        self.models = models
+
+    def __enter__(self):
+        self.prev_states = []
+        for model in self.models:
+            self.prev_states.append(model.training)
+            model.train(False)
+
+    def __exit__(self, *args):
+        for model, state in zip(self.models, self.prev_states):
+            model.train(state)
+        return False
+
+
+def get_params(models):
+    for m in models:
+        for p in m.parameters():
+            yield p
+
+
+def accum_prod(x):
+    assert x.dim() == 2
+    x_accum = [x[0]]
+    for i in range(x.size(0) - 1):
+        x_accum.append(x_accum[-1] * x[i])
+    x_accum = torch.stack(x_accum, dim=0)
+    return x_accum
+
+
+# def init_weights(layer):
+#     if isinstance(layer, nn.Linear):
+#         torch.nn.init.xavier_uniform_(layer.weight)
+#         layer.bias.data.fill_(0.01)
+
+
+# def normalize_obs(obs, statistics):
+#     return (obs - statistics["ob_mean"]) / statistics["ob_std"]
+
+
+# def unnormalize_deltas(normalized_deltas, statistics):
+#     return (normalized_deltas * statistics["delta_std"]) + statistics["delta_mean"]
+
+
+# def normalize_deltas(deltas, statistics):
+#     return (deltas - statistics["delta_mean"]) / statistics["delta_std"]
+
+
+# def soft_update(local_model, target_model, tau):
+#     for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
+#         target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
 
 class MaskedLinear(nn.Linear):
     """A linear module with a masked weight matrix."""
@@ -384,114 +509,3 @@ class MaskedAffineAutoregressive(nn.Module):
         shift = autoregressive_params[..., 1]
         return unconstrained_scale, shift
 
-
-#################################      Functions    ##############################################
-def _get_input_degrees(in_features):
-    """Returns the degrees an input to MADE should have."""
-    return torch.arange(1, in_features + 1)
-
-
-def sum_except_batch(x, num_batch_dims=1):
-    """Sums all elements of `x` except for the first `num_batch_dims` dimensions."""
-    reduce_dims = list(range(num_batch_dims, x.ndimension()))
-    return torch.sum(x, dim=reduce_dims)
-
-
-def tile(x, n):
-    x_ = x.reshape(-1)
-    x_ = x_.repeat(n)
-    x_ = x_.reshape(n, -1)
-    x_ = x_.transpose(1, 0)
-    x_ = x_.reshape(-1)
-    return x_
-
-
-def weight_init(m):
-    """Custom weight init for Conv2D and Linear layers."""
-    if isinstance(m, nn.Linear):
-        nn.init.orthogonal_(m.weight.data)
-        if hasattr(m.bias, 'statistics'):
-            m.bias.data.fill_(0.0)
-    elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
-        # delta-orthogonal init from https://arxiv.org/pdf/1806.05393.pdf
-        assert m.weight.size(2) == m.weight.size(3)
-        m.weight.data.fill_(0.0)
-        m.bias.data.fill_(0.0)
-        mid = m.weight.size(2) // 2
-        gain = nn.init.calculate_gain('relu')
-        nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
-
-
-class eval_mode(object):
-    def __init__(self, *models):
-        self.models = models
-
-    def __enter__(self):
-        self.prev_states = []
-        for model in self.models:
-            self.prev_states.append(model.training)
-            model.train(False)
-
-    def __exit__(self, *args):
-        for model, state in zip(self.models, self.prev_states):
-            model.train(state)
-        return False
-
-
-def get_params(models):
-    for m in models:
-        for p in m.parameters():
-            yield p
-
-
-def accum_prod(x):
-    assert x.dim() == 2
-    x_accum = [x[0]]
-    for i in range(x.size(0) - 1):
-        x_accum.append(x_accum[-1] * x[i])
-    x_accum = torch.stack(x_accum, dim=0)
-    return x_accum
-
-
-# def init_weights(layer):
-#     if isinstance(layer, nn.Linear):
-#         torch.nn.init.xavier_uniform_(layer.weight)
-#         layer.bias.data.fill_(0.01)
-
-
-# def normalize_obs(obs, statistics):
-#     return (obs - statistics["ob_mean"]) / statistics["ob_std"]
-
-
-def silu(x_input):
-    # Applies the Sigmoid Linear Unit (SiLU) function element-wise: SiLU(x) = x * sigmoid(x)
-    return x_input * torch.sigmoid(x_input)
-
-
-# def unnormalize_deltas(normalized_deltas, statistics):
-#     return (normalized_deltas * statistics["delta_std"]) + statistics["delta_mean"]
-
-
-# def normalize_deltas(deltas, statistics):
-#     return (deltas - statistics["delta_mean"]) / statistics["delta_std"]
-
-
-# def soft_update(local_model, target_model, tau):
-#     for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
-#         target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
-
-
-def weighted_mse_loss(input, target, weight):
-    return torch.sum(weight * (input - target) ** 2)
-
-
-def set_requires_grad(module, flag):
-    """Sets requires_grad flag of all parameters of a torch.nn.module
-
-    Args:
-      module: torch.nn.module
-      flag: Flag to set requires_grad to
-    """
-
-    for param in module.parameters():
-        param.requires_grad = flag

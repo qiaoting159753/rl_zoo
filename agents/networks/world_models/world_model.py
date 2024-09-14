@@ -26,18 +26,31 @@ class World_Model:
         """
         logging.info("Not Implemented")
 
-    def estimate_uncertainty(
-            self, observation: torch.Tensor, actions: torch.Tensor
-    ) -> tuple[float, float]:
+    def train_world(
+            self,
+            states: torch.Tensor,
+            actions: torch.Tensor,
+            next_states: torch.Tensor,
+    ) -> None:
         """
-        Estimate next state uncertainty and reward uncertainty.
+        Train the dynamic of world model.
+        :param states:
+        :param actions:
+        :param next_states:
+        """
+        logging.info("Not Implemented")
 
+    def pred_next_states(
+            self, observation: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Make a prediction of next state.
         :param observation:
         :param actions:
         :return:
         """
         logging.info("Not Implemented")
-        return 0.0, 0.0
+        return torch.zeros(observation.shape), torch.zeros(observation.shape), torch.zeros(observation.shape), torch.zeros(observation.shape)
 
     def train_reward(
             self,
@@ -56,20 +69,6 @@ class World_Model:
         """
         logging.info("Not Implemented")
 
-    def train_world(
-            self,
-            states: torch.Tensor,
-            actions: torch.Tensor,
-            next_states: torch.Tensor,
-    ) -> None:
-        """
-        Train the dynamic of world model.
-        :param states:
-        :param actions:
-        :param next_states:
-        """
-        logging.info("Not Implemented")
-
     def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor
                      ) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -82,8 +81,15 @@ class World_Model:
         logging.info("Not Implemented")
         return torch.zeros((1,)), torch.zeros((1,))
 
-    def pred_next_states(
+    def estimate_uncertainty(
             self, observation: torch.Tensor, actions: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[float, float]:
+        """
+        Estimate next state uncertainty and reward uncertainty.
+
+        :param observation:
+        :param actions:
+        :return:
+        """
         logging.info("Not Implemented")
-        return torch.zeros((1,)), torch.zeros((1,)), torch.zeros((1,)), torch.zeros((1,))
+        return 0.0, 0.0

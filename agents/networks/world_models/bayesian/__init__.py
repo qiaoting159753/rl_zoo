@@ -1,3 +1,3 @@
 from .dropout_bnn import Dropout_Dynamics
-from .bnn_world_model import Bayesian_World_Model
-from .bnn_world_model_heter import Bayesian_World_Model_2
+from .bnn_bbb_lr import Bayesian_World_Model_BBB_LR
+from .bnn_bbb_heter import Bayesian_World_Model_BBB_Heter

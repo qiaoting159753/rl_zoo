@@ -20,7 +20,8 @@ from agents.networks.world_models.deterministic import Probabilistic_Dynamics
 from agents.networks.world_models.deterministic import One_Dyna_One_SAS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
 from agents.networks.world_models.ensembles import Ensemble_Dyna_Ensemble_SAS_Reward
-from agents.networks.world_models.bayesian import Bayesian_World_Model, Bayesian_World_Model_2
+from agents.networks.world_models.bayesian import Bayesian_World_Model_BBB_LR, Bayesian_World_Model_BBB_Heter
+from agents.networks.world_models.deterministic import NVP_World_Model
 
 
 class World_Model_Trainer:
@@ -316,7 +317,13 @@ class World_Model_Trainer:
                                                        device=self.device)
 
         if self.world_model_name == "Bayesian_VI":
-            self.world_model = Bayesian_World_Model(observation_size=self.state_dim,
-                                                      num_actions=self.action_dim,
-                                                      l_r=0.001,
-                                                      device=self.device)
+            self.world_model = Bayesian_World_Model_BBB_Heter(observation_size=self.state_dim,
+                                                              num_actions=self.action_dim,
+                                                              l_r=0.001,
+                                                              device=self.device)
+
+        if self.world_model_name == "NF_NVP":
+            self.world_model = NVP_World_Model(observation_size=self.state_dim,
+                                               num_actions=self.action_dim,
+                                               l_r=0.001,
+                                               device=self.device)

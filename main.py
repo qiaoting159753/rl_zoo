@@ -34,7 +34,7 @@ def main():
         if not os.path.exists(directory):
             os.makedirs(directory)
         device = "cpu"  # For mac training.
-        agent_name = "Bayesian_VI"
+        agent_name = "NF_NVP"
         # MBRL
         model_G = 0.2
         horizon = 5

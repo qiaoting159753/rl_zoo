@@ -12,7 +12,7 @@ from agents.networks.world_models.deterministic import (
 from utils import normalize_observation, denormalize_observation_delta
 
 
-class Bayesian_World_Model(World_Model):
+class Bayesian_World_Model_BBB_LR(World_Model):
     def __init__(self, observation_size: int, num_actions: int, l_r: float, device: str, hidden_size: int = 128):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size)
         self.statistics = None
