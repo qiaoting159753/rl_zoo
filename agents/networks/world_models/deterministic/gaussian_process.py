@@ -25,7 +25,7 @@ class Gaussian_Process_World_Model(World_Model):
         self.device = device
         self.noise = noise
         self.train_iter = train_iter
-        self.kernel = gp.kernels.RBF(input_dim=observation_size + num_actions)
+        self.kernel = gp.kernels.RBF(input_dim=observation_size + num_actions).to(self.device)
         self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
                                                      hidden_size=hidden_size)
         self.reward_optimizers = optim.Adam(self.reward_model.parameters(), lr=l_r)
@@ -35,7 +35,6 @@ class Gaussian_Process_World_Model(World_Model):
         """
         Update all statistics for normalization for all world models and the
         ensemble itself.
-
         :param (Dictionary) statistics:
         """
         return
@@ -67,12 +66,12 @@ class Gaussian_Process_World_Model(World_Model):
         :param actions:
         :param next_states:
         """
-        states = torch.FloatTensor(np.array(states))
-        actions = torch.FloatTensor(np.array(actions))
-        next_states = torch.FloatTensor(np.array(next_states))
+        states = torch.FloatTensor(np.array(states)).to(self.device)
+        actions = torch.FloatTensor(np.array(actions)).to(self.device)
+        next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         y_y = next_states.T
         x_x = torch.cat((states, actions), dim=1)
-        gpr = gp.models.GPRegression(x_x, y_y, self.kernel, noise=torch.tensor(self.noise))
+        gpr = gp.models.GPRegression(x_x, y_y, self.kernel, noise=torch.tensor(self.noise)).to(self.device)
         optimizer = torch.optim.Adam(gpr.parameters(), lr=self.l_r)
         loss_fn = pyro.infer.Trace_ELBO().differentiable_loss
         for _ in range(self.train_iter):

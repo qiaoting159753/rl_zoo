@@ -278,8 +278,9 @@ class World_Model_Trainer:
                 if len(self.memory) > self.batch_size:
                     # first time update world model statistics
                     if len(self.memory) == (self.batch_size + 1):
-                        statistics = self.memory.get_statistics()
-                        self.world_model.set_statistics(statistics)
+                        if not g_p:
+                            statistics = self.memory.get_statistics()
+                            self.world_model.set_statistics(statistics)
                     # Train the agent only when on-policy.
                     if self.on_policy:
                         for _ in range(self.G):
@@ -313,8 +314,9 @@ class World_Model_Trainer:
                     need_reset = True
                     # Update World Model Statistics.
                     if len(self.memory) > self.batch_size:
-                        statistics = self.memory.get_statistics()
-                        self.world_model.set_statistics(statistics)
+                        if not g_p:
+                            statistics = self.memory.get_statistics()
+                            self.world_model.set_statistics(statistics)
                     # Evaluation
                     if need_evaluate:
                         self.evaluate()

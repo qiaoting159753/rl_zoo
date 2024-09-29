@@ -37,11 +37,10 @@ def main():
     for noise in noises:
         for train_iter in train_iters:
             sub_directory = agent_name + "_" + env_domain + "_" + env_task + "_" + str(noise) + "_" + str(train_iter)
-
+            # parent_dir = "statistics/"
             parent_dir = "/root/rl_zoo_data/"
             if not os.path.exists(parent_dir):
                 os.mkdir(parent_dir)
-            # parent_dir = "statistics/"
             directory = os.path.join(parent_dir, sub_directory)
             if not os.path.exists(directory):
                 os.mkdir(directory)
