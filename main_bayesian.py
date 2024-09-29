@@ -37,8 +37,8 @@ def main():
     for sigma in sigmas:
         for ratio in ratios:
             sub_directory = agent_name + "_" + env_domain + "_" + env_task + "_" + str(sigma) + "_" + str(ratio)
-            # parent_dir = "/root/rl_zoo_data/"
-            parent_dir = "statistics/"
+            parent_dir = "/root/rl_zoo_data/"
+            # parent_dir = "statistics/"
             directory = os.path.join(parent_dir, sub_directory)
             if not os.path.exists(directory):
                 os.mkdir(directory)
