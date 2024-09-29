@@ -12,7 +12,7 @@ import logging
 from agents.networks.world_models.deterministic import Probabilistic_SAS_Reward
 
 
-class NVP_World_Model(World_Model):
+class Conditional_NVP_World_Model(World_Model):
     def __init__(
             self,
             observation_size: int,
@@ -27,7 +27,7 @@ class NVP_World_Model(World_Model):
         self.device = device
         self.hidden_size = hidden_size
         self.statistic = {}
-        self.world_model = NVP_Flows(self.observation_size, self.num_actions)
+        self.world_model = Conditional_NVP_Flows(self.observation_size, self.num_actions)
         self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
                                                      hidden_size=hidden_size)
         self.reward_optimizers = optim.Adam(self.reward_model.parameters(), lr=l_r)
@@ -61,7 +61,7 @@ class NVP_World_Model(World_Model):
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        pred_next, _ = self.world_model.forward(observation, actions)
+        pred_next, _, _ = self.world_model.forward(observation, actions)
         return pred_next, torch.zeros(observation.shape), torch.zeros(observation.shape), torch.zeros(observation.shape)
 
     def estimate_uncertainty(
@@ -75,17 +75,12 @@ class NVP_World_Model(World_Model):
         :return:
         """
         # logging.info("Not Implemented")
-        pred_next, pred_z = self.world_model.forward(observation, actions)
+        pred_next, pred_z, _ = self.world_model.forward(observation, actions)
         normalized_obs = normalize_observation(observation, self.statistic)
         target_z_ = torch.cat((normalized_obs, actions), dim=1)
-        z_ = self.world_model.reverse(pred_z)
-        if torch.any(torch.isinf(z_)):
-            print("Reverse!")
-        if torch.any(torch.isinf(pred_z)):
-            print("Prediction!")
-        # mse_loss = F.mse_loss(z_, target_z_).item()
-
-        mse_loss = np.sum(abs(z_.detach().numpy() - target_z_.detach().numpy()))
+        z_,_ = self.world_model.reverse(pred_z)
+        mse_loss = F.mse_loss(z_, target_z_).item()
+        # mse_loss = np.sum(abs(z_.detach().numpy() - target_z_.detach().numpy()))
         return mse_loss, 0.0
 
     def train_reward(
@@ -123,7 +118,10 @@ class NVP_World_Model(World_Model):
         return pred_reward, None, reward_var
 
 
-class NVP_Flows:
+class Conditional_NVP_Flows:
+    """
+    Conditional NVP.
+    """
     # Forward KLD: inverse back, -log_q - init_log.
     # Reverse KLD: forward, + init_log - log_det, loss = (mean - beta * mean).
     # total_params = sum(p.numel() for p in self.flows.parameters())
@@ -136,6 +134,7 @@ class NVP_Flows:
         # Define a nf
         num_layers = 32
         flows = []
+        self.q_0 = ConditionalDiagGaussian(self.shape)
         for i in range(num_layers):
             mask = MaskedAffineAutoregressive(state_dim + act_dim, hidden_features=128, num_blocks=1)
             # Swap dimensions
@@ -144,27 +143,6 @@ class NVP_Flows:
         self.flows = nn.ModuleList(flows)
         self.optimizer = optim.Adam(self.flows.parameters(), lr=0.00001)
         self.statistics = dict()
-
-    def train_net(self, states, actions, next_states):
-        # Target is the normalized diff
-        target = (next_states - states)
-        delta_targets_normalized = normalize_observation_delta(target, self.statistics)
-        normalized_obs = normalize_observation(states, self.statistics)
-        # Make sure the size is the same.
-        s_a = torch.cat((normalized_obs, actions), dim=1)
-        s_n_a = torch.cat((delta_targets_normalized, actions), dim=1)
-        # KL Divergence.
-        z_ = s_a
-        log_dets = 0
-        for flow in self.flows:
-            z_, log_det = flow.forward(z_)
-            log_dets -= log_det
-        # Reverse KLD: Log_q - Log_p = (Log_q0 - forward_log_det) - (-MSE)
-        mse_loss = F.mse_loss(z_, s_n_a, reduction="sum")
-        loss = torch.mean(log_dets + mse_loss)
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
 
     def forward(self, states, actions):
         """
@@ -175,16 +153,44 @@ class NVP_Flows:
         """
         normalized_obs = normalize_observation(states, self.statistics)
         s_a = torch.cat((normalized_obs, actions), dim=1)
-        z_ = s_a
+        log_dets = 0
+        z_, log_det = self.q_0.forward(s_a, log_scale=torch.ones(s_a.shape) * 0.1)
+        log_dets += log_det
         for flow in self.flows:
-            z_, _ = flow.forward(z_)
+            z_, log_det = flow.forward(z_)
+            log_dets += log_det
         pred = z_[:, 0:self.state_dim]
         pred_delta = denormalize_observation_delta(pred, self.statistics)
         pred_next = pred_delta + states
-        return pred_next, z_
+        return pred_next, z_, log_dets
+
+    def train_net(self, states, actions, next_states):
+        """
+        :param states:
+        :param actions:
+        :param next_states:
+        """
+        # Target is the normalized diff
+        target = (next_states - states)
+        delta_targets_normalized = normalize_observation_delta(target, self.statistics)
+        s_n_a = torch.cat((delta_targets_normalized, actions), dim=1)
+        _, z_end, log_dets = self.forward(states, actions)
+        # Reverse KLD: Log_q - Log_p = (Log_q0 - forward_log_det) - (-MSE)
+        mse_loss = F.mse_loss(z_end, s_n_a, reduction="sum")
+        loss = torch.mean(-1 * log_dets + mse_loss)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
     def reverse(self, z_):
+        """
+        Reverse to the start
+        :param z_:
+        :return:
+        """
         # Reverse
+        reverse_log_dets = 0
         for i in range(len(self.flows) - 1, -1, -1):
-            z_, _ = self.flows[i].inverse(z_)
-        return z_
+            z_, reverse_log_det = self.flows[i].inverse(z_)
+            reverse_log_dets += reverse_log_det
+        return z_, reverse_log_dets

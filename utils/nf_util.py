@@ -56,6 +56,9 @@ class DiagGaussian(nn.Module):
 
 
 class ConditionalDiagGaussian():
+    """
+
+    """
     def __init__(self, shape):
         super().__init__()
         if isinstance(shape, int):

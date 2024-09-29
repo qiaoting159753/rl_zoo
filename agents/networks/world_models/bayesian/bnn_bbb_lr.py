@@ -1,181 +1,114 @@
+from .bayesian_javirantoran_util import *
 import torch
-import numpy as np
-from agents.networks.world_models import World_Model
-from agents.networks.world_models.bayesian.bayesian_javirantoran_bbb_lr import bayes_linear_LR_2L
-
-from utils import normalize_observation_delta
 import torch.nn.functional as F
-from torch import optim
-from agents.networks.world_models.deterministic import (
-    Probabilistic_SAS_Reward,
-)
-from utils import normalize_observation, denormalize_observation_delta
+import torch.nn as nn
 
 
-class Bayesian_World_Model_BBB_LR(World_Model):
-    def __init__(self, observation_size: int, num_actions: int, l_r: float, device: str, hidden_size: int = 128):
-        super().__init__(observation_size, num_actions, l_r, device, hidden_size)
-        self.statistics = None
-        self.observation_size = observation_size
-        self.num_actions = num_actions
-        self.hidden_size = hidden_size
-        self.l_r = l_r
-        self.device = device
-        self.world_model = bayes_linear_LR_2L(observation_size + num_actions, 2 * observation_size, hidden_size,
-                                              prior_sig=0.1)
-        self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
-                                                     hidden_size=hidden_size)
-        self.reward_optimizers = optim.Adam(self.reward_model.parameters(), lr=l_r)
-        self.world_optimizers = optim.Adam(self.world_model.parameters(), lr=0.0001)
-        self.reward_model.to(self.device)
-        self.world_model.to(self.device)
+def KLD_cost(mu_p, sig_p, mu_q, sig_q):
+    KLD = 0.5 * (2 * torch.log(sig_p / sig_q) - 1 + (sig_q / sig_p).pow(2) + ((mu_p - mu_q) / sig_p).pow(2)).sum()
+    # https://arxiv.org/abs/1312.6114 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+    if torch.any(torch.isnan(KLD)):
+        raise Exception("Bayesian Local Reparameterization KLD NaN error")
+    return KLD
 
-    def set_statistics(self, statistics: dict) -> None:
-        """
-        Update all statistics for normalization for all world models and the
-        ensemble itself.
 
-        :param (Dictionary) statistics:
-        """
-        for key, value in statistics.items():
-            if isinstance(value, np.ndarray):
-                statistics[key] = torch.FloatTensor(statistics[key]).to(self.device)
-        self.statistics = statistics
-        # self.world_model.statistics = statistics
+class BayesLinear_local_reparam(nn.Module):
+    """Linear Layer where activations are sampled from a fully factorised normal which is given by aggregating
+     the moments of each weight's normal distribution. The KL divergence is obtained in closed form. Only works
+      with gaussian priors.
+    """
 
-    def train_world(
-            self,
-            states: torch.Tensor,
-            actions: torch.Tensor,
-            next_states: torch.Tensor,
-    ) -> None:
-        """
-        Train the dynamic of world model.
-        :param states:
-        :param actions:
-        :param next_states:
-        """
-        samples = 10
-        target = next_states - states
-        y = normalize_observation_delta(target, self.statistics)
-        normalized_obs = normalize_observation(states, self.statistics)
-        x = torch.cat((normalized_obs, actions), dim=1)
+    def __init__(self, n_in, n_out, sigma):
+        super(BayesLinear_local_reparam, self).__init__()
+        self.n_in = n_in
+        self.n_out = n_out
+        self.prior_sigma = sigma
+        # Learnable parameters
+        self.W_mu = nn.Parameter(torch.Tensor(self.n_in, self.n_out).uniform_(-0.1, 0.1))
+        self.W_p = nn.Parameter(torch.Tensor(self.n_in, self.n_out).uniform_(-3, -2))
+        self.b_mu = nn.Parameter(torch.Tensor(self.n_out).uniform_(-0.1, 0.1))
+        self.b_p = nn.Parameter(torch.Tensor(self.n_out).uniform_(-3, -2))
 
-        # x, y = to_variable(var=(x, y.long()), cuda=self.cuda)
-        self.world_optimizers.zero_grad()
-        mlpdw_cum = 0
-        Edkl_cum = 0
-        for i in range(samples):
-            out, tlqw, tlpw = self.world_model(x, sample=True)
-            Edkl_i = (tlqw - tlpw)
+    def forward(self, X, sample=True):
+        # # calculate std
+        # calculate std
+        std_w = 1e-6 + F.softplus(self.W_p, beta=1, threshold=20)
+        std_b = 1e-6 + F.softplus(self.b_p, beta=1, threshold=20)
+        act_W_mu = torch.mm(X, self.W_mu)  # self.W_mu + std_w * eps_W
+        act_W_std = torch.sqrt(torch.mm(X.pow(2), std_w.pow(2)))
+        # Tensor.new()  Constructs a new tensor of the same data type as self tensor.
+        # the same random sample is used for every element in the minibatch output
+        eps_W = Variable(self.W_mu.data.new(act_W_std.size()).normal_(mean=0, std=1))
+        eps_b = Variable(self.b_mu.data.new(std_b.size()).normal_(mean=0, std=1))
+        act_W_out = act_W_mu + act_W_std * eps_W  # (batch_size, n_output)
+        act_b_out = self.b_mu + std_b * eps_b
+        output = act_W_out + act_b_out.unsqueeze(0).expand(X.shape[0], -1)
+        KL_loss = (KLD_cost(mu_p=0.0, sig_p=self.prior_sigma, mu_q=self.W_mu, sig_q=std_w)
+                   + KLD_cost(mu_p=0.0, sig_p=self.prior_sigma, mu_q=self.b_mu, sig_q=std_b))
 
-            mean_pred = out[:, :self.observation_size]
-            var_pred = out[:, self.observation_size:]
-            var_pred = torch.tanh(var_pred)
-            var_pred = torch.exp(var_pred)
-            mlpdw_i = F.gaussian_nll_loss(input=mean_pred, target=y, var=var_pred).mean()
+        # # sample gaussian noise for each weight and each bias
+        # weight_epsilons = Variable(self.W_mu.data.new(self.W_mu.size()).normal_())
+        # bias_epsilons = Variable(self.b_mu.data.new(self.b_mu.size()).normal_())
+        # # calculate the weight and bias stds from the rho parameters
+        # weight_stds = torch.log(1 + torch.exp(self.W_p))
+        # bias_stds = torch.log(1 + torch.exp(self.b_p))
+        # # calculate samples from the posterior from the sampled noise and mus/stds
+        # weight_sample = self.W_mu + weight_epsilons * weight_stds
+        # bias_sample = self.b_mu + bias_epsilons * bias_stds
+        # output = torch.mm(X, weight_sample) + bias_sample
+        # # computing the KL loss term
+        # prior_cov, varpost_cov = self.prior_sigma ** 2, weight_stds ** 2
+        # KL_loss = 0.5 * (torch.log(prior_cov / varpost_cov)).sum() - 0.5 * weight_stds.numel()
+        # KL_loss = KL_loss + 0.5 * (varpost_cov / prior_cov).sum()
+        # KL_loss = KL_loss + 0.5 * ((self.W_mu - 0.0) ** 2 / prior_cov).sum()
+        # prior_cov, varpost_cov = self.prior_sigma ** 2, bias_stds ** 2
+        # KL_loss = KL_loss + 0.5 * (torch.log(prior_cov / varpost_cov)).sum() - 0.5 * bias_stds.numel()
+        # KL_loss = KL_loss + 0.5 * (varpost_cov / prior_cov).sum()
+        # KL_loss = KL_loss + 0.5 * ((self.b_mu - 0.0) ** 2 / prior_cov).sum()
+        return output, KL_loss, 0.0
 
-            # mlpdw_i = F.mse_loss(out, y).mean()
 
-            mlpdw_cum += mlpdw_i
-            Edkl_cum = Edkl_cum + Edkl_i
-        mlpdw = mlpdw_cum / samples
-        Edkl = Edkl_cum / (samples * 20000)
-        loss = Edkl + mlpdw
-        loss.backward()
-        self.world_optimizers.step()
+class bayes_linear_lr(nn.Module):
+    def __init__(self, input_dim, output_dim, nhid, sigma):
+        super(bayes_linear_lr, self).__init__()
+        n_hid = nhid
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.bfc1 = BayesLinear_local_reparam(input_dim, n_hid, sigma)
+        self.bfc2 = BayesLinear_local_reparam(n_hid, n_hid, sigma)
+        self.bfc3 = BayesLinear_local_reparam(n_hid, output_dim, sigma)
+        self.act = nn.ReLU(inplace=True)
 
-    def estimate_uncertainty(
-            self, observation: torch.Tensor, actions: torch.Tensor
-    ) -> tuple[float, float]:
-        """
-        Estimate next state uncertainty and reward uncertainty.
+    def forward(self, x, sample=True):
+        tlqw = 0
+        tlpw = 0
+        x = x.view(-1, self.input_dim)  # view(batch_size, input_dim)
+        # -----------------
+        x, lqw, lpw = self.bfc1(x, sample)
+        tlqw = tlqw + lqw
+        tlpw = tlpw + lpw
+        # -----------------
+        x = self.act(x)
+        # -----------------
+        x, lqw, lpw = self.bfc2(x, sample)
+        tlqw = tlqw + lqw
+        tlpw = tlpw + lpw
+        # -----------------
+        x = self.act(x)
+        # -----------------
+        y, lqw, lpw = self.bfc3(x, sample)
+        tlqw = tlqw + lqw
+        tlpw = tlpw + lpw
+        return y, tlqw, tlpw
 
-        :param observation:
-        :param actions:
-        :return:
-        """
-        # logging.info("Not Implemented")
-        sample = 10
-        preds = []
-        normalized_obs = normalize_observation(observation, self.statistics)
-        x = torch.cat((normalized_obs, actions), dim=1)
-        for _ in range(sample):
-            pred, _, _ = self.world_model(x, sample=True)
-
-            mean_pred = pred[:, :self.observation_size]
-            var_pred = pred[:, self.observation_size:]
-            var_pred = torch.tanh(var_pred)
-            var_pred = torch.exp(var_pred)
-            sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
-            preds.append(sample1)
-
-            # preds.append(pred)
-
-        preds = torch.vstack(preds).squeeze()
-        mean_deltas = denormalize_observation_delta(preds, self.statistics)
-        preds = mean_deltas + observation
-        dyna_var = torch.sum(torch.var(preds, dim=0)).item()
-        return dyna_var, 0.0
-
-    def train_reward(
-            self,
-            states: torch.Tensor,
-            actions: torch.Tensor,
-            next_states: torch.Tensor,
-            rewards: torch.Tensor,
-    ) -> None:
-        """
-        Train the reward prediction with or without world model dynamics.
-
-        :param states:
-        :param actions:
-        :param next_states:
-        :param rewards:
-        """
-        self.reward_optimizers.zero_grad()
-        rwd_mean, rwd_var = self.reward_model.forward(states, actions, next_states)
-        reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var).mean()
-        reward_loss.backward()
-        self.reward_optimizers.step()
-
-    def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor
-                     ):
-        """
-        Predict reward based on SAS
-        :param observation:
-        :param action:
-        :param next_observation:
-        :return:
-        """
-        pred_reward, reward_var = self.reward_model.forward(observation, action, next_observation)
-        return pred_reward, None, reward_var
-
-    def pred_next_states(
-            self, observation: torch.Tensor, actions: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-
-        :param observation:
-        :param actions:
-        """
-        sample = 3
-        preds = []
-        normalized_obs = normalize_observation(observation, self.statistics)
-        x = torch.cat((normalized_obs, actions), dim=1)
-        for i in range(sample):
-            pred, _, _ = self.world_model(x, sample=True)
-            mean_pred = pred[:, :self.observation_size]
-            var_pred = pred[:, self.observation_size:]
-            var_pred = torch.tanh(var_pred)
-            var_pred = torch.exp(var_pred)
-            sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
-            preds.append(sample1)
-
-            # preds.append(pred)
-
-        preds = torch.vstack(preds).squeeze()
-        mean_deltas = denormalize_observation_delta(preds, self.statistics)
-        preds = mean_deltas + observation
-        preds = torch.mean(preds, dim=0).unsqueeze(dim=0)
-        return preds, None, None, None
+    def sample_predict(self, x, Nsamples):
+        # Just copies type from x, initializes new vector
+        predictions = x.data.new(Nsamples, x.shape[0], self.output_dim)
+        tlqw_vec = np.zeros(Nsamples)
+        tlpw_vec = np.zeros(Nsamples)
+        for i in range(Nsamples):
+            y, tlqw, tlpw = self.forward(x, sample=True)
+            predictions[i] = y
+            tlqw_vec[i] = tlqw
+            tlpw_vec[i] = tlpw
+        return predictions, tlqw_vec, tlpw_vec

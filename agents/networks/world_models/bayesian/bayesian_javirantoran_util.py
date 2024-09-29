@@ -12,6 +12,16 @@ except:
     import pickle
 
 
+class gaussian:
+    def __init__(self, mu, sigma):
+        self.mu = mu
+        self.sigma = sigma
+    def loglik(self, weights):
+        exponent = -0.5 * (weights - self.mu) ** 2 / self.sigma ** 2
+        log_coeff = -0.5 * (np.log(2 * np.pi) + 2 * np.log(self.sigma))
+        return (exponent + log_coeff).sum()
+
+
 class laplace_prior(object):
     def __init__(self, mu, b):
         self.mu = mu

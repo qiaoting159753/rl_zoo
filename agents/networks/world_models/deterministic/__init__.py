@@ -2,3 +2,5 @@ from .probabilistic_dynamic import Probabilistic_Dynamics
 from .probabilistic_sas_reward import Probabilistic_SAS_Reward
 from .one_sas_rwd import One_Dyna_One_SAS_Reward
 from .nf_nvp import NVP_World_Model
+from .nf_conditional_nvp import Conditional_NVP_World_Model
+from .nf_nvp import NVP_Flows

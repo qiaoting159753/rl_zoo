@@ -15,13 +15,18 @@ from agents.mfrl import SAC
 from utils import PrioritizedReplayBuffer
 
 # World Models
-from agents.networks.world_models.ensembles import Ensemble_Dyna_One_SAS_Reward
-from agents.networks.world_models.deterministic import Probabilistic_Dynamics
-from agents.networks.world_models.deterministic import One_Dyna_One_SAS_Reward
-from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
-from agents.networks.world_models.ensembles import Ensemble_Dyna_Ensemble_SAS_Reward
-from agents.networks.world_models.bayesian import Bayesian_World_Model_BBB_LR, Bayesian_World_Model_BBB_Heter
-from agents.networks.world_models.deterministic import NVP_World_Model
+from agents.networks.world_models.deterministic import (Probabilistic_Dynamics,
+                                                        One_Dyna_One_SAS_Reward,
+                                                        NVP_World_Model,
+                                                        Conditional_NVP_World_Model)
+
+from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_SAS_Reward,
+                                                    Ensemble_NF_One_SAS_Reward,
+                                                    Ensemble_Dyna_One_SAS_Reward,
+                                                    Ensemble_Dyna_One_NS_Reward)
+
+from agents.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
+                                                   Bayesian_Laplace)
 
 
 class World_Model_Trainer:
@@ -43,7 +48,9 @@ class World_Model_Trainer:
                  evaluate_interval: int,
                  generate_results: bool,
                  seed: int,
-                 directory: str):
+                 directory: str,
+                 ratio,
+                 sigma):
         # Training
         self.counter = 0
         self.G = G
@@ -51,7 +58,8 @@ class World_Model_Trainer:
         self.batch_size = batch_size
         self.maximum_steps = maximum_steps
         self.episode_steps = episode_steps
-
+        self.ratio = ratio
+        self.sigma = sigma
         # Environment
         self.env = env
         self.state_dim = env.observation_space
@@ -94,7 +102,7 @@ class World_Model_Trainer:
         multi_rwd_uncerts = []
 
         gt_s = self.env.reset()
-        multi_state = torch.FloatTensor(gt_s).to(self.device).unsqueeze(dim=0)
+        # multi_state = torch.FloatTensor(gt_s).to(self.device).unsqueeze(dim=0)
         episodic_pred_error = 0.0
         episodic_rwd_pred_error = 0.0
 
@@ -110,22 +118,24 @@ class World_Model_Trainer:
             # One step prediction
             pred_ns, _, _, _ = self.world_model.pred_next_states(observation=tensor_state,
                                                                  actions=tensor_action)
-            one_pred_rewards, _, _ = self.world_model.pred_rewards(observation=tensor_state,
-                                                                   action=tensor_action,
-                                                                   next_observation=pred_ns)
+            # one_pred_rewards, _, _ = self.world_model.pred_rewards(observation=tensor_state,
+            #                                                        action=tensor_action,
+            #                                                        next_observation=pred_ns)
             # Multi-step prediction with different actions.
-            if self.on_policy:
-                np_multi_state = multi_state.detach().squeeze().cpu().numpy()
-                multi_action = self.agent.select_action_from_policy(np_multi_state)
-            else:
-                multi_action = action
-            multi_tensor_action = torch.FloatTensor(multi_action).to(self.device).unsqueeze(dim=0)
-            # Make accumulative multi-step predictions.
-            multi_state_pred, _, _, _ = self.world_model.pred_next_states(observation=multi_state,
-                                                                          actions=multi_tensor_action)
-            multi_pred_rewards, _, _ = self.world_model.pred_rewards(observation=multi_state,
-                                                                     action=multi_tensor_action,
-                                                                     next_observation=multi_state_pred)
+            # if self.on_policy:
+            #     np_multi_state = multi_state.detach().squeeze().cpu().numpy()
+            #     multi_action = self.agent.select_action_from_policy(np_multi_state)
+            # else:
+            #     multi_action = action
+
+            # multi_tensor_action = torch.FloatTensor(multi_action).to(self.device).unsqueeze(dim=0)
+            # # Make accumulative multi-step predictions.
+            # multi_state_pred, _, _, _ = self.world_model.pred_next_states(observation=multi_state,
+            #                                                               actions=multi_tensor_action)
+
+            # multi_pred_rewards, _, _ = self.world_model.pred_rewards(observation=multi_state,
+            #                                                          action=multi_tensor_action,
+            #                                                          next_observation=multi_state_pred)
             # MSE. L1 of dynamics
             np_pred_ns = pred_ns.detach().squeeze().cpu().numpy()
             one_step_mse = (np.square(np_pred_ns - gt_ns)).mean()
@@ -133,37 +143,43 @@ class World_Model_Trainer:
             one_step_l1 = (abs(np_pred_ns - gt_ns)).mean()
             l1_one_step_errors.append(one_step_l1)
             l2_one_step_errors.append(one_step_mse)
-            np_multi_state = multi_state_pred.detach().squeeze().cpu().numpy()
-            multi_step_mse = (np.square(np_multi_state - gt_ns)).mean()
-            multi_step_l1 = (abs(np_multi_state - gt_ns)).mean()
-            l1_multi_step_errors.append(multi_step_l1)
-            l2_multi_step_errors.append(multi_step_mse)
+
+            # np_multi_state = multi_state_pred.detach().squeeze().cpu().numpy()
+            # multi_step_mse = (np.square(np_multi_state - gt_ns)).mean()
+            # multi_step_l1 = (abs(np_multi_state - gt_ns)).mean()
+            l1_multi_step_errors.append(0.0)
+            l2_multi_step_errors.append(0.0)
             # L1 of Rewards
-            np_one_pred_rewards = one_pred_rewards.detach().squeeze().cpu().numpy()
-            np_multi_pred_rewards = multi_pred_rewards.detach().squeeze().cpu().numpy()
-            l1_one_rwd_error = abs(np_one_pred_rewards - gt_rwd)
-            episodic_rwd_pred_error += l1_one_rwd_error
-            l1_multi_rwd_error = abs(np_multi_pred_rewards - gt_rwd)
-            l1_one_rwd_errors.append(l1_one_rwd_error)
-            l1_multi_rwd_errors.append(l1_multi_rwd_error)
+            # np_one_pred_rewards = one_pred_rewards.detach().squeeze().cpu().numpy()
+            # np_multi_pred_rewards = multi_pred_rewards.detach().squeeze().cpu().numpy()
+            # l1_one_rwd_error = abs(np_one_pred_rewards - gt_rwd)
+            # episodic_rwd_pred_error += l1_one_rwd_error
+            # l1_multi_rwd_error = abs(np_multi_pred_rewards - gt_rwd)
+            # l1_one_rwd_errors.append(l1_one_rwd_error)
+            # l1_multi_rwd_errors.append(l1_multi_rwd_error)
+            l1_one_rwd_errors.append(0.0)
+            l1_multi_rwd_errors.append(0.0)
             #################    Uncertainty Estimation and Quantification    ################
-            one_dyna_uncert, one_rwd_uncert = self.world_model.estimate_uncertainty(observation=multi_state,
-                                                                                    actions=multi_tensor_action)
-            multi_dyna_uncert, multi_rwd_uncert = self.world_model.estimate_uncertainty(observation=tensor_state,
-                                                                                        actions=tensor_action)
+            # one_dyna_uncert, one_rwd_uncert = self.world_model.estimate_uncertainty(observation=multi_state,
+            #                                                                         actions=multi_tensor_action)
+            one_dyna_uncert, one_rwd_uncert = self.world_model.estimate_uncertainty(observation=tensor_state,
+                                                                                    actions=tensor_action)
             one_dyna_uncerts.append(one_dyna_uncert)
-            one_rwd_uncerts.append(one_rwd_uncert)
-            multi_dyna_uncerts.append(multi_dyna_uncert)
-            multi_rwd_uncerts.append(multi_rwd_uncert)
+            one_rwd_uncerts.append(0.0)
+            # one_rwd_uncerts.append(one_rwd_uncert)
+            # multi_dyna_uncerts.append(multi_dyna_uncert)
+            # multi_rwd_uncerts.append(multi_rwd_uncert)
+            multi_dyna_uncerts.append(0.0)
+            multi_rwd_uncerts.append(0.0)
 
             gt_s = gt_ns
             if gt_done:
                 break
 
-        l2_one_step_errors = np.array(l2_one_step_errors)
-        l2_multi_step_errors = np.array(l2_multi_step_errors)
         l1_one_step_errors = np.array(l1_one_step_errors)
+        l2_one_step_errors = np.array(l2_one_step_errors)
         l1_multi_step_errors = np.array(l1_multi_step_errors)
+        l2_multi_step_errors = np.array(l2_multi_step_errors)
         l1_one_rwd_errors = np.array(l1_one_rwd_errors)
         l1_multi_rwd_errors = np.array(l1_multi_rwd_errors)
         one_dyna_uncerts = np.array(one_dyna_uncerts)
@@ -173,10 +189,10 @@ class World_Model_Trainer:
 
         c_1 = np.corrcoef(l2_one_step_errors, one_dyna_uncerts)
         c_2 = np.corrcoef(l1_one_step_errors, one_dyna_uncerts)
-        c_3 = np.corrcoef(l2_multi_step_errors, multi_dyna_uncerts)
-        c_4 = np.corrcoef(l1_multi_step_errors, multi_dyna_uncerts)
-        c_5 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
-        c_6 = np.corrcoef(l1_multi_rwd_errors, multi_rwd_uncerts)
+        # c_3 = np.corrcoef(l2_multi_step_errors, multi_dyna_uncerts)
+        # c_4 = np.corrcoef(l1_multi_step_errors, multi_dyna_uncerts)
+        # c_5 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
+        # c_6 = np.corrcoef(l1_multi_rwd_errors, multi_rwd_uncerts)
 
         logging.info(f"Prediction Error: {episodic_pred_error}")
         all_data = np.zeros((9,))
@@ -185,10 +201,11 @@ class World_Model_Trainer:
         all_data[2] = episodic_rwd_pred_error
         all_data[3] = c_1[0, 1]
         all_data[4] = c_2[0, 1]
-        all_data[5] = c_3[0, 1]
-        all_data[6] = c_4[0, 1]
-        all_data[7] = c_5[0, 1]
-        all_data[8] = c_6[0, 1]
+        # all_data[5] = c_3[0, 1]
+        # all_data[6] = c_4[0, 1]
+        # all_data[7] = c_5[0, 1]
+        # all_data[8] = c_6[0, 1]
+
         self.evaluation_array.append(all_data)
 
         if self.generate_results:
@@ -317,13 +334,36 @@ class World_Model_Trainer:
                                                        device=self.device)
 
         if self.world_model_name == "Bayesian_VI":
-            self.world_model = Bayesian_World_Model_BBB_Heter(observation_size=self.state_dim,
-                                                              num_actions=self.action_dim,
-                                                              l_r=0.001,
-                                                              device=self.device)
+            self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
+                                                        l_r=0.001, device=self.device, option=1, sigma=self.sigma, ratio=self.ratio)
 
-        if self.world_model_name == "NF_NVP":
-            self.world_model = NVP_World_Model(observation_size=self.state_dim,
-                                               num_actions=self.action_dim,
-                                               l_r=0.001,
-                                               device=self.device)
+        if self.world_model_name == "Bayesian_LR":
+            self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
+                                                        l_r=0.001, device=self.device, option=2, sigma=self.sigma, ratio=self.ratio)
+
+        if self.world_model_name == "Hyper_Bayesian_VI":
+            self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim,
+                                                        num_actions=self.action_dim,
+                                                        l_r=0.001,
+                                                        device=self.device,
+                                                        option=0)
+
+        if self.world_model_name == "Bayesian_Laplace":
+            self.world_model = Bayesian_Laplace(observation_size=self.state_dim,
+                                                num_actions=self.action_dim,
+                                                l_r=0.001,
+                                                hidden_size=128,
+                                                device=self.device)
+
+        if self.world_model_name == "Conditional_NF_NVP":
+            self.world_model = Conditional_NVP_World_Model(observation_size=self.state_dim,
+                                                           num_actions=self.action_dim,
+                                                           l_r=0.001,
+                                                           device=self.device)
+
+        if self.world_model_name == "Ensemble_NF_NVP":
+            self.world_model = Ensemble_NF_One_SAS_Reward(num_models=5,
+                                                          observation_size=self.state_dim,
+                                                          num_actions=self.action_dim,
+                                                          l_r=0.00002,
+                                                          device=self.device)

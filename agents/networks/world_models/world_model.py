@@ -15,7 +15,7 @@ class World_Model:
             device: str,
             hidden_size: int = 128,
     ):
-        logging.info("Not Implemented")
+        logging.info("World Model Init Not Implemented")
 
     def set_statistics(self, statistics: dict) -> None:
         """
@@ -24,7 +24,7 @@ class World_Model:
 
         :param (Dictionary) statistics:
         """
-        logging.info("Not Implemented")
+        logging.info("Set Statistics Not Implemented")
 
     def train_world(
             self,
@@ -79,7 +79,7 @@ class World_Model:
         :return:
         """
         logging.info("Not Implemented")
-        return torch.zeros((1,)), torch.zeros((1,))
+        return torch.zeros((1,)), torch.zeros((1,)), torch.zeros((1,))
 
     def estimate_uncertainty(
             self, observation: torch.Tensor, actions: torch.Tensor
