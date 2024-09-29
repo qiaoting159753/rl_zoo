@@ -71,7 +71,7 @@ class Gaussian_Process_World_Model(World_Model):
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         y_y = next_states.T
         x_x = torch.cat((states, actions), dim=1)
-        gpr = gp.models.GPRegression(x_x, y_y, self.kernel, noise=torch.tensor(self.noise)).to(self.device)
+        gpr = gp.models.GPRegression(x_x, y_y, self.kernel, noise=torch.tensor(self.noise), jitter=0.0001).to(self.device)
         optimizer = torch.optim.Adam(gpr.parameters(), lr=self.l_r)
         loss_fn = pyro.infer.Trace_ELBO().differentiable_loss
         for _ in range(self.train_iter):
