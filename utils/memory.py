@@ -491,7 +491,7 @@ class PrioritizedReplayBuffer:
         for buffer in self.memory_buffers:
             # NOTE: we convert back to a standard list here
             experiences.append(buffer[0: self.current_size].tolist())
-        self.clear()
+        # self.clear()
         return experiences
 
     def sample_consecutive(self, batch_size: int) -> tuple:

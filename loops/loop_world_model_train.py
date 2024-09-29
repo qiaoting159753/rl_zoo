@@ -16,6 +16,7 @@ from utils import PrioritizedReplayBuffer
 
 # World Models
 from agents.networks.world_models.deterministic import (Probabilistic_Dynamics,
+                                                        Gaussian_Process_World_Model,
                                                         One_Dyna_One_SAS_Reward,
                                                         NVP_World_Model,
                                                         Conditional_NVP_World_Model)
@@ -239,13 +240,18 @@ class World_Model_Trainer:
             #     np.savetxt(fff, all_data, delimiter=",")
             # fff.close()
 
-    def train(self):
+    def train(self, g_p=False):
         """
         Train the MFRL Agent.
         """
         with logging_redirect_tqdm():
             need_evaluate = False
             need_reset = True
+            if g_p:
+                store_states = []
+                store_actions = []
+                store_next_states = []
+
             for _ in trange(self.maximum_steps):
                 if need_reset:
                     epi_reward = 0.0
@@ -258,6 +264,11 @@ class World_Model_Trainer:
                     action = self.env.sample_action()
                 # Do action is for the environment.
                 next_state, reward, done, _ = self.env.step(action)
+                if g_p:
+                    store_states.append(state)
+                    store_actions.append(action)
+                    store_next_states.append(next_state)
+
                 # Small action is for training.
                 self.memory.add(state, action, reward, next_state, done)
                 epi_reward += reward
@@ -277,15 +288,21 @@ class World_Model_Trainer:
                     # Train the world model every time.
                     if self.model_G > 1.0:
                         for _ in range(int(self.model_G)):
-                            self.agent.train_world_model(memory=self.memory,
-                                                         batch_size=self.batch_size,
-                                                         world_model=self.world_model)
+                            if g_p:
+                                self.world_model.train_world_all(store_states, store_actions, store_next_states)
+                            else:
+                                self.agent.train_world_model(memory=self.memory,
+                                                             batch_size=self.batch_size,
+                                                             world_model=self.world_model)
                     else:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
-                            self.agent.train_world_model(memory=self.memory,
-                                                         batch_size=self.batch_size,
-                                                         world_model=self.world_model)
+                            if g_p:
+                                self.world_model.train_world_all(store_states, store_actions, store_next_states)
+                            else:
+                                self.agent.train_world_model(memory=self.memory,
+                                                             batch_size=self.batch_size,
+                                                             world_model=self.world_model)
                 # Evaluating
                 if self.counter % self.evaluate_interval == 0:
                     need_evaluate = True
@@ -332,14 +349,21 @@ class World_Model_Trainer:
                                                        num_actions=self.action_dim,
                                                        l_r=0.001,
                                                        device=self.device)
+        if self.world_model_name == "Gaussian_Process":
+            self.world_model = Gaussian_Process_World_Model(observation_size=self.state_dim,
+                                                            num_actions=self.action_dim,
+                                                            l_r=0.001, device=self.device, noise=self.sigma,
+                                                            train_iter=self.ratio)
 
         if self.world_model_name == "Bayesian_VI":
             self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
-                                                        l_r=0.001, device=self.device, option=1, sigma=self.sigma, ratio=self.ratio)
+                                                        l_r=0.001, device=self.device, option=1, sigma=self.sigma,
+                                                        ratio=self.ratio)
 
         if self.world_model_name == "Bayesian_LR":
             self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
-                                                        l_r=0.001, device=self.device, option=2, sigma=self.sigma, ratio=self.ratio)
+                                                        l_r=0.001, device=self.device, option=2, sigma=self.sigma,
+                                                        ratio=self.ratio)
 
         if self.world_model_name == "Hyper_Bayesian_VI":
             self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim,

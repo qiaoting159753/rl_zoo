@@ -40,18 +40,22 @@ def test(env, gaussian_model, i_i, j_j, k_k, l_l):
             ttensor_state = torch.FloatTensor(tstate).unsqueeze(dim=0)
             ttensor_action = torch.FloatTensor(t_action).unsqueeze(dim=0)
             ttensor_input = torch.cat((ttensor_state, ttensor_action), dim=1)
+
             tmean, tcov = gaussian_model(ttensor_input, full_cov=True)
+
             covs.append(torch.sum(torch.squeeze(tcov)).detach().cpu().numpy())
             tmean = tmean.detach().squeeze().cpu().numpy()
             mse_loss = np.mean((tn_state - tmean) ** 2)
             errors.append(mse_loss)
             mse_errors += mse_loss
             tstate = tn_state
+
         errors = np.array(errors)
         covs = np.array(covs)
         corr = np.corrcoef(errors, covs)
         total_errors[i_i, j_j, k_k, l_l, m_m] = mse_errors
         corr_results[i_i, j_j, k_k, l_l, m_m] = corr[0, 1]
+
         logging.info(f"error: {mse_errors}, corr: {corr[0,1]}")
 
 
@@ -62,7 +66,9 @@ for i in range(len(domain_names)):
         env.set_seed(seed_list[j])
         state_dim = env.observation_space
         action_dim = env.action_num
+
         kernel = gp.kernels.RBF(input_dim=state_dim + action_dim)
+
         for k in range(len(train_collect_epis)):
             for l in range(len(train_iters)):
                 states = []
@@ -77,13 +83,17 @@ for i in range(len(domain_names)):
                         next_states.append(n_state)
                         actions.append(action)
                         state = n_state
+
                 states = np.stack(states)
                 actions = np.stack(actions)
                 next_states = np.stack(next_states)
+
                 tensor_states = torch.FloatTensor(states)
                 tensor_actions = torch.FloatTensor(actions)
                 tensor_n_states = torch.FloatTensor(next_states)
+
                 tensor_x = torch.cat((tensor_states, tensor_actions), dim=1)
+
                 tensor_y = tensor_n_states.T
                 gpr = gp.models.GPRegression(tensor_x, tensor_y, kernel)
                 optimizer = torch.optim.Adam(gpr.parameters(), lr=0.005)
@@ -94,6 +104,7 @@ for i in range(len(domain_names)):
                     loss = loss_fn(gpr.model, gpr.guide)
                     loss.backward()
                     optimizer.step()
+
                 test(env, gpr, i, j, k, l)
 
     np.save(directory + domain_names[i] + "gp_errors.npy", total_errors)

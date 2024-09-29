@@ -4,3 +4,4 @@ from .one_sas_rwd import One_Dyna_One_SAS_Reward
 from .nf_nvp import NVP_World_Model
 from .nf_conditional_nvp import Conditional_NVP_World_Model
 from .nf_nvp import NVP_Flows
+from .gaussian_process import Gaussian_Process_World_Model
