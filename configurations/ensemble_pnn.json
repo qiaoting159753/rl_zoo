@@ -13,7 +13,7 @@
   "model_G": 0.2,
   "horizon": 5,
   "branch_factor": 10,
-  "device": "cpu",
+  "device": "cuda",
   "loop_name": "World_Model",
   "on_policy": false
 }
