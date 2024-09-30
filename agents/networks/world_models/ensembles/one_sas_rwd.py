@@ -31,14 +31,12 @@ class Ensemble_Dyna_One_SAS_Reward(World_Model):
         self.num_models = num_models
         self.observation_size = observation_size
         self.num_actions = num_actions
-
         self.reward_network = Simple_SAS_Reward(
             observation_size=observation_size,
             num_actions=num_actions,
             hidden_size=hidden_size,
         )
         self.reward_optimizer = optim.Adam(self.reward_network.parameters(), lr=l_r)
-
         self.models = [
             Probabilistic_Dynamics(
                 observation_size=observation_size,
@@ -47,11 +45,8 @@ class Ensemble_Dyna_One_SAS_Reward(World_Model):
             )
             for _ in range(self.num_models)
         ]
-
         self.optimizers = [optim.Adam(self.models[i].parameters(), lr=l_r) for i in range(self.num_models)]
-
         self.statistics = {}
-
         # Bring all reward prediction and dynamic rediction networks to device.
         self.device = device
         self.reward_network.to(self.device)
@@ -114,9 +109,10 @@ class Ensemble_Dyna_One_SAS_Reward(World_Model):
             logging.info("Predicting all Nans")
             sys.exit()
         # Random Take next state.
-        rand_ind = random.randint(0, len(not_nans) - 1)
-        prediction = predictions_means[not_nans[rand_ind]]
+        # rand_ind = random.randint(0, len(not_nans) - 1)
+        # prediction = predictions_means[not_nans[rand_ind]]
         # next = current + delta
+        prediction = torch.mean(predictions_means, dim=0)
         prediction += observation
         all_predictions = torch.stack(means)
         for j in range(all_predictions.shape[0]):
@@ -187,9 +183,9 @@ class Ensemble_Dyna_One_SAS_Reward(World_Model):
         sample1 = torch.vstack(tempa)
         sample1i = denormalize_observation_delta(sample1, self.statistics)
         sample1i += observation
-        dyna_uncert = torch.sum(torch.var(sample1i, dim=0)).item()
-        multi_observation = torch.repeat_interleave(observation, self.num_models * sample_times, dim=0)
-        multi_reward = torch.repeat_interleave(actions, self.num_models * sample_times, dim=0)
-        reward, _, _ = self.pred_rewards(multi_observation, multi_reward, sample1i)
-        rwd_uncert = torch.var(reward).item()
-        return dyna_uncert, rwd_uncert
+        dyna_uncert = torch.mean(torch.var(sample1i, dim=0)).item()
+        # multi_observation = torch.repeat_interleave(observation, self.num_models * sample_times, dim=0)
+        # multi_reward = torch.repeat_interleave(actions, self.num_models * sample_times, dim=0)
+        # reward, _, _ = self.pred_rewards(multi_observation, multi_reward, sample1i)
+        # rwd_uncert = torch.var(reward).item()
+        return dyna_uncert, 0.0

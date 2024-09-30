@@ -7,7 +7,7 @@ import json
 
 
 def main():
-    with open('configurations/bayesian_la.json', 'r') as file:
+    with open('configurations/ensemble_pnn.json', 'r') as file:
         data = json.load(file)
     logging.info(data)
 
@@ -31,8 +31,8 @@ def main():
     agent_name = data["agent_name"]
     seeds = data["seeds"]
     # Parameter tuning.
-    sigmas = data["sigmas"]
     ratios = data["ratios"]
+    sigmas = [0.0]
 
     for sigma in sigmas:
         for ratio in ratios:
@@ -102,7 +102,7 @@ def main():
                                                   directory=directory,
                                                   ratio=ratio,
                                                   sigma=sigma)
-                trainer.train(g_p=True)
+                trainer.train()
                 # try:
                 #     trainer.train()
                 # except Exception as e:

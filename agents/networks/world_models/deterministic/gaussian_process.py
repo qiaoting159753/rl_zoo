@@ -56,9 +56,9 @@ class Gaussian_Process_World_Model(World_Model):
 
     def train_world_all(
             self,
-            states: list,
-            actions: list,
-            next_states: list,
+            states: torch.Tensor,
+            actions: torch.Tensor,
+            next_states: torch.Tensor,
     ) -> None:
         """
         Train the dynamic of world model.
@@ -66,9 +66,6 @@ class Gaussian_Process_World_Model(World_Model):
         :param actions:
         :param next_states:
         """
-        states = torch.FloatTensor(np.array(states)).to(self.device)
-        actions = torch.FloatTensor(np.array(actions)).to(self.device)
-        next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         y_y = next_states.T
         x_x = torch.cat((states, actions), dim=1)
         gpr = gp.models.GPRegression(x_x, y_y, self.kernel, noise=torch.tensor(self.noise), jitter=0.0001).to(self.device)

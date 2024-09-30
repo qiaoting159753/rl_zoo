@@ -1,0 +1,21 @@
+{
+  "domain":"cheetah",
+  "task":"run",
+  "agent_name":"Ensemble_Dyna_One_NS_Reward",
+  "seeds":[15, 25, 35],
+  "ratios" : [3, 5, 10, 20, 50],
+  "G": 1,
+  "random_goal": false,
+  "batch_size": 256,
+  "episode_steps": 257,
+  "evaluate_interval": 257,
+  "maximum_steps": 257000,
+  "model_G": 0.2,
+  "horizon": 5,
+  "branch_factor": 10,
+  "device": "cpu",
+  "loop_name": "World_Model",
+  "on_policy": false
+}
+
+

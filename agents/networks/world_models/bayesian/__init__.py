@@ -1,2 +1,3 @@
 from .bnn_bbb_world import Bayesian_World_Model_BBB
-from .bnn_laplace_javirantoran import Bayesian_Laplace
+from .bnn_laplace_javirantoran import Bayesian_World_Model_Laplace_JA
+from .bnn_laplace_aleximmer import Bayesian_World_Model_Laplace_AX

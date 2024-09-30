@@ -121,7 +121,7 @@ class Linear_2L_KFRA(nn.Module):
         return predictions
 
 
-class Bayesian_Laplace(World_Model):
+class Bayesian_World_Model_Laplace_JA(World_Model):
     def __init__(self,
                  observation_size,
                  num_actions,

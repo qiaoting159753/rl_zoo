@@ -27,7 +27,8 @@ from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_SAS_R
                                                     Ensemble_Dyna_One_NS_Reward)
 
 from agents.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
-                                                   Bayesian_Laplace)
+                                                   Bayesian_World_Model_Laplace_JA,
+                                                   Bayesian_World_Model_Laplace_AX)
 
 
 class World_Model_Trainer:
@@ -278,9 +279,8 @@ class World_Model_Trainer:
                 if len(self.memory) > self.batch_size:
                     # first time update world model statistics
                     if len(self.memory) == (self.batch_size + 1):
-                        if not g_p:
-                            statistics = self.memory.get_statistics()
-                            self.world_model.set_statistics(statistics)
+                        statistics = self.memory.get_statistics()
+                        self.world_model.set_statistics(statistics)
                     # Train the agent only when on-policy.
                     if self.on_policy:
                         for _ in range(self.G):
@@ -290,7 +290,12 @@ class World_Model_Trainer:
                     if self.model_G > 1.0:
                         for _ in range(int(self.model_G)):
                             if g_p:
-                                self.world_model.train_world_all(store_states, store_actions, store_next_states)
+                                tensor_store_states = torch.FloatTensor(np.array(store_states)).to(self.device)
+                                tensor_store_actions = torch.FloatTensor(np.array(store_actions)).to(self.device)
+                                tensor_store_next_states = torch.FloatTensor(np.array(store_next_states)).to(
+                                    self.device)
+                                self.world_model.train_world_all(tensor_store_states, tensor_store_actions,
+                                                                 tensor_store_next_states)
                             else:
                                 self.agent.train_world_model(memory=self.memory,
                                                              batch_size=self.batch_size,
@@ -299,7 +304,12 @@ class World_Model_Trainer:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
                             if g_p:
-                                self.world_model.train_world_all(store_states, store_actions, store_next_states)
+                                tensor_store_states = torch.FloatTensor(np.array(store_states)).to(self.device)
+                                tensor_store_actions = torch.FloatTensor(np.array(store_actions)).to(self.device)
+                                tensor_store_next_states = torch.FloatTensor(np.array(store_next_states)).to(
+                                    self.device)
+                                self.world_model.train_world_all(tensor_store_states, tensor_store_actions,
+                                                                 tensor_store_next_states)
                             else:
                                 self.agent.train_world_model(memory=self.memory,
                                                              batch_size=self.batch_size,
@@ -314,9 +324,8 @@ class World_Model_Trainer:
                     need_reset = True
                     # Update World Model Statistics.
                     if len(self.memory) > self.batch_size:
-                        if not g_p:
-                            statistics = self.memory.get_statistics()
-                            self.world_model.set_statistics(statistics)
+                        statistics = self.memory.get_statistics()
+                        self.world_model.set_statistics(statistics)
                     # Evaluation
                     if need_evaluate:
                         self.evaluate()
@@ -338,6 +347,14 @@ class World_Model_Trainer:
                          critic_lr=3e-4,
                          device=torch.device(self.device),
                          reward_scale=1.0)
+
+        if self.world_model_name == "Ensemble_Dyna_One_NS_Reward":
+            self.world_model = Ensemble_Dyna_One_NS_Reward(observation_size=self.state_dim,
+                                                           num_actions=self.action_dim,
+                                                           num_models=5,
+                                                           l_r=0.001,
+                                                           device=self.device,
+                                                           boost_inter=self.ratio)
 
         if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
             self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
@@ -374,12 +391,19 @@ class World_Model_Trainer:
                                                         device=self.device,
                                                         option=0)
 
-        if self.world_model_name == "Bayesian_Laplace":
-            self.world_model = Bayesian_Laplace(observation_size=self.state_dim,
-                                                num_actions=self.action_dim,
-                                                l_r=0.001,
-                                                hidden_size=128,
-                                                device=self.device)
+        if self.world_model_name == "Bayesian_Laplace_AX":
+            self.world_model = Bayesian_World_Model_Laplace_AX(observation_size=self.state_dim,
+                                                               num_actions=self.action_dim,
+                                                               l_r=0.001,
+                                                               hidden_size=128,
+                                                               device=self.device)
+
+        if self.world_model_name == "Bayesian_Laplace_JA":
+            self.world_model = Bayesian_World_Model_Laplace_JA(observation_size=self.state_dim,
+                                                               num_actions=self.action_dim,
+                                                               l_r=0.001,
+                                                               hidden_size=128,
+                                                               device=self.device)
 
         if self.world_model_name == "Conditional_NF_NVP":
             self.world_model = Conditional_NVP_World_Model(observation_size=self.state_dim,

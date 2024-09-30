@@ -38,7 +38,7 @@ class World_Model:
         :param actions:
         :param next_states:
         """
-        logging.info("Not Implemented")
+        logging.info(" Train world Not Implemented")
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -49,7 +49,7 @@ class World_Model:
         :param actions:
         :return:
         """
-        logging.info("Not Implemented")
+        logging.info("Predict Next Not Implemented")
         return torch.zeros(observation.shape), torch.zeros(observation.shape), torch.zeros(observation.shape), torch.zeros(observation.shape)
 
     def train_reward(
@@ -67,7 +67,7 @@ class World_Model:
         :param next_states:
         :param rewards:
         """
-        logging.info("Not Implemented")
+        logging.info("Train reward Not Implemented")
 
     def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor
                      ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -78,7 +78,7 @@ class World_Model:
         :param next_observation:
         :return:
         """
-        logging.info("Not Implemented")
+        logging.info("Predict reward Not Implemented")
         return torch.zeros((1,)), torch.zeros((1,)), torch.zeros((1,))
 
     def estimate_uncertainty(
@@ -91,5 +91,5 @@ class World_Model:
         :param actions:
         :return:
         """
-        logging.info("Not Implemented")
+        logging.info("Estimating Uncertainty Not Implemented")
         return 0.0, 0.0
