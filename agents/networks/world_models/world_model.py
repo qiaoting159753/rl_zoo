@@ -47,10 +47,10 @@ class World_Model:
         Make a prediction of next state.
         :param observation:
         :param actions:
-        :return:
+        :return: Next_state Prediction, Next_state Means, Next_State Variance.
         """
         logging.info("Predict Next Not Implemented")
-        return torch.zeros(observation.shape), torch.zeros(observation.shape), torch.zeros(observation.shape), torch.zeros(observation.shape)
+        return torch.zeros(observation.shape), torch.zeros(observation.shape), torch.zeros(observation.shape)
 
     def train_reward(
             self,
@@ -76,7 +76,7 @@ class World_Model:
         :param observation:
         :param action:
         :param next_observation:
-        :return:
+        :return: Predicted rewards, Means of rewards, Variances of rewards
         """
         logging.info("Predict reward Not Implemented")
         return torch.zeros((1,)), torch.zeros((1,)), torch.zeros((1,))
@@ -89,7 +89,7 @@ class World_Model:
 
         :param observation:
         :param actions:
-        :return:
+        :return: Dynamic Uncertainty, Reward Uncertainty
         """
         logging.info("Estimating Uncertainty Not Implemented")
         return 0.0, 0.0

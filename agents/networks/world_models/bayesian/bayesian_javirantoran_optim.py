@@ -45,7 +45,7 @@ class pSGLD(Optimizer):
     RMSprop preconditioned SGLD using pytorch rmsprop implementation.
     """
 
-    def __init__(self, params, lr=required, norm_sigma=0.1, alpha=0.99, eps=1e-6, centered=False, addnoise=True):
+    def __init__(self, params, lr=required, norm_sigma=0.02, alpha=0.95, eps=1e-8, centered=False, addnoise=True):
         weight_decay = 1 / (norm_sigma ** 2)
         if weight_decay < 0.0:
             raise ValueError("Invalid weight_decay value: {}".format(weight_decay))

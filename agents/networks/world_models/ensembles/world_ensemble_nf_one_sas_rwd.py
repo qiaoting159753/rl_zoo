@@ -159,17 +159,36 @@ class Ensemble_NF_One_SAS_Reward(World_Model):
         """
         normalized_obs = normalize_observation(observation, self.statistics)
         gt_s_a = torch.cat((normalized_obs, actions), dim=1)
-        reversed_results = []
-        mse_losses = 0.0
+        # reversed_results = []
+        # mse_losses = 0.0
+        # for model in self.models:
+        #     _, z, _ = model.forward(observation, actions)
+        #     z = z.detach()
+        #     z_, _ = model.reverse(z)
+        #     mse_loss = F.mse_loss(z_, gt_s_a).item()
+        #     mse_losses += mse_loss
+        #     z_ = z_.detach()
+        #     reversed_results.append(z_)
+        # reversed_results = torch.vstack(reversed_results)
+        # dyna_uncert = torch.mean(torch.var(reversed_results, dim=0))
+        # rwd_uncert = 0.0
+        means = []
+        vars = []
         for model in self.models:
-            _, z, _ = model.forward(observation, actions)
-            z = z.detach()
-            z_, _ = model.reverse(z)
-            mse_loss = F.mse_loss(z_, gt_s_a).item()
-            mse_losses += mse_loss
-            z_ = z_.detach()
-            reversed_results.append(z_)
-        reversed_results = torch.vstack(reversed_results)
-        dyna_uncert = torch.mean(torch.var(reversed_results, dim=0))
-        rwd_uncert = 0.0
-        return dyna_uncert, rwd_uncert
+            _, mean, var = model.forward(observation, actions)
+            means.append(mean)
+            vars.append(var)
+        all_vars = torch.stack(vars)
+        all_means = torch.stack(means)
+
+        print(all_vars.shape)
+        print(all_means.shape)
+
+        noises = all_vars
+        aleatoric = (noises ** 2).mean(axis=0) ** 0.5
+        epistemic = all_means.var(dim=0) ** 0.5
+        aleatoric = np.minimum(aleatoric, 10e3)
+        epistemic = np.minimum(epistemic, 10e3)
+        total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
+
+        return 0.0, 0.0

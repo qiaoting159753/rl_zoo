@@ -68,8 +68,8 @@ class Bayesian_World_Model_BBB(World_Model):
         samples = 10
         target = next_states - states
         normalized_target = normalize_observation_delta(target, self.statistics)
-        normalized_obs = normalize_observation(states, self.statistics)
-        x = torch.cat((normalized_obs, actions), dim=1)
+        normlized_state = normalize_observation(states, self.statistics)
+        x = torch.cat((normlized_state, actions), dim=1)
         # x, y = to_variable(var=(x, y.long()), cuda=self.cuda)
         self.world_optimizers.zero_grad()
         mlpdw_cum = 0
@@ -102,25 +102,51 @@ class Bayesian_World_Model_BBB(World_Model):
         :return:
         """
         # logging.info("Not Implemented")
-        normalized_obs = normalize_observation(observation, self.statistics)
-        x = torch.cat((normalized_obs, actions), dim=1)
-        sample = 5
-        preds = []
-        for _ in range(sample):
-            pred, _, _ = self.world_model.sample_predict(x, Nsamples=sample)
+        # x = torch.cat((observation, actions), dim=1)
+        # sample = 5
+        # preds = []
+        # for _ in range(sample):
+        #     pred, _, _ = self.world_model.sample_predict(x, Nsamples=sample)
+        #     pred = pred.squeeze()
+        #     mean_pred = pred[:, :self.observation_size]
+        #     var_pred = pred[:, self.observation_size:]
+        #     var_pred = torch.tanh(var_pred)
+        #     var_pred = torch.exp(var_pred)
+        #     sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
+        #     preds.append(sample1)
+        # preds = torch.vstack(preds).squeeze()
+        # preds = torch.reshape(preds, (preds.shape[0] * preds.shape[1], self.observation_size))
+        # mean_deltas = denormalize_observation_delta(preds, self.statistics)
+        # preds = mean_deltas + observation
+        # dyna_var = torch.sum(torch.var(preds, dim=0)).item()
+        normlized_state = normalize_observation(observation, self.statistics)
+        x = torch.cat((normlized_state, actions), dim=1)
+        means = []
+        vars = []
+        sample_times = 5
+        # for _ in range(sample_times):
+        for i in range(sample_times):
+            pred, _, _ = self.world_model.sample_predict(x, Nsamples=sample_times)
             pred = pred.squeeze()
             mean_pred = pred[:, :self.observation_size]
             var_pred = pred[:, self.observation_size:]
             var_pred = torch.tanh(var_pred)
             var_pred = torch.exp(var_pred)
-            sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
-            preds.append(sample1)
-        preds = torch.vstack(preds).squeeze()
-        preds = torch.reshape(preds, (preds.shape[0] * preds.shape[1], self.observation_size))
-        mean_deltas = denormalize_observation_delta(preds, self.statistics)
-        preds = mean_deltas + observation
-        dyna_var = torch.sum(torch.var(preds, dim=0)).item()
-        return dyna_var, 0.0
+            means.append(mean_pred)
+            vars.append(var_pred)
+
+        all_vars = torch.vstack(vars).squeeze().detach().cpu().numpy()
+        all_means = torch.vstack(means).squeeze().detach().cpu().numpy()
+
+        noises = all_vars
+        aleatoric = (noises ** 2).mean(axis=0) ** 0.5
+        epistemic = all_means.var(axis=0) ** 0.5
+        aleatoric = np.minimum(aleatoric, 10e3)
+        epistemic = np.minimum(epistemic, 10e3)
+        total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
+        uncert = np.mean(total_unc).item()
+
+        return uncert, 0.0
 
     def train_reward(
             self,
@@ -165,8 +191,8 @@ class Bayesian_World_Model_BBB(World_Model):
         """
         sample = 3
         preds = []
-        normalized_obs = normalize_observation(observation, self.statistics)
-        normalized_obs_a = torch.cat((normalized_obs, actions), dim=1)
+        normlized_state = normalize_observation(observation, self.statistics)
+        normalized_obs_a = torch.cat((normlized_state, actions), dim=1)
         for i in range(sample):
             pred, _, _ = self.world_model(normalized_obs_a)
             mean_pred = pred[:, :self.observation_size]

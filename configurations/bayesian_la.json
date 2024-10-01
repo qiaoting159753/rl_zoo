@@ -1,22 +1,25 @@
 {
   "domain":"cheetah",
   "task":"run",
+  "loop_name": "World_Model",
   "agent_name":"Bayesian_Laplace_AX",
+  "device": "cpu",
   "seeds":[15, 25, 35],
-  "sigmas": [1.0, 0.7, 0.5, 0.3, 0.1],
-  "ratios" : [16, 32, 64, 128, 256],
   "G": 1,
+  "model_G": 0.2,
   "random_goal": false,
   "batch_size": 256,
   "episode_steps": 257,
   "evaluate_interval": 257,
   "maximum_steps": 257000,
-  "model_G": 0.2,
   "horizon": 5,
   "branch_factor": 10,
-  "device": "cpu",
-  "loop_name": "World_Model",
-  "on_policy": false
+  "on_policy": false,
+  "Parameter_A": [1.0, 0.7, 0.5, 0.3, 0.1],
+  "Parameter_B" : [16, 32, 64, 128, 256],
+  "Parameter_C" : [16, 32, 64, 128, 256],
+  "flush": false,
+  "parent_direction": "/root/rl_zoo_data/"
 }
 
 

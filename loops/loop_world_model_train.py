@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import trange
 from datetime import datetime
 from tqdm.contrib.logging import logging_redirect_tqdm
-
+import math
 logging.basicConfig(level=logging.INFO)
 from envs import DMCSEnvironment
 
@@ -19,6 +19,7 @@ from agents.networks.world_models.deterministic import (Probabilistic_Dynamics,
                                                         Gaussian_Process_World_Model,
                                                         One_Dyna_One_SAS_Reward,
                                                         NVP_World_Model,
+                                                        Prior_World_Model,
                                                         Conditional_NVP_World_Model)
 
 from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_SAS_Reward,
@@ -52,8 +53,9 @@ class World_Model_Trainer:
                  generate_results: bool,
                  seed: int,
                  directory: str,
-                 ratio,
-                 sigma):
+                 parameter_a: float,
+                 parameter_b: float,
+                 parameter_c: float):
         # Training
         self.counter = 0
         self.G = G
@@ -61,8 +63,9 @@ class World_Model_Trainer:
         self.batch_size = batch_size
         self.maximum_steps = maximum_steps
         self.episode_steps = episode_steps
-        self.ratio = ratio
-        self.sigma = sigma
+        self.parameter_a = parameter_a
+        self.parameter_b = parameter_b
+        self.parameter_c = parameter_c
         # Environment
         self.env = env
         self.state_dim = env.observation_space
@@ -202,8 +205,13 @@ class World_Model_Trainer:
         all_data[0] = self.counter
         all_data[1] = episodic_pred_error
         all_data[2] = episodic_rwd_pred_error
+        if math.isnan(c_1[0, 1]):
+            c_1[0, 1] = 0.0
+        if math.isnan(c_2[0, 1]):
+            c_2[0, 1] = 0.0
         all_data[3] = c_1[0, 1]
         all_data[4] = c_2[0, 1]
+
         # all_data[5] = c_3[0, 1]
         # all_data[6] = c_4[0, 1]
         # all_data[7] = c_5[0, 1]
@@ -234,22 +242,22 @@ class World_Model_Trainer:
             #                            l1_multi_rwd_errors,
             #                            multi_rwd_uncerts), axis=0)
             # Save the metrics
-            file_name = self.directory + str(self.seed) + "_" + self.env.domain + "_" + \
-                        self.env.task + "_" + self.world_model_name + "_" + self.date_and_time + ".csv"
+            file_name = self.directory + str(self.seed) + "_" + self.date_and_time + ".csv"
+
             np.savetxt(file_name + ".csv", np.array(self.evaluation_array), delimiter=",")
 
             # with open(file_name, 'ab') as fff:
             #     np.savetxt(fff, all_data, delimiter=",")
             # fff.close()
 
-    def train(self, g_p=False):
+    def train(self, flush=False):
         """
         Train the MFRL Agent.
         """
         with logging_redirect_tqdm():
             need_evaluate = False
             need_reset = True
-            if g_p:
+            if flush:
                 store_states = []
                 store_actions = []
                 store_next_states = []
@@ -266,7 +274,7 @@ class World_Model_Trainer:
                     action = self.env.sample_action()
                 # Do action is for the environment.
                 next_state, reward, done, _ = self.env.step(action)
-                if g_p:
+                if flush:
                     store_states.append(state)
                     store_actions.append(action)
                     store_next_states.append(next_state)
@@ -290,7 +298,7 @@ class World_Model_Trainer:
                     # Train the world model every time.
                     if self.model_G > 1.0:
                         for _ in range(int(self.model_G)):
-                            if g_p:
+                            if flush:
                                 tensor_store_states = torch.FloatTensor(np.array(store_states)).to(self.device)
                                 tensor_store_actions = torch.FloatTensor(np.array(store_actions)).to(self.device)
                                 tensor_store_next_states = torch.FloatTensor(np.array(store_next_states)).to(
@@ -304,7 +312,7 @@ class World_Model_Trainer:
                     else:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
-                            if g_p:
+                            if flush:
                                 tensor_store_states = torch.FloatTensor(np.array(store_states)).to(self.device)
                                 tensor_store_actions = torch.FloatTensor(np.array(store_actions)).to(self.device)
                                 tensor_store_next_states = torch.FloatTensor(np.array(store_next_states)).to(
@@ -355,7 +363,7 @@ class World_Model_Trainer:
                                                            num_models=5,
                                                            l_r=0.001,
                                                            device=self.device,
-                                                           boost_inter=self.ratio)
+                                                           boost_inter=int(self.parameter_a))
 
         if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
             self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
@@ -369,21 +377,22 @@ class World_Model_Trainer:
                                                        num_actions=self.action_dim,
                                                        l_r=0.001,
                                                        device=self.device)
+
         if self.world_model_name == "Gaussian_Process":
             self.world_model = Gaussian_Process_World_Model(observation_size=self.state_dim,
                                                             num_actions=self.action_dim,
-                                                            l_r=0.001, device=self.device, noise=self.sigma,
-                                                            train_iter=self.ratio)
+                                                            l_r=0.001, device=self.device, noise=self.parameter_a,
+                                                            train_iter=int(self.parameter_b))
 
         if self.world_model_name == "Bayesian_VI":
             self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
-                                                        l_r=0.001, device=self.device, option=1, sigma=self.sigma,
-                                                        ratio=self.ratio)
+                                                        l_r=0.001, device=self.device, option=1, sigma=self.parameter_a,
+                                                        ratio=self.parameter_b)
 
         if self.world_model_name == "Bayesian_LR":
             self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
-                                                        l_r=0.001, device=self.device, option=2, sigma=self.sigma,
-                                                        ratio=self.ratio)
+                                                        l_r=0.001, device=self.device, option=2, sigma=self.parameter_a,
+                                                        ratio=self.parameter_b)
 
         if self.world_model_name == "Hyper_Bayesian_VI":
             self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim,
@@ -391,8 +400,8 @@ class World_Model_Trainer:
                                                         l_r=0.001,
                                                         device=self.device,
                                                         option=0,
-                                                        sigma=self.sigma,
-                                                        ratio=self.ratio)
+                                                        sigma=self.parameter_a,
+                                                        ratio=self.parameter_b)
 
         if self.world_model_name == "Bayesian_Laplace_AX":
             self.world_model = Bayesian_World_Model_Laplace_AX(observation_size=self.state_dim,
@@ -411,7 +420,7 @@ class World_Model_Trainer:
         if self.world_model_name == "Bayesian_World_Model_SGLD_JA":
             self.world_model = Bayesian_World_Model_SGLD_JA(observation_size=self.state_dim,
                                                             num_actions=self.action_dim,
-                                                            l_r=0.001,
+                                                            l_r=0.00001,
                                                             hidden_size=128,
                                                             device=self.device)
 
@@ -427,3 +436,8 @@ class World_Model_Trainer:
                                                           num_actions=self.action_dim,
                                                           l_r=0.00002,
                                                           device=self.device)
+        if self.world_model_name == "Prior_World_Model":
+            self.world_model = Prior_World_Model(observation_size=self.state_dim,
+                                                 num_actions=self.action_dim,
+                                                 l_r=0.0001,
+                                                 device=self.device, hidden_size=128)

@@ -1,7 +1,3 @@
-import logging
-import math
-import random
-import sys
 import math
 import numpy as np
 import torch
@@ -25,13 +21,16 @@ def sig(x):
     :param x:
     :return:
     """
-    return 1/(1 + np.exp(-x))
+    return 1 / (1 + np.exp(-x))
+
 
 class Ensemble_Dyna_One_NS_Reward(World_Model):
     """
     Spec
     """
-    def __init__(self, observation_size: int, num_actions: int, num_models: int, l_r: float, device: str, boost_inter: int = 3,
+
+    def __init__(self, observation_size: int, num_actions: int, num_models: int, l_r: float, device: str,
+                 boost_inter: int = 3,
                  hidden_size: int = 128):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size)
 
@@ -85,7 +84,7 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
         for model in self.models:
             model.statistics = statistics
 
-    def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor , next_observation: torch.Tensor):
+    def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor):
         pred_rewards = self.reward_network(observation)
         return pred_rewards, None, None
 
@@ -199,20 +198,37 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
         :param observation:
         :param actions:
         """
-        sample_times = 100
-        _, _, mean, var = self.pred_next_states(observation, actions)
-        # # Sample next state several times, and estimate reward uncertianty.
-        sample1 = torch.distributions.Normal(mean, var).sample([sample_times])
-        sample1 = sample1.squeeze()
-        tempa = []
-        for lm in range(self.num_models):
-            tempa.append(sample1[:, lm, :])
-        sample1 = torch.vstack(tempa)
-        sample1i = denormalize_observation_delta(sample1, self.statistics)
-        sample1i += observation
-        dyna_uncert = torch.mean(torch.var(sample1i, dim=0)).item()
-        # multi_observation = torch.repeat_interleave(observation, self.num_models * sample_times, dim=0)
-        # multi_reward = torch.repeat_interleave(actions, self.num_models * sample_times, dim=0)
-        # reward, _, _ = self.pred_rewards(multi_observation, multi_reward, sample1i)
-        # rwd_uncert = torch.var(reward).item()
-        return dyna_uncert, 0.0
+        # sample_times = 100
+        # _, _, mean, var = self.pred_next_states(observation, actions)
+        # # # Sample next state several times, and estimate reward uncertianty.
+        # sample1 = torch.distributions.Normal(mean, var).sample([sample_times])
+        # sample1 = sample1.squeeze()
+        # tempa = []
+        # for lm in range(self.num_models):
+        #     tempa.append(sample1[:, lm, :])
+        # sample1 = torch.vstack(tempa)
+        # sample1i = denormalize_observation_delta(sample1, self.statistics)
+        # sample1i += observation
+        # dyna_uncert = torch.mean(torch.var(sample1i, dim=0)).item()
+        # # multi_observation = torch.repeat_interleave(observation, self.num_models * sample_times, dim=0)
+        # # multi_reward = torch.repeat_interleave(actions, self.num_models * sample_times, dim=0)
+        # # reward, _, _ = self.pred_rewards(multi_observation, multi_reward, sample1i)
+        # # rwd_uncert = torch.var(reward).item()
+
+        means = []
+        vars = []
+        for model in self.models:
+            _, mean, var = model.forward(observation, actions)
+            means.append(mean)
+            vars.append(var)
+        all_vars = torch.stack(vars).squeeze().detach().numpy()
+        all_means = torch.stack(means).squeeze().detach().numpy()
+
+        noises = all_vars
+        aleatoric = (noises ** 2).mean(axis=0) ** 0.5
+        epistemic = all_means.var(axis=0) ** 0.5
+        aleatoric = np.minimum(aleatoric, 10e3)
+        epistemic = np.minimum(epistemic, 10e3)
+        total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
+        uncert = np.mean(total_unc)
+        return uncert, 0.0
