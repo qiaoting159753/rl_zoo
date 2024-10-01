@@ -193,16 +193,22 @@ class Bayesian_World_Model_BBB(World_Model):
         preds = []
         normlized_state = normalize_observation(observation, self.statistics)
         normalized_obs_a = torch.cat((normlized_state, actions), dim=1)
-        for i in range(sample):
-            pred, _, _ = self.world_model(normalized_obs_a)
-            mean_pred = pred[:, :self.observation_size]
-            var_pred = pred[:, self.observation_size:]
-            var_pred = torch.tanh(var_pred)
-            var_pred = torch.exp(var_pred)
-            sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
-            preds.append(sample1)
-        preds = torch.vstack(preds).squeeze()
+        # for i in range(sample):
+        #     pred, _, _ = self.world_model(normalized_obs_a)
+        #     mean_pred = pred[:, :self.observation_size]
+        #     var_pred = pred[:, self.observation_size:]
+        #     var_pred = torch.tanh(var_pred)
+        #     var_pred = torch.exp(var_pred)
+        #     sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
+        #     preds.append(sample1)
+        # preds = torch.vstack(preds).squeeze()
+
+        pred, _, _ = self.world_model(normalized_obs_a)
+        preds = pred[:, :self.observation_size]
+
         mean_deltas = denormalize_observation_delta(preds, self.statistics)
         preds = mean_deltas + observation
-        preds = torch.mean(preds, dim=0).unsqueeze(dim=0)
+        # preds = torch.mean(preds, dim=0).unsqueeze(dim=0)
+
+
         return preds, None, None, None
