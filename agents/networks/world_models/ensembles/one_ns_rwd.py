@@ -19,6 +19,14 @@ from agents.networks.world_models import World_Model
 from utils.helpers import normalize_observation_delta, denormalize_observation_delta
 
 
+def sig(x):
+    """
+    Sigmoid
+    :param x:
+    :return:
+    """
+    return 1/(1 + np.exp(-x))
+
 class Ensemble_Dyna_One_NS_Reward(World_Model):
     """
     Spec
@@ -30,6 +38,8 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
         self.num_models = num_models
         self.observation_size = observation_size
         self.num_actions = num_actions
+
+        self.curr_losses = np.ones((self.num_models,)) * 5
 
         self.reward_network = Simple_NS_Reward(
             observation_size=observation_size,
@@ -89,10 +99,15 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
         means = []
         norm_means = []
         norm_vars = []
+
+        # weights = 1.5 - sig(self.curr_losses)
+        # weights /= np.max(weights)
+
         # Iterate over the neural networks and get the predictions
-        for model in self.models:
+        for counter in range(self.num_models):
             # Predict delta
-            mean, n_mean, n_var = model.forward(observation, actions)
+            mean, n_mean, n_var = self.models[counter].forward(observation, actions)
+            # mean *= weights[counter]
             means.append(mean)
             norm_means.append(n_mean)
             norm_vars.append(n_var)
@@ -134,14 +149,25 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
                 states.shape[1] + actions.shape[1]
                 == self.num_actions + self.observation_size
         )
+
+        min_ = np.min(self.curr_losses)
+        max_ = np.max(self.curr_losses)
+        delta = max_ - min_
+        if delta == 0:
+            delta = 0.1
+        temp = (self.curr_losses - min_) / delta * 5.0
+        temp = sig(temp)
+
         index = int(math.floor(self.update_counter / self.boost_inter))
         target = next_states - states
         delta_targets_normalized = normalize_observation_delta(target, self.statistics)
         _, n_mean, n_var = self.models[index].forward(states, actions)
-        model_loss = F.gaussian_nll_loss(input=n_mean, target=delta_targets_normalized, var=n_var).mean()
+        model_loss = temp[index] * F.gaussian_nll_loss(input=n_mean, target=delta_targets_normalized, var=n_var).mean()
         self.optimizers[index].zero_grad()
         model_loss.backward()
         self.optimizers[index].step()
+
+        self.curr_losses[index] = model_loss.item()
         self.update_counter += 1
         self.update_counter %= self.boost_inter * self.num_models
 

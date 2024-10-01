@@ -28,7 +28,8 @@ from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_SAS_R
 
 from agents.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
                                                    Bayesian_World_Model_Laplace_JA,
-                                                   Bayesian_World_Model_Laplace_AX)
+                                                   Bayesian_World_Model_Laplace_AX,
+                                                   Bayesian_World_Model_SGLD_JA)
 
 
 class World_Model_Trainer:
@@ -389,7 +390,9 @@ class World_Model_Trainer:
                                                         num_actions=self.action_dim,
                                                         l_r=0.001,
                                                         device=self.device,
-                                                        option=0)
+                                                        option=0,
+                                                        sigma=self.sigma,
+                                                        ratio=self.ratio)
 
         if self.world_model_name == "Bayesian_Laplace_AX":
             self.world_model = Bayesian_World_Model_Laplace_AX(observation_size=self.state_dim,
@@ -404,6 +407,13 @@ class World_Model_Trainer:
                                                                l_r=0.001,
                                                                hidden_size=128,
                                                                device=self.device)
+
+        if self.world_model_name == "Bayesian_World_Model_SGLD_JA":
+            self.world_model = Bayesian_World_Model_SGLD_JA(observation_size=self.state_dim,
+                                                            num_actions=self.action_dim,
+                                                            l_r=0.001,
+                                                            hidden_size=128,
+                                                            device=self.device)
 
         if self.world_model_name == "Conditional_NF_NVP":
             self.world_model = Conditional_NVP_World_Model(observation_size=self.state_dim,

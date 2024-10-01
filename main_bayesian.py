@@ -7,7 +7,7 @@ import json
 
 
 def main():
-    with open('configurations/bayesian_la.json', 'r') as file:
+    with open('configurations/bayesian_sgld.json', 'r') as file:
         data = json.load(file)
     logging.info(data)
 
@@ -36,7 +36,7 @@ def main():
 
     for sigma in sigmas:
         for ratio in ratios:
-            sub_directory = agent_name + "_" + env_domain + "_" + env_task + "_" + str(sigma) + "_" + str(ratio)
+            sub_directory = agent_name + "_" + env_domain + "_" + env_task + "_" + str(sigma) + "_" + str(ratio) + "/"
             # parent_dir = "/root/rl_zoo_data/"
             parent_dir = "statistics/"
             if not os.path.exists(parent_dir):
@@ -102,7 +102,7 @@ def main():
                                                   directory=directory,
                                                   ratio=ratio,
                                                   sigma=sigma)
-                trainer.train(g_p=True)
+                trainer.train()
                 # try:
                 #     trainer.train()
                 # except Exception as e:

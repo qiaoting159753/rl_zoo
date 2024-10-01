@@ -2,16 +2,21 @@ from __future__ import division
 import numpy as np
 import torch
 import torch.nn.functional as F
+import copy
+
 from agents.networks.world_models import World_Model
+
 from utils.helpers import normalize_observation_delta, denormalize_observation_delta
+
 from agents.networks.world_models.deterministic import (
     Probabilistic_SAS_Reward,
 )
 from utils.common import MLP
-from .bayesian_aleximmer_la import KronLaplace
+
+from agents.networks.world_models.bayesian.bayesian_javirantoran_optim import SGLD, pSGLD
 
 
-class Bayesian_World_Model_Laplace_AX(World_Model):
+class Bayesian_World_Model_SGLD_JA(World_Model):
     def __init__(self,
                  observation_size,
                  num_actions,
@@ -22,15 +27,15 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         self.device = device
         self.observation_size = observation_size
 
-        self.world_model = MLP(input_size=(observation_size + num_actions), output_size=2*observation_size,
+        self.world_model = MLP(input_size=(observation_size + num_actions), output_size=2 * observation_size,
                                hidden_sizes=[128, 128, 128])
 
-        self.bnn = KronLaplace(model=self.world_model, likelihood="regression")
-
-        self.world_optimizers = torch.optim.Adam(self.world_model.parameters(), lr=l_r)
+        self.world_optimizers = pSGLD(self.world_model.parameters(), lr=l_r)
 
         self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
                                                      hidden_size=hidden_size)
+        self.weight_set_samples = []
+
         self.reward_optimizers = torch.optim.Adam(self.reward_model.parameters(), lr=l_r)
         self.reward_model.to(self.device)
         self.world_model.to(self.device)
@@ -48,12 +53,29 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         self.statistics = statistics
         self.world_model.statistics = statistics
 
-    def train_world_all(
+    def save_sampled_net(self, max_samples):
+        """
+        Sample the network parameters with optimizer?
+        :param max_samples:
+        :return:
+        """
+        if len(self.weight_set_samples) >= max_samples:
+            self.weight_set_samples.pop(0)
+        self.weight_set_samples.append(copy.deepcopy(self.world_model.state_dict()))
+        return None
+
+    def train_world(
             self,
             states: torch.Tensor,
             actions: torch.Tensor,
             next_states: torch.Tensor,
     ) -> None:
+        """
+        Train for On-policy flush training use.
+        :param states:
+        :param actions:
+        :param next_states:
+        """
         target = next_states - states
         delta_targets_normalized = normalize_observation_delta(target, self.statistics)
         s_n_a = torch.cat((states, actions), dim=1)
@@ -67,9 +89,7 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         model_loss.backward()
         self.world_optimizers.step()
 
-        target = torch.cat((delta_targets_normalized, torch.zeros(delta_targets_normalized.shape).to(self.device)), dim=1)
-        self.bnn.fit((s_n_a, target))
-        self.bnn.optimize_prior_precision(method="marglik", pred_type="glm", link_approx="probit")
+        self.save_sampled_net(max_samples=20)
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -84,28 +104,31 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
     def estimate_uncertainty(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[float, float]:
+        length = len(self.weight_set_samples)
         uncert = 0.0
-        if self.bnn.n_data > 0:
+        if  length > 0:
             s_n_a = torch.cat((observation, actions), dim=1)
-            pred = self.bnn(s_n_a, pred_type="glm", link_approx="probit")
-            mean, var = pred
-            var_all = torch.diagonal(var.squeeze())
-            uncert = torch.mean(var_all).item()
+            Nsamples = len(self.weight_set_samples)
+            sample_times = 10
 
-            # Sampling does not working well.
-            # var_all = var_all.unsqueeze(dim=0)
-            # dist1 = torch.distributions.Normal(mean, var_all)
-            # # [100, 34]
-            # first_sample = dist1.sample([20])
-            # first_sample = first_sample.squeeze()
-            # var_mean = first_sample[:, :self.observation_size]
-            # var_var = first_sample[:, self.observation_size:]
-            # var_var[var_var<0.00001] = 0.00001
-            # dist2 = torch.distributions.Normal(var_mean, var_var)
-            # second_sample = dist2.sample([20])
-            # second_sample = second_sample.squeeze()
-            # second_sample = torch.reshape(second_sample, (400, self.observation_size))
-            # uncert = torch.mean(torch.var(second_sample, dim=0)).item()
+            predictions = []
+            # iterate over all saved weight configuration samples
+            for idx, weight_dict in enumerate(self.weight_set_samples):
+                if idx == Nsamples:
+                    break
+                self.world_model.load_state_dict(weight_dict)
+                out_temp = self.world_model(s_n_a)
+                n_mean_delta = out_temp[:, :self.observation_size:]
+                n_log_delta = out_temp[:, self.observation_size:]
+                logvar = torch.tanh(n_log_delta)
+                normalized_var = torch.exp(logvar)
+                sample1 = torch.distributions.Normal(n_mean_delta, normalized_var).sample([sample_times])
+                sample1 = sample1.squeeze()
+                predictions.append(sample1)
+
+            predictions = torch.stack(predictions)
+            predictions = torch.reshape(predictions, (length * sample_times, self.observation_size))
+            uncert = torch.mean(torch.var(predictions, dim=0)).item()
         return uncert, 0.0
 
     def pred_rewards(self, observation: torch.Tensor,
@@ -137,4 +160,3 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var).mean()
         reward_loss.backward()
         self.reward_optimizers.step()
-
