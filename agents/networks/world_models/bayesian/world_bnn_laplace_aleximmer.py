@@ -58,7 +58,6 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
                                          hidden_sizes=[128, 128, 128])
 
         self.bnn = KronLaplace(model=self.world_model, likelihood="regression")
-
         self.world_optimizers = torch.optim.Adam(self.world_model.parameters(), lr=l_r)
 
         self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
@@ -96,7 +95,6 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         pred_s = self.world_model.customized_forward(s_n_a)
         x = pred_s[:, :self.observation_size:]
         y_x = ((delta_targets_normalized - x) ** 2).detach()
-
         self.bnn.fit((s_n_a, torch.cat((delta_targets_normalized, y_x), dim=1)))
         self.bnn.optimize_prior_precision(method="marglik", pred_type="glm", link_approx="probit")
 
@@ -109,6 +107,7 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
             pred = self.bnn(s_n_a, pred_type="glm", link_approx="probit")
             mean, var = pred
             var_all = torch.diagonal(var.squeeze())
+
             uncert = torch.mean(var_all).item()
 
             # Sampling does not working well.
