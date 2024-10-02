@@ -357,6 +357,12 @@ class World_Model_Trainer:
                          device=torch.device(self.device),
                          reward_scale=1.0)
 
+        if self.world_model_name == "Prior_World_Model":
+            self.world_model = Prior_World_Model(observation_size=self.state_dim,
+                                                 num_actions=self.action_dim,
+                                                 l_r=0.0001,
+                                                 device=self.device, hidden_size=128)
+
         if self.world_model_name == "Ensemble_Dyna_One_NS_Reward":
             self.world_model = Ensemble_Dyna_One_NS_Reward(observation_size=self.state_dim,
                                                            num_actions=self.action_dim,
@@ -365,55 +371,13 @@ class World_Model_Trainer:
                                                            device=self.device,
                                                            boost_inter=int(self.parameter_a))
 
-        if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
-            self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
-                                                            num_actions=self.action_dim,
-                                                            num_models=5,
-                                                            l_r=0.001,
-                                                            device=self.device)
-
-        if self.world_model_name == "One_Dyna_One_SAS_Reward":
-            self.world_model = One_Dyna_One_SAS_Reward(observation_size=self.state_dim,
-                                                       num_actions=self.action_dim,
-                                                       l_r=0.001,
-                                                       device=self.device)
-
-        if self.world_model_name == "Gaussian_Process":
-            self.world_model = Gaussian_Process_World_Model(observation_size=self.state_dim,
-                                                            num_actions=self.action_dim,
-                                                            l_r=0.001, device=self.device, noise=self.parameter_a,
-                                                            train_iter=int(self.parameter_b))
-
         if self.world_model_name == "Bayesian_VI":
             self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
-                                                        l_r=0.001, device=self.device, option=1, sigma=self.parameter_a,
-                                                        ratio=self.parameter_b)
-
-        if self.world_model_name == "Bayesian_LR":
-            self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
-                                                        l_r=0.001, device=self.device, option=2, sigma=self.parameter_a,
-                                                        ratio=self.parameter_b)
-
-        if self.world_model_name == "Hyper_Bayesian_VI":
-            self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim,
-                                                        num_actions=self.action_dim,
-                                                        l_r=0.001,
-                                                        device=self.device,
-                                                        option=0,
-                                                        sigma=self.parameter_a,
-                                                        ratio=self.parameter_b)
+                                                        l_r=0.001, device=self.device, ratio=self.parameter_a,
+                                                        sigma=self.parameter_b)
 
         if self.world_model_name == "Bayesian_Laplace_AX":
             self.world_model = Bayesian_World_Model_Laplace_AX(observation_size=self.state_dim,
-                                                               num_actions=self.action_dim,
-                                                               l_r=0.001,
-                                                               hidden_size=128,
-                                                               device=self.device)
-
-
-
-        if self.world_model_name == "Bayesian_Laplace_JA":
-            self.world_model = Bayesian_World_Model_Laplace_JA(observation_size=self.state_dim,
                                                                num_actions=self.action_dim,
                                                                l_r=0.001,
                                                                hidden_size=128,
@@ -426,20 +390,49 @@ class World_Model_Trainer:
                                                             hidden_size=128,
                                                             device=self.device)
 
-        if self.world_model_name == "Conditional_NF_NVP":
-            self.world_model = Conditional_NVP_World_Model(observation_size=self.state_dim,
-                                                           num_actions=self.action_dim,
-                                                           l_r=0.001,
-                                                           device=self.device)
-
-        if self.world_model_name == "Ensemble_NF_NVP":
-            self.world_model = Ensemble_NF_One_SAS_Reward(num_models=5,
-                                                          observation_size=self.state_dim,
-                                                          num_actions=self.action_dim,
-                                                          l_r=0.00002,
-                                                          device=self.device)
-        if self.world_model_name == "Prior_World_Model":
-            self.world_model = Prior_World_Model(observation_size=self.state_dim,
-                                                 num_actions=self.action_dim,
-                                                 l_r=0.0001,
-                                                 device=self.device, hidden_size=128)
+        # if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
+        #     self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
+        #                                                     num_actions=self.action_dim,
+        #                                                     num_models=5,
+        #                                                     l_r=0.001,
+        #                                                     device=self.device)
+        # if self.world_model_name == "One_Dyna_One_SAS_Reward":
+        #     self.world_model = One_Dyna_One_SAS_Reward(observation_size=self.state_dim,
+        #                                                num_actions=self.action_dim,
+        #                                                l_r=0.001,
+        #                                                device=self.device)
+        # if self.world_model_name == "Gaussian_Process":
+        #     self.world_model = Gaussian_Process_World_Model(observation_size=self.state_dim,
+        #                                                     num_actions=self.action_dim,
+        #                                                     l_r=0.001, device=self.device, noise=self.parameter_a,
+        #                                                     train_iter=int(self.parameter_b))
+        # if self.world_model_name == "Bayesian_LR":
+        #     self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
+        #                                                 l_r=0.001, device=self.device, option=2, sigma=self.parameter_a,
+        #                                                 ratio=self.parameter_b)
+        # if self.world_model_name == "Hyper_Bayesian_VI":
+        #     self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim,
+        #                                                 num_actions=self.action_dim,
+        #                                                 l_r=0.001,
+        #                                                 device=self.device,
+        #                                                 option=0,
+        #                                                 sigma=self.parameter_a,
+        #                                                 ratio=self.parameter_b)
+        # if self.world_model_name == "Bayesian_Laplace_JA":
+        #     self.world_model = Bayesian_World_Model_Laplace_JA(observation_size=self.state_dim,
+        #                                                        num_actions=self.action_dim,
+        #                                                        l_r=0.001,
+        #                                                        hidden_size=128,
+        #                                                        device=self.device)
+        # if self.world_model_name == "Conditional_NF_NVP":
+        #     self.world_model = Conditional_NVP_World_Model(observation_size=self.state_dim,
+        #                                                    num_actions=self.action_dim,
+        #                                                    l_r=0.001,
+        #                                                    device=self.device)
+        #
+        # if self.world_model_name == "Ensemble_NF_NVP":
+        #     self.world_model = Ensemble_NF_One_SAS_Reward(num_models=5,
+        #                                                   observation_size=self.state_dim,
+        #                                                   num_actions=self.action_dim,
+        #                                                   l_r=0.00002,
+        #                                                   device=self.device)

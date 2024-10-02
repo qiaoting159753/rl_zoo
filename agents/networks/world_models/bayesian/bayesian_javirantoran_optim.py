@@ -9,7 +9,7 @@ class SGLD(Optimizer):
     Note that the weight decay is specified in terms of the gaussian prior sigma.
     """
 
-    def __init__(self, params, lr=required, norm_sigma=0.01, addnoise=True):
+    def __init__(self, params, lr=required, norm_sigma=0.2, addnoise=False):
         weight_decay = 1 / (norm_sigma ** 2)
         if weight_decay < 0.0:
             raise ValueError("Invalid weight_decay value: {}".format(weight_decay))

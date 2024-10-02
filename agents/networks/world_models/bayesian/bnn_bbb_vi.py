@@ -19,25 +19,29 @@ class BayesLinear_Normalq(nn.Module):
         self.n_out = n_out
         self.prior = prior_class
         # Learnable parameters -> Initialisation is set empirically.
-        self.W_mu = nn.Parameter(torch.Tensor(self.n_in, self.n_out).uniform_(-0.1, 0.1))
-        self.W_p = nn.Parameter(torch.Tensor(self.n_in, self.n_out).uniform_(-3, -2))
-        self.b_mu = nn.Parameter(torch.Tensor(self.n_out).uniform_(-0.1, 0.1))
-        self.b_p = nn.Parameter(torch.Tensor(self.n_out).uniform_(-3, -2))
+        self.W_mu = nn.Parameter(torch.Tensor(self.n_in, self.n_out).uniform_(-0.2, 0.2))
+        self.W_p = nn.Parameter(torch.Tensor(self.n_in, self.n_out).uniform_(-3, -1))
+        self.b_mu = nn.Parameter(torch.Tensor(self.n_out).uniform_(-0.2, 0.2))
+        self.b_p = nn.Parameter(torch.Tensor(self.n_out).uniform_(-3, -1))
         self.lpw = 0
         self.lqw = 0
 
     def forward(self, X, sample=False):
-        eps_W = Variable(self.W_mu.data.new(self.W_mu.size()).normal_())
-        eps_b = Variable(self.b_mu.data.new(self.b_mu.size()).normal_())
-        # sample parameters
-        std_w = 1e-6 + F.softplus(self.W_p, beta=1, threshold=20)
-        std_b = 1e-6 + F.softplus(self.b_p, beta=1, threshold=20)
-        W = self.W_mu + 1 * std_w * eps_W
-        b = self.b_mu + 1 * std_b * eps_b
-        output = torch.mm(X, W) + b.unsqueeze(0).expand(X.shape[0], -1)  # (batch_size, n_output)
-        lqw = isotropic_gauss_loglike(W, self.W_mu, std_w) + isotropic_gauss_loglike(b, self.b_mu, std_b)
-        lpw = self.prior.loglike(W) + self.prior.loglike(b)
-        return output, lqw, lpw
+        if not sample:
+            output = torch.mm(X, self.W_mu) + self.b_mu.expand(X.size()[0], self.n_out)
+            return output, 0, 0
+        else:
+            eps_W = Variable(self.W_mu.data.new(self.W_mu.size()).normal_())
+            eps_b = Variable(self.b_mu.data.new(self.b_mu.size()).normal_())
+            # sample parameters
+            std_w = 1e-6 + F.softplus(self.W_p, beta=1, threshold=20)
+            std_b = 1e-6 + F.softplus(self.b_p, beta=1, threshold=20)
+            W = self.W_mu + 1 * std_w * eps_W
+            b = self.b_mu + 1 * std_b * eps_b
+            output = torch.mm(X, W) + b.unsqueeze(0).expand(X.shape[0], -1)  # (batch_size, n_output)
+            lqw = isotropic_gauss_loglike(W, self.W_mu, std_w) + isotropic_gauss_loglike(b, self.b_mu, std_b)
+            lpw = self.prior.loglike(W) + self.prior.loglike(b)
+            return output, lqw, lpw
 
 
 class bayes_linear_vi(nn.Module):

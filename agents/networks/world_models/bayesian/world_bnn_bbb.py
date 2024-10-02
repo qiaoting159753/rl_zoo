@@ -22,8 +22,8 @@ class Bayesian_World_Model_BBB(World_Model):
         self.num_actions = num_actions
         self.hidden_size = hidden_size
         self.l_r = l_r
-        self.device = device
         self.ratio = ratio
+        self.device = device
         if option == 0:
             self.world_model = Hyper_BBP_Heteroscedastic_Model(observation_size + num_actions, 2 * observation_size,
                                                                hidden_size)
@@ -75,7 +75,7 @@ class Bayesian_World_Model_BBB(World_Model):
         mlpdw_cum = 0
         Edkl_cum = 0
         for i in range(samples):
-            out, tlqw, tlpw = self.world_model(x, sample=True)
+            out, tlqw, tlpw = self.world_model(x, sample=False)
             Edkl_i = (tlqw - tlpw)
             mean_pred = out[:, :self.observation_size]
             var_pred = out[:, self.observation_size:]
@@ -189,8 +189,6 @@ class Bayesian_World_Model_BBB(World_Model):
         :param observation:
         :param actions:
         """
-        sample = 3
-        preds = []
         normlized_state = normalize_observation(observation, self.statistics)
         normalized_obs_a = torch.cat((normlized_state, actions), dim=1)
         # for i in range(sample):
@@ -202,13 +200,10 @@ class Bayesian_World_Model_BBB(World_Model):
         #     sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
         #     preds.append(sample1)
         # preds = torch.vstack(preds).squeeze()
-
-        pred, _, _ = self.world_model(normalized_obs_a)
+        pred, _, _ = self.world_model(normalized_obs_a, sample=False)
         preds = pred[:, :self.observation_size]
-
         mean_deltas = denormalize_observation_delta(preds, self.statistics)
         preds = mean_deltas + observation
         # preds = torch.mean(preds, dim=0).unsqueeze(dim=0)
-
 
         return preds, None, None, None

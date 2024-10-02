@@ -76,7 +76,6 @@ def isotropic_gauss_loglike(x, mu, sigma, do_sum=True):
     det_sig_term = -torch.log(sigma)
     inner = (x - mu) / sigma
     dist_term = -(0.5) * (inner ** 2)
-
     if do_sum:
         out = (cte_term + det_sig_term + dist_term).sum()  # sum over all weights
     else:
