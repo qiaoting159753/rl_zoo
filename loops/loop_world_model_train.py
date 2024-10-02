@@ -410,6 +410,8 @@ class World_Model_Trainer:
                                                                hidden_size=128,
                                                                device=self.device)
 
+
+
         if self.world_model_name == "Bayesian_Laplace_JA":
             self.world_model = Bayesian_World_Model_Laplace_JA(observation_size=self.state_dim,
                                                                num_actions=self.action_dim,

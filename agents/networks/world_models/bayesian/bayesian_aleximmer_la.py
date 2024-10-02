@@ -13,6 +13,7 @@ from torch import nn
 from torch.linalg import LinAlgError
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
 from torch.utils.data import DataLoader
+
 from laplace.curvature.curvature import CurvatureInterface
 from laplace.curvature.curvlinops import CurvlinopsGGN
 from laplace.utils.enums import (
@@ -23,7 +24,6 @@ from laplace.utils.enums import (
     TuningMethod,
 )
 from laplace.utils.matrix import Kron, KronDecomposed
-from laplace.utils.metrics import RunningNLLMetric
 from laplace.utils.utils import (
     fix_prior_prec_structure,
     normal_samples,
@@ -215,6 +215,7 @@ class BaseLaplace:
                 * self.n_outputs
                 * torch.log(torch.as_tensor(self.sigma_noise) * sqrt(2 * pi))
             )
+
             return factor * self.loss - c
         else:
             # for classification Xent == log Cat

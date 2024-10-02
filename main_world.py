@@ -8,7 +8,7 @@ import json
 
 def main():
 
-    with open('configurations/bayesian_vi.json', 'r') as file:
+    with open('configurations/bayesian_la.json', 'r') as file:
         data = json.load(file)
     logging.info(data)
 
@@ -36,7 +36,7 @@ def main():
     parent_dir = data["parent_direction"]
     flush = data["flush"]
 
-    # parent_dir = "statistics/"
+    parent_dir = "statistics/"
 
     for parameter_a in Parameter_A:
         for parameter_b in Parameter_B:
@@ -44,10 +44,12 @@ def main():
                 sub_directory = agent_name + "_" + env_domain + "_" + env_task + "/"
                 if not os.path.exists(parent_dir):
                     os.mkdir(parent_dir)
+
                 directory = os.path.join(parent_dir, sub_directory)
                 if not os.path.exists(directory):
                     os.mkdir(directory)
                 directory = directory + str(parameter_a) + "_" + str(parameter_b) + "_" + str(parameter_c) + "_"
+
                 for seed in seeds:
                     # Random Seed
                     set_seed(seed)
@@ -73,13 +75,13 @@ def main():
                                                   parameter_a=parameter_a,
                                                   parameter_b=parameter_b,
                                                   parameter_c=parameter_c)
-                    try:
-                        trainer.train(flush=flush)
-                    except Exception as e:
-                        logging.info("--------------------")
-                        logging.info(e)
-                        pass
-
+                    # try:
+                    #     trainer.train(flush=flush)
+                    # except Exception as e:
+                    #     logging.info("--------------------")
+                    #     logging.info(e)
+                    #     pass
+                    trainer.train(flush=flush)
 
 if __name__ == "__main__":
     main()

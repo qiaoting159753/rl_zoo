@@ -9,6 +9,38 @@ from agents.networks.world_models.deterministic import (
 )
 from utils.common import MLP
 from .bayesian_aleximmer_la import KronLaplace
+import torch.nn as nn
+
+
+class CustomizedMLP(nn.Module):
+    def __init__(self, input_size: int, hidden_sizes: list[int], output_size: int):
+        super().__init__()
+
+        self.fully_connected_layers = []
+        for i, next_size in enumerate(hidden_sizes):
+            fully_connected_layer = nn.Linear(input_size, next_size)
+            self.add_module(f"fully_connected_layer_{i}", fully_connected_layer)
+            self.fully_connected_layers.append(fully_connected_layer)
+            input_size = next_size
+        self.obs_length = int(output_size / 2)
+        self.output_layer = nn.Linear(input_size, output_size)
+
+    def customized_forward(self, state):
+        for fully_connected_layer in self.fully_connected_layers:
+            state = F.relu(fully_connected_layer(state))
+        output = self.output_layer(state)
+        return output
+
+    def forward(self, state):
+        for fully_connected_layer in self.fully_connected_layers:
+            state = F.relu(fully_connected_layer(state))
+        output = self.output_layer(state)
+        mean_out = output[:, :self.obs_length]
+        var_out = output[:, self.obs_length:]
+        logvar = torch.tanh(var_out)
+        normalized_var = torch.exp(logvar)
+        output = torch.concatenate((mean_out, normalized_var), dim=1)
+        return output
 
 
 class Bayesian_World_Model_Laplace_AX(World_Model):
@@ -22,8 +54,8 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         self.device = device
         self.observation_size = observation_size
 
-        self.world_model = MLP(input_size=(observation_size + num_actions), output_size=2*observation_size,
-                               hidden_sizes=[128, 128, 128])
+        self.world_model = CustomizedMLP(input_size=(observation_size + num_actions), output_size=2 * observation_size,
+                                         hidden_sizes=[128, 128, 128])
 
         self.bnn = KronLaplace(model=self.world_model, likelihood="regression")
 
@@ -35,29 +67,23 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         self.reward_model.to(self.device)
         self.world_model.to(self.device)
 
-    def set_statistics(self, statistics: dict) -> None:
-        """
-        Update all statistics for normalization for all world models and the
-        ensemble itself.
-
-        :param (Dictionary) statistics:
-        """
-        for key, value in statistics.items():
-            if isinstance(value, np.ndarray):
-                statistics[key] = torch.FloatTensor(statistics[key]).to(self.device)
-        self.statistics = statistics
-        self.world_model.statistics = statistics
-
-    def train_world_all(
+    def train_world(
             self,
             states: torch.Tensor,
             actions: torch.Tensor,
             next_states: torch.Tensor,
     ) -> None:
+        """
+        Train all
+
+        :param states:
+        :param actions:
+        :param next_states:
+        """
         target = next_states - states
         delta_targets_normalized = normalize_observation_delta(target, self.statistics)
         s_n_a = torch.cat((states, actions), dim=1)
-        pred_s = self.world_model.forward(s_n_a)
+        pred_s = self.world_model.customized_forward(s_n_a)
         n_mean_delta = pred_s[:, :self.observation_size:]
         n_log_delta = pred_s[:, self.observation_size:]
         logvar = torch.tanh(n_log_delta)
@@ -67,19 +93,12 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         model_loss.backward()
         self.world_optimizers.step()
 
-        target = torch.cat((delta_targets_normalized, torch.zeros(delta_targets_normalized.shape).to(self.device)), dim=1)
-        self.bnn.fit((s_n_a, target))
-        self.bnn.optimize_prior_precision(method="marglik", pred_type="glm", link_approx="probit")
+        pred_s = self.world_model.customized_forward(s_n_a)
+        x = pred_s[:, :self.observation_size:]
+        y_x = ((delta_targets_normalized - x) ** 2).detach()
 
-    def pred_next_states(
-            self, observation: torch.Tensor, actions: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        s_n_a = torch.cat((observation, actions), dim=1)
-        pred_s = self.world_model.forward(s_n_a)
-        n_mean_delta = pred_s[:, :self.observation_size]
-        prediction = denormalize_observation_delta(n_mean_delta, self.statistics)
-        prediction += observation
-        return prediction, None, None, None
+        self.bnn.fit((s_n_a, torch.cat((delta_targets_normalized, y_x), dim=1)))
+        self.bnn.optimize_prior_precision(method="marglik", pred_type="glm", link_approx="probit")
 
     def estimate_uncertainty(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -107,6 +126,29 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
             # second_sample = torch.reshape(second_sample, (400, self.observation_size))
             # uncert = torch.mean(torch.var(second_sample, dim=0)).item()
         return uncert, 0.0
+
+    def set_statistics(self, statistics: dict) -> None:
+        """
+        Update all statistics for normalization for all world models and the
+        ensemble itself.
+
+        :param (Dictionary) statistics:
+        """
+        for key, value in statistics.items():
+            if isinstance(value, np.ndarray):
+                statistics[key] = torch.FloatTensor(statistics[key]).to(self.device)
+        self.statistics = statistics
+        self.world_model.statistics = statistics
+
+    def pred_next_states(
+            self, observation: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        s_n_a = torch.cat((observation, actions), dim=1)
+        pred_s = self.world_model.customized_forward(s_n_a)
+        n_mean_delta = pred_s[:, :self.observation_size]
+        prediction = denormalize_observation_delta(n_mean_delta, self.statistics)
+        prediction += observation
+        return prediction, None, None, None
 
     def pred_rewards(self, observation: torch.Tensor,
                      action: torch.Tensor, next_observation: torch.Tensor):
@@ -137,4 +179,3 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var).mean()
         reward_loss.backward()
         self.reward_optimizers.step()
-

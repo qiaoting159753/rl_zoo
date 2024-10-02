@@ -1,8 +1,4 @@
-import logging
 import math
-import random
-import sys
-
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -16,19 +12,32 @@ from agents.networks.world_models.simple import (
     Simple_NS_Reward,
 )
 from agents.networks.world_models import World_Model
-from utils.helpers import normalize_observation_delta
+from utils.helpers import normalize_observation_delta, denormalize_observation_delta
+
+
+def sig(x):
+    """
+    Sigmoid
+    :param x:
+    :return:
+    """
+    return 1 / (1 + np.exp(-x))
 
 
 class Ensemble_Dyna_One_NS_Reward(World_Model):
     """
     Spec
     """
+
     def __init__(self, observation_size: int, num_actions: int, num_models: int, l_r: float, device: str,
-                 hidden_size: int = 128):
+                 boost_inter: int = 3, hidden_size: int = 128):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size)
+
         self.num_models = num_models
         self.observation_size = observation_size
         self.num_actions = num_actions
+
+        self.curr_losses = np.ones((self.num_models,)) * 5
 
         self.reward_network = Simple_NS_Reward(
             observation_size=observation_size,
@@ -56,6 +65,9 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
         for model in self.models:
             model.to(device)
 
+        self.boost_inter = boost_inter
+        self.update_counter = 0
+
     def set_statistics(self, statistics: dict) -> None:
         """
         Update all statistics for normalization for all world models and the
@@ -73,17 +85,11 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
 
     def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor):
         pred_rewards = self.reward_network(observation)
-        return pred_rewards, None
+        return pred_rewards, None, None
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Predic next.
-        :param observation:
-        :param actions:
-        :return:
-        """
         assert (
                 observation.shape[1] + actions.shape[1]
                 == self.observation_size + self.num_actions
@@ -91,10 +97,16 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
         means = []
         norm_means = []
         norm_vars = []
+
+        # This boosting part is useless, cause inaccuracy.
+        # weights = 1.5 - sig(self.curr_losses)
+        # weights /= np.max(weights)
+
         # Iterate over the neural networks and get the predictions
-        for model in self.models:
+        for counter in range(self.num_models):
             # Predict delta
-            mean, n_mean, n_var = model.forward(observation, actions)
+            mean, n_mean, n_var = self.models[counter].forward(observation, actions)
+            # mean *= weights[counter]
             means.append(mean)
             norm_means.append(n_mean)
             norm_vars.append(n_var)
@@ -102,22 +114,26 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
         predictions_means = torch.stack(means)
         predictions_norm_means = torch.stack(norm_means)
         predictions_vars = torch.stack(norm_vars)
+
         # Get rid of the nans
-        not_nans = []
-        for i in range(self.num_models):
-            if not torch.any(torch.isnan(predictions_means[i])):
-                not_nans.append(i)
-        if len(not_nans) == 0:
-            logging.info("Predicting all Nans")
-            sys.exit()
+        # not_nans = []
+        # for i in range(self.num_models):
+        #     if not torch.any(torch.isnan(predictions_means[i])):
+        #         not_nans.append(i)
+        # if len(not_nans) == 0:
+        #     logging.info("Predicting all Nans")
+        #     sys.exit()
         # Random Take next state.
-        rand_ind = random.randint(0, len(not_nans) - 1)
-        prediction = predictions_means[not_nans[rand_ind]]
+        # rand_ind = random.randint(0, len(not_nans) - 1)
+        # prediction = predictions_means[not_nans[rand_ind]]
         # next = current + delta
+        prediction = torch.mean(predictions_means, dim=0)
         prediction += observation
+
         all_predictions = torch.stack(means)
         for j in range(all_predictions.shape[0]):
             all_predictions[j] += observation
+
         return prediction, all_predictions, predictions_norm_means, predictions_vars
 
     def train_world(
@@ -133,22 +149,27 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
                 states.shape[1] + actions.shape[1]
                 == self.num_actions + self.observation_size
         )
-        # For each model, train with different data.
-        mini_batch_size = int(math.floor(states.shape[0] / self.num_models))
 
-        for i in range(self.num_models):
-            sub_states = states[i * mini_batch_size: (i + 1) * mini_batch_size]
-            sub_actions = actions[i * mini_batch_size: (i + 1) * mini_batch_size]
-            sub_next_states = next_states[i * mini_batch_size: (i + 1) * mini_batch_size]
-            sub_target = sub_next_states - sub_states
+        min_ = np.min(self.curr_losses)
+        max_ = np.max(self.curr_losses)
+        delta = max_ - min_
+        if delta == 0:
+            delta = 0.1
+        temp = (self.curr_losses - min_) / delta * 5.0
+        temp = sig(temp)
 
-            delta_targets_normalized = normalize_observation_delta(sub_target, self.statistics)
-            _, n_mean, n_var = self.models[i].forward(sub_states, sub_actions)
-            model_loss = F.gaussian_nll_loss(input=n_mean, target=delta_targets_normalized, var=n_var).mean()
+        index = int(math.floor(self.update_counter / self.boost_inter))
+        target = next_states - states
+        delta_targets_normalized = normalize_observation_delta(target, self.statistics)
+        _, n_mean, n_var = self.models[index].forward(states, actions)
+        model_loss = temp[index] * F.gaussian_nll_loss(input=n_mean, target=delta_targets_normalized, var=n_var).mean()
+        self.optimizers[index].zero_grad()
+        model_loss.backward()
+        self.optimizers[index].step()
 
-            self.optimizers[i].zero_grad()
-            model_loss.backward()
-            self.optimizers[i].step()
+        self.curr_losses[index] = model_loss.item()
+        self.update_counter += 1
+        self.update_counter %= self.boost_inter * self.num_models
 
     def train_reward(
             self,
@@ -168,3 +189,46 @@ class Ensemble_Dyna_One_NS_Reward(World_Model):
         reward_loss = F.mse_loss(rwd_mean, rewards)
         reward_loss.backward()
         self.reward_optimizer.step()
+
+    def estimate_uncertainty(
+            self, observation: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[float, float]:
+        """
+        Estimate uncertainty.
+
+        :param observation:
+        :param actions:
+        """
+        # sample_times = 100
+        # _, _, mean, var = self.pred_next_states(observation, actions)
+        # # # Sample next state several times, and estimate reward uncertianty.
+        # sample1 = torch.distributions.Normal(mean, var).sample([sample_times])
+        # sample1 = sample1.squeeze()
+        # tempa = []
+        # for lm in range(self.num_models):
+        #     tempa.append(sample1[:, lm, :])
+        # sample1 = torch.vstack(tempa)
+        # sample1i = denormalize_observation_delta(sample1, self.statistics)
+        # sample1i += observation
+        # dyna_uncert = torch.mean(torch.var(sample1i, dim=0)).item()
+        # # multi_observation = torch.repeat_interleave(observation, self.num_models * sample_times, dim=0)
+        # # multi_reward = torch.repeat_interleave(actions, self.num_models * sample_times, dim=0)
+        # # reward, _, _ = self.pred_rewards(multi_observation, multi_reward, sample1i)
+        # # rwd_uncert = torch.var(reward).item()
+
+        means = []
+        vars = []
+        for model in self.models:
+            _, mean, var = model.forward(observation, actions)
+            means.append(mean)
+            vars.append(var)
+        all_vars = torch.stack(vars).squeeze().detach().numpy()
+        all_means = torch.stack(means).squeeze().detach().numpy()
+        noises = all_vars
+        aleatoric = (noises ** 2).mean(axis=0) ** 0.5
+        epistemic = all_means.var(axis=0) ** 0.5
+        aleatoric = np.minimum(aleatoric, 10e3)
+        epistemic = np.minimum(epistemic, 10e3)
+        total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
+        uncert = np.mean(total_unc)
+        return uncert, 0.0
