@@ -386,7 +386,10 @@ class World_Model_Trainer:
                                                                num_actions=self.action_dim,
                                                                l_r=0.001,
                                                                hidden_size=128,
-                                                               device=self.device)
+                                                               device=self.device,
+                                                               sigma=self.parameter_a,
+                                                               temperature=self.parameter_b,
+                                                               prior_precision=self.parameter_c)
 
         if self.world_model_name == "Bayesian_World_Model_SGLD_JA":
             self.world_model = Bayesian_World_Model_SGLD_JA(observation_size=self.state_dim,

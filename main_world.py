@@ -8,7 +8,7 @@ import json
 
 def main():
 
-    with open('configurations/bayesian_vi.json', 'r') as file:
+    with open('configurations/bayesian_la.json', 'r') as file:
         data = json.load(file)
     logging.info(data)
 
@@ -33,9 +33,9 @@ def main():
     Parameter_A = data["Parameter_A"]
     Parameter_B = data["Parameter_B"]
     Parameter_C = data["Parameter_C"]
-    parent_dir = data["parent_direction"]
     flush = data["flush"]
 
+    parent_dir = data["parent_direction"]
     # parent_dir = "statistics/"
 
     for parameter_a in Parameter_A:
@@ -75,13 +75,12 @@ def main():
                                                   parameter_a=parameter_a,
                                                   parameter_b=parameter_b,
                                                   parameter_c=parameter_c)
-                    # try:
-                    #     trainer.train(flush=flush)
-                    # except Exception as e:
-                    #     logging.info("--------------------")
-                    #     logging.info(e)
-                    #     pass
-                    trainer.train(flush=flush)
+                    try:
+                        trainer.train(flush=flush)
+                    except Exception as e:
+                        logging.info("--------------------")
+                        logging.info(e)
+                        pass
 
 if __name__ == "__main__":
     main()

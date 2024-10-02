@@ -3,7 +3,7 @@
   "task":"run",
   "loop_name": "World_Model",
   "agent_name":"Bayesian_Laplace_AX",
-  "device": "cpu",
+  "device": "cuda",
   "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 0.2,
@@ -15,9 +15,9 @@
   "horizon": 5,
   "branch_factor": 10,
   "on_policy": false,
-  "Parameter_A": [1.0, 0.7, 0.5, 0.3, 0.1],
-  "Parameter_B" : [16, 32, 64, 128, 256],
-  "Parameter_C" : [16, 32, 64, 128, 256],
+  "Parameter_A": [0.9, 0.7, 0.5, 0.3, 0.1],
+  "Parameter_B" : [0.9, 0.7, 0.5, 0.3, 0.1],
+  "Parameter_C" : [1.2, 1.0, 0.8, 0.5, 0.3],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/"
 }

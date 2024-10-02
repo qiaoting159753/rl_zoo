@@ -49,15 +49,20 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
                  num_actions,
                  l_r,
                  hidden_size,
+                 sigma,
+                 temperature,
+                 prior_precision,
                  device):
         self.statistics = None
         self.device = device
         self.observation_size = observation_size
 
         self.world_model = CustomizedMLP(input_size=(observation_size + num_actions), output_size=2 * observation_size,
-                                         hidden_sizes=[128, 128, 128])
+                                         hidden_sizes=[256, 256, 256])
 
-        self.bnn = KronLaplace(model=self.world_model, likelihood="regression")
+        self.bnn = KronLaplace(model=self.world_model, likelihood="regression", sigma_noise=sigma,
+                               temperature=temperature, prior_precision=prior_precision)
+
         self.world_optimizers = torch.optim.Adam(self.world_model.parameters(), lr=l_r)
 
         self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
@@ -96,7 +101,7 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         x = pred_s[:, :self.observation_size:]
         y_x = ((delta_targets_normalized - x) ** 2).detach()
         self.bnn.fit((s_n_a, torch.cat((delta_targets_normalized, y_x), dim=1)))
-        self.bnn.optimize_prior_precision(method="marglik", pred_type="glm", link_approx="probit")
+        self.bnn.optimize_prior_precision(pred_type="glm")
 
     def estimate_uncertainty(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -106,9 +111,18 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
             s_n_a = torch.cat((observation, actions), dim=1)
             pred = self.bnn(s_n_a, pred_type="glm", link_approx="probit")
             mean, var = pred
-            var_all = torch.diagonal(var.squeeze())
-
-            uncert = torch.mean(var_all).item()
+            mean = mean.detach().cpu().numpy()
+            var_all = torch.diagonal(var.squeeze()).unsqueeze(dim=0).detach().cpu().numpy()
+            # Aleatoric: Last part of the mean
+            # Epistemic: First/Second half of the var.
+            epistemic = var_all[:, self.observation_size:]
+            noises = mean[:, self.observation_size:]
+            aleatoric = (noises ** 2).mean(axis=0) ** 0.5
+            # epistemic = all_means.var(axis=0) ** 0.5
+            aleatoric = np.minimum(aleatoric, 10e3)
+            epistemic = np.minimum(epistemic, 10e3)
+            total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
+            uncert = np.mean(total_unc).item()
 
             # Sampling does not working well.
             # var_all = var_all.unsqueeze(dim=0)
