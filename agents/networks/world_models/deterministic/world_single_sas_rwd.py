@@ -18,14 +18,14 @@ from utils.helpers import normalize_observation_delta
 from utils import denormalize_observation_delta
 
 
-class One_Dyna_One_SAS_Reward(World_Model):
+class Single_PNN(World_Model):
     """
     This class consist of an ensemble of all components for critic update.
     Q_label = REWARD + gamma * (1 - DONES) * Q(NEXT_STATES).
     """
 
     def __init__(self, observation_size: int, num_actions: int, l_r: float, device: str,
-                 hidden_size: int = 128):
+                 hidden_size: int = 256):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size)
         self.observation_size = observation_size
         self.num_actions = num_actions
@@ -58,8 +58,8 @@ class One_Dyna_One_SAS_Reward(World_Model):
         """
         predict reward based on current observation and action and next state
         """
-        pred_reward, reward_var = self.reward_model.forward(observation, action, next_observation)
-        return pred_reward, None, reward_var
+        # pred_reward, reward_var = self.reward_model.forward(observation, action, next_observation)
+        return 0.0, None, 0.0
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -134,12 +134,13 @@ class One_Dyna_One_SAS_Reward(World_Model):
             next_states:
             rewards:
         """
-        self.reward_optimizers.zero_grad()
-        rwd_mean, rwd_var = self.reward_model.forward(states, actions, next_states)
-        # reward_loss = F.mse_loss(rwd_mean, sub_rewards)
-        reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var).mean()
-        reward_loss.backward()
-        self.reward_optimizers.step()
+        # self.reward_optimizers.zero_grad()
+        # rwd_mean, rwd_var = self.reward_model.forward(states, actions, next_states)
+        # # reward_loss = F.mse_loss(rwd_mean, sub_rewards)
+        # reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var).mean()
+        # reward_loss.backward()
+        # self.reward_optimizers.step()
+        return
 
     def estimate_uncertainty(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -150,18 +151,18 @@ class One_Dyna_One_SAS_Reward(World_Model):
         :param observation:
         :param actions:
         """
-        sample_times = 10
-        _, _, mean, var = self.pred_next_states(observation, actions)
-        dyna_uncert = torch.sum(var.squeeze()).item()
-        # Sample next state several times, and estimate reward uncertianty.
-        sample1 = torch.distributions.Normal(mean, var).sample([sample_times])
-        sample1 = sample1.squeeze()
-        sample1i = denormalize_observation_delta(sample1, self.world_model.statistics)
-        sample1i += observation
-        multi_observation = torch.repeat_interleave(observation, sample_times, dim=0)
-        multi_reward = torch.repeat_interleave(actions, sample_times, dim=0)
-        reward, _, rwd_var = self.pred_rewards(multi_observation, multi_reward, sample1i)
-        sample2 = torch.distributions.Normal(reward, rwd_var).sample([sample_times])
-        sample2 = torch.reshape(sample2, (sample_times ** 2,))
-        rwd_uncert = torch.var(sample2).item()
-        return dyna_uncert, rwd_uncert
+        # sample_times = 10
+        # _, _, mean, var = self.pred_next_states(observation, actions)
+        # dyna_uncert = torch.sum(var.squeeze()).item()
+        # # Sample next state several times, and estimate reward uncertianty.
+        # sample1 = torch.distributions.Normal(mean, var).sample([sample_times])
+        # sample1 = sample1.squeeze()
+        # sample1i = denormalize_observation_delta(sample1, self.world_model.statistics)
+        # sample1i += observation
+        # multi_observation = torch.repeat_interleave(observation, sample_times, dim=0)
+        # multi_reward = torch.repeat_interleave(actions, sample_times, dim=0)
+        # reward, _, rwd_var = self.pred_rewards(multi_observation, multi_reward, sample1i)
+        # sample2 = torch.distributions.Normal(reward, rwd_var).sample([sample_times])
+        # sample2 = torch.reshape(sample2, (sample_times ** 2,))
+        # rwd_uncert = torch.var(sample2).item()
+        return 0.0, 0.0

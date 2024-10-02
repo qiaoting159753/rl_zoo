@@ -607,40 +607,12 @@ class BaseLaplace:
     ) -> torch.Tensor:
         """Sample from the posterior predictive on input data `x` using "glm" prediction
         type.
-
-        Parameters
-        ----------
-        f_mu : torch.Tensor or MutableMapping
-            glm predictive mean `(batch_size, output_shape)`
-
-        f_var : torch.Tensor or MutableMapping
-            glm predictive covariances `(batch_size, output_shape, output_shape)`
-
-        n_samples : int
-            number of samples
-
-        diagonal_output : bool
-            whether to use a diagonalized glm posterior predictive on the outputs.
-
-        generator : torch.Generator, optional
-            random number generator to control the samples (if sampling used)
-
-        Returns
-        -------
-        samples : torch.Tensor
-            samples `(n_samples, batch_size, output_shape)`
         """
         assert f_var.shape == torch.Size([f_mu.shape[0], f_mu.shape[1], f_mu.shape[1]])
-
         if diagonal_output:
             f_var = torch.diagonal(f_var, dim1=1, dim2=2)
-
         f_samples = normal_samples(f_mu, f_var, n_samples, generator)
-
-        if self.likelihood == Likelihood.REGRESSION:
-            return f_samples
-        else:
-            return torch.softmax(f_samples, dim=-1)
+        return f_samples
 
 
 class ParametricLaplace(BaseLaplace):

@@ -5,6 +5,7 @@ from tqdm import trange
 from datetime import datetime
 from tqdm.contrib.logging import logging_redirect_tqdm
 import math
+
 logging.basicConfig(level=logging.INFO)
 from envs import DMCSEnvironment
 
@@ -17,7 +18,7 @@ from utils import PrioritizedReplayBuffer
 # World Models
 from agents.networks.world_models.deterministic import (Probabilistic_Dynamics,
                                                         Gaussian_Process_World_Model,
-                                                        One_Dyna_One_SAS_Reward,
+                                                        Single_PNN,
                                                         NVP_World_Model,
                                                         Prior_World_Model,
                                                         Conditional_NVP_World_Model)
@@ -362,6 +363,10 @@ class World_Model_Trainer:
                                                  num_actions=self.action_dim,
                                                  l_r=0.0001,
                                                  device=self.device, hidden_size=128)
+
+        if self.world_model_name == "Single_PNN":
+            self.world_model = Single_PNN(observation_size=self.state_dim, num_actions=self.action_dim, l_r=0.001,
+                                          device=self.device)
 
         if self.world_model_name == "Ensemble_Dyna_One_NS_Reward":
             self.world_model = Ensemble_Dyna_One_NS_Reward(observation_size=self.state_dim,

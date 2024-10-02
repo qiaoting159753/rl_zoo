@@ -54,7 +54,8 @@ class bayes_linear_vi(nn.Module):
         self.output_dim = output_dim
         self.bfc1 = BayesLinear_Normalq(input_dim, n_hid, self.prior_instance)
         self.bfc2 = BayesLinear_Normalq(n_hid, n_hid, self.prior_instance)
-        self.bfc3 = BayesLinear_Normalq(n_hid, output_dim, self.prior_instance)
+        self.bfc3 = BayesLinear_Normalq(n_hid, n_hid, self.prior_instance)
+        self.bfc4 = BayesLinear_Normalq(n_hid, output_dim, self.prior_instance)
         self.act = nn.ReLU(inplace=True)
 
     def forward(self, x, sample=True):
@@ -74,7 +75,13 @@ class bayes_linear_vi(nn.Module):
         # -----------------
         x = self.act(x)
         # -----------------
-        y, lqw, lpw = self.bfc3(x, sample)
+        x, lqw, lpw = self.bfc3(x, sample)
+        tlqw = tlqw + lqw
+        tlpw = tlpw + lpw
+        # -----------------
+        x = self.act(x)
+        # -----------------
+        y, lqw, lpw = self.bfc4(x, sample)
         tlqw = tlqw + lqw
         tlpw = tlpw + lpw
         return y, tlqw, tlpw

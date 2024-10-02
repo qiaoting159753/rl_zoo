@@ -28,10 +28,12 @@ class Probabilistic_Dynamics(nn.Module):
 
     def __init__(self, observation_size: int, num_actions: int, hidden_size: int):
         super().__init__()
+        print(hidden_size)
         self.observation_size = observation_size
         self.num_actions = num_actions
         self.layer1 = nn.Linear(observation_size + num_actions, hidden_size)
         self.layer2 = nn.Linear(hidden_size, hidden_size)
+        self.layer3 = nn.Linear(hidden_size, hidden_size)
         self.mean_layer = nn.Linear(hidden_size, observation_size)
         self.logvar_layer = nn.Linear(hidden_size, observation_size)
         self.apply(weight_init)
@@ -64,9 +66,10 @@ class Probabilistic_Dynamics(nn.Module):
         x = F.relu(x)
         x = self.layer2(x)
         x = F.relu(x)
+        x = self.layer3(x)
+        x = F.relu(x)
         normalized_mean = self.mean_layer(x)
         logvar = self.logvar_layer(x)
-
         logvar = torch.tanh(logvar)
         normalized_var = torch.exp(logvar)
         # Always denormalized delta

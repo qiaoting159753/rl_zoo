@@ -75,7 +75,7 @@ class Bayesian_World_Model_BBB(World_Model):
         mlpdw_cum = 0
         Edkl_cum = 0
         for i in range(samples):
-            out, tlqw, tlpw = self.world_model(x, sample=False)
+            out, tlqw, tlpw = self.world_model(x, sample=True)
             Edkl_i = (tlqw - tlpw)
             mean_pred = out[:, :self.observation_size]
             var_pred = out[:, self.observation_size:]
@@ -163,11 +163,12 @@ class Bayesian_World_Model_BBB(World_Model):
         :param next_states:
         :param rewards:
         """
-        self.reward_optimizers.zero_grad()
-        rwd_mean, rwd_var = self.reward_model.forward(states, actions, next_states)
-        reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var).mean()
-        reward_loss.backward()
-        self.reward_optimizers.step()
+        # self.reward_optimizers.zero_grad()
+        # rwd_mean, rwd_var = self.reward_model.forward(states, actions, next_states)
+        # reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var).mean()
+        # reward_loss.backward()
+        # self.reward_optimizers.step()
+        return
 
     def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor
                      ):
@@ -178,8 +179,8 @@ class Bayesian_World_Model_BBB(World_Model):
         :param next_observation:
         :return:
         """
-        pred_reward, reward_var = self.reward_model.forward(observation, action, next_observation)
-        return pred_reward, None, reward_var
+        # pred_reward, reward_var = self.reward_model.forward(observation, action, next_observation)
+        return 0.0, None, 0.0
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
