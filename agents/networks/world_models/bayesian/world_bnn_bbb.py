@@ -134,10 +134,8 @@ class Bayesian_World_Model_BBB(World_Model):
             var_pred = torch.exp(var_pred)
             means.append(mean_pred)
             vars.append(var_pred)
-
         all_vars = torch.vstack(vars).squeeze().detach().cpu().numpy()
         all_means = torch.vstack(means).squeeze().detach().cpu().numpy()
-
         noises = all_vars
         aleatoric = (noises ** 2).mean(axis=0) ** 0.5
         epistemic = all_means.var(axis=0) ** 0.5
@@ -145,7 +143,6 @@ class Bayesian_World_Model_BBB(World_Model):
         epistemic = np.minimum(epistemic, 10e3)
         total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
         uncert = np.mean(total_unc).item()
-
         return uncert, 0.0
 
     def train_reward(
