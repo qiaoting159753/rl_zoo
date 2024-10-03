@@ -6,7 +6,7 @@
   "device": "cuda",
   "seeds":[15, 25, 35],
   "G": 1,
-  "model_G": 0.4,
+  "model_G": 0.2,
   "random_goal": false,
   "batch_size": 256,
   "episode_steps": 257,
