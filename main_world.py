@@ -1,4 +1,5 @@
 import logging
+import shutil
 from loops import World_Model_Trainer
 from envs import DMCSEnvironment
 from utils import set_seed
@@ -7,8 +8,9 @@ import json
 
 
 def main():
+    config_file = 'configurations/bayesian_la.json'
 
-    with open('configurations/bayesian_la.json', 'r') as file:
+    with open(config_file, 'r') as file:
         data = json.load(file)
     logging.info(data)
 
@@ -38,18 +40,18 @@ def main():
     parent_dir = data["parent_direction"]
     # parent_dir = "statistics/"
 
+    sub_directory = agent_name + "_" + env_domain + "_" + env_task + "/"
+    if not os.path.exists(parent_dir):
+        os.mkdir(parent_dir)
+    directory = os.path.join(parent_dir, sub_directory)
+    if not os.path.exists(directory):
+        os.mkdir(directory)
+    shutil.copyfile(config_file, directory)
+
     for parameter_a in Parameter_A:
         for parameter_b in Parameter_B:
             for parameter_c in Parameter_C:
-                sub_directory = agent_name + "_" + env_domain + "_" + env_task + "/"
-                if not os.path.exists(parent_dir):
-                    os.mkdir(parent_dir)
-
-                directory = os.path.join(parent_dir, sub_directory)
-                if not os.path.exists(directory):
-                    os.mkdir(directory)
-                directory = directory + str(parameter_a) + "_" + str(parameter_b) + "_" + str(parameter_c) + "_"
-
+                direct_param = directory + str(parameter_a) + "_" + str(parameter_b) + "_" + str(parameter_c) + "_"
                 for seed in seeds:
                     # Random Seed
                     set_seed(seed)
@@ -71,7 +73,7 @@ def main():
                                                   maximum_steps=maximum_steps,
                                                   generate_results=True,
                                                   seed=seed,
-                                                  directory=directory,
+                                                  directory=direct_param,
                                                   parameter_a=parameter_a,
                                                   parameter_b=parameter_b,
                                                   parameter_c=parameter_c)
