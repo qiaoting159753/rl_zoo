@@ -14,8 +14,8 @@ import torch
 
 from utils import PrioritizedReplayBuffer
 
-from agents.networks.world_models.ensembles import (
-    Ensemble_Dyna_One_SAS_Reward,
+from agents.networks.world_models import (
+    World_Model,
 )
 
 
@@ -28,7 +28,7 @@ class STEVE_SAC_Critic_mean:
             self,
             actor_network: torch.nn.Module,
             critic_network: torch.nn.Module,
-            world_network: Ensemble_Dyna_One_SAS_Reward,
+            world_network: World_Model,
             gamma: float,
             tau: float,
             action_num: int,

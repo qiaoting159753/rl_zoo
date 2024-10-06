@@ -1,20 +1,20 @@
 from __future__ import division
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import copy
-
+import math
 from agents.networks.world_models import World_Model
 
-from utils.helpers import normalize_observation_delta, denormalize_observation_delta
+from utils.helpers import normalize_observation_delta, denormalize_observation_delta, normalize_observation
 
 from agents.networks.world_models.deterministic import (
     Probabilistic_SAS_Reward,
 )
 from utils.common import MLP
 
-from agents.networks.world_models.bayesian.bayesian_javirantoran_optim import SGLD, pSGLD
-
+from agents.networks.world_models.bayesian.bayesian_javirantoran_optim import SGLD
 
 class Bayesian_World_Model_SGLD_JA(World_Model):
     def __init__(self,
@@ -28,9 +28,9 @@ class Bayesian_World_Model_SGLD_JA(World_Model):
         self.observation_size = observation_size
 
         self.world_model = MLP(input_size=(observation_size + num_actions), output_size=2 * observation_size,
-                               hidden_sizes=[128, 128, 128])
+                               hidden_sizes=[256, 256, 256])
 
-        self.world_optimizers = pSGLD(self.world_model.parameters(), lr=l_r)
+        self.world_optimizers = SGLD(self.world_model.parameters(), lr=0.00001)
 
         self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
                                                      hidden_size=hidden_size)
@@ -39,6 +39,21 @@ class Bayesian_World_Model_SGLD_JA(World_Model):
         self.reward_optimizers = torch.optim.Adam(self.reward_model.parameters(), lr=l_r)
         self.reward_model.to(self.device)
         self.world_model.to(self.device)
+        self.counter = 0
+        # Alpha = 0.9
+
+    def update_params(self, lr, momentum, weight_decay):
+        for p in self.world_model.parameters():
+            if not hasattr(p, 'buf'):
+                p.buf = torch.zeros(p.size())
+            d_p = p.grad.data
+            d_p.add_(weight_decay, p.data)
+            buf_new = (1 - momentum) * p.buf - lr * d_p
+            # Noise
+            eps = torch.randn(p.size())
+            buf_new += (2.0 * lr * momentum * (1e-7)) ** .5 * eps
+            p.data.add_(buf_new)
+            p.buf = buf_new
 
     def set_statistics(self, statistics: dict) -> None:
         """
@@ -76,25 +91,28 @@ class Bayesian_World_Model_SGLD_JA(World_Model):
         :param actions:
         :param next_states:
         """
+        self.counter += 1
         target = next_states - states
         delta_targets_normalized = normalize_observation_delta(target, self.statistics)
-        s_n_a = torch.cat((states, actions), dim=1)
+        normalized_states = normalize_observation(states, self.statistics)
+        s_n_a = torch.cat((normalized_states, actions), dim=1)
+
         pred_s = self.world_model.forward(s_n_a)
-        n_mean_delta = pred_s[:, :self.observation_size:]
+        n_mean_delta = pred_s[:, :self.observation_size]
         n_log_delta = pred_s[:, self.observation_size:]
         logvar = torch.tanh(n_log_delta)
         normalized_var = torch.exp(logvar)
         model_loss = F.gaussian_nll_loss(input=n_mean_delta, target=delta_targets_normalized, var=normalized_var).mean()
-        self.world_optimizers.zero_grad()
         model_loss.backward()
-        self.world_optimizers.step()
-
-        self.save_sampled_net(max_samples=20)
+        self.update_params(lr=0.00001, momentum=0.9, weight_decay=0.0001)
+        # self.world_optimizers.step()
+        self.save_sampled_net(max_samples=100)
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        s_n_a = torch.cat((observation, actions), dim=1)
+        normalized_states = normalize_observation(observation, self.statistics)
+        s_n_a = torch.cat((normalized_states, actions), dim=1)
         pred_s = self.world_model.forward(s_n_a)
         n_mean_delta = pred_s[:, :self.observation_size]
         prediction = denormalize_observation_delta(n_mean_delta, self.statistics)
@@ -110,7 +128,6 @@ class Bayesian_World_Model_SGLD_JA(World_Model):
             s_n_a = torch.cat((observation, actions), dim=1)
             Nsamples = len(self.weight_set_samples)
             sample_times = 10
-
             predictions = []
             # iterate over all saved weight configuration samples
             for idx, weight_dict in enumerate(self.weight_set_samples):
@@ -125,7 +142,6 @@ class Bayesian_World_Model_SGLD_JA(World_Model):
                 sample1 = torch.distributions.Normal(n_mean_delta, normalized_var).sample([sample_times])
                 sample1 = sample1.squeeze()
                 predictions.append(sample1)
-
             predictions = torch.stack(predictions)
             predictions = torch.reshape(predictions, (length * sample_times, self.observation_size))
             uncert = torch.mean(torch.var(predictions, dim=0)).item()

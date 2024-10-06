@@ -3,7 +3,7 @@
   "task":"run",
   "loop_name": "World_Model",
   "agent_name":"Bayesian_Laplace_AX",
-  "device": "cuda",
+  "device": "cpu",
   "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 0.2,

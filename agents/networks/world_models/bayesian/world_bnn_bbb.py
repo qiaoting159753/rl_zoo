@@ -136,7 +136,7 @@ class Bayesian_World_Model_BBB(World_Model):
             vars.append(var_pred)
         all_vars = torch.vstack(vars).squeeze().detach().cpu().numpy()
         all_means = torch.vstack(means).squeeze().detach().cpu().numpy()
-        noises = all_vars
+        noises = all_vars ** 0.5
         aleatoric = (noises ** 2).mean(axis=0) ** 0.5
         epistemic = all_means.var(axis=0) ** 0.5
         aleatoric = np.minimum(aleatoric, 10e3)

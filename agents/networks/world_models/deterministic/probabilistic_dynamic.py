@@ -40,8 +40,8 @@ class Probabilistic_Dynamics(nn.Module):
         self.statistics = {}
 
     def forward(
-        self, observation: torch.Tensor, actions: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            self, observation: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Forward the inputs throught the network.
 
@@ -56,12 +56,11 @@ class Probabilistic_Dynamics(nn.Module):
         uncertainty estimation.
         """
         assert (
-            observation.shape[1] + actions.shape[1]
-            == self.observation_size + self.num_actions
+                observation.shape[1] + actions.shape[1]
+                == self.observation_size + self.num_actions
         )
         # Always normalized obs
-        normalized_obs = normalize_observation(observation, self.statistics)
-        x = torch.cat((normalized_obs, actions), dim=1)
+        x = torch.cat((observation, actions), dim=1)
         x = self.layer1(x)
         x = F.relu(x)
         x = self.layer2(x)
@@ -73,5 +72,4 @@ class Probabilistic_Dynamics(nn.Module):
         logvar = torch.tanh(logvar)
         normalized_var = torch.exp(logvar)
         # Always denormalized delta
-        mean_deltas = denormalize_observation_delta(normalized_mean, self.statistics)
-        return mean_deltas, normalized_mean, normalized_var
+        return normalized_mean, normalized_var

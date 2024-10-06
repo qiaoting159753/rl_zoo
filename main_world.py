@@ -8,7 +8,7 @@ import json
 
 
 def main():
-    config_file = 'configurations/bayesian_la.json'
+    config_file = 'configurations/ensemble_pnn.json'
 
     with open(config_file, 'r') as file:
         data = json.load(file)
@@ -35,10 +35,13 @@ def main():
     Parameter_A = data["Parameter_A"]
     Parameter_B = data["Parameter_B"]
     Parameter_C = data["Parameter_C"]
+    sas = data["sas"]
+    prob_rwd = data["prob_rwd"]
     flush = data["flush"]
 
     parent_dir = data["parent_direction"]
-    # parent_dir = "statistics/"
+    # Switch
+    parent_dir = "statistics/"
 
     sub_directory = agent_name + "_" + env_domain + "_" + env_task + "/"
     if not os.path.exists(parent_dir):
@@ -46,7 +49,7 @@ def main():
     directory = os.path.join(parent_dir, sub_directory)
     if not os.path.exists(directory):
         os.mkdir(directory)
-    shutil.copyfile(config_file, directory)
+    shutil.copyfile(config_file, directory + config_file[15:])
 
     for parameter_a in Parameter_A:
         for parameter_b in Parameter_B:
@@ -76,13 +79,16 @@ def main():
                                                   directory=direct_param,
                                                   parameter_a=parameter_a,
                                                   parameter_b=parameter_b,
-                                                  parameter_c=parameter_c)
-                    try:
-                        trainer.train(flush=flush)
-                    except Exception as e:
-                        logging.info("--------------------")
-                        logging.info(e)
-                        pass
+                                                  parameter_c=parameter_c,
+                                                  sas=sas,
+                                                  prob_rwd=prob_rwd)
+                    trainer.train(flush=flush)
+                    # try:
+                    #     trainer.train(flush=flush)
+                    # except Exception as e:
+                    #     logging.info("--------------------")
+                    #     logging.info(e)
+                    #     pass
 
 if __name__ == "__main__":
     main()

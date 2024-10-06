@@ -11,8 +11,7 @@ from agents.mbrl import Immersive_Reweight_Dyna_SAC
 from agents.mbrl import STEVE_SAC_Critic_mean
 
 # World Models
-from agents.networks.world_models.ensembles import Ensemble_Dyna_One_SAS_Reward
-from agents.networks.world_models.ensembles import Ensemble_Dyna_One_NS_Reward
+from agents.networks.world_models.ensembles import Ensemble_Dyna_One_Reward
 
 # Actors and Critics
 from agents.networks.mfrl.common import Actor
@@ -155,7 +154,7 @@ class MBRL_Trainer:
         :param agent_name:
         """
         actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-        sas_world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
+        sas_world_model = Ensemble_Dyna_One_Reward(observation_size=self.state_dim,
                                                        num_actions=self.action_dim,
                                                        num_models=5,
                                                        lr=0.001,
@@ -163,7 +162,7 @@ class MBRL_Trainer:
 
         if agent_name == "Dyna_SAC_NS":
             sac_critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-            ns_world_model = Ensemble_Dyna_One_NS_Reward(observation_size=self.state_dim,
+            ns_world_model = Ensemble_Dyna_One_Reward(observation_size=self.state_dim,
                                                          num_actions=self.action_dim,
                                                          num_models=5,
                                                          lr=0.001,

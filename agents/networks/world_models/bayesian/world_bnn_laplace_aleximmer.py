@@ -88,7 +88,7 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         delta_targets_normalized = normalize_observation_delta(target, self.statistics)
         s_n_a = torch.cat((states, actions), dim=1)
         pred_s = self.world_model.customized_forward(s_n_a)
-        n_mean_delta = pred_s[:, :self.observation_size:]
+        n_mean_delta = pred_s[:, :self.observation_size]
         n_log_delta = pred_s[:, self.observation_size:]
         logvar = torch.tanh(n_log_delta)
         normalized_var = torch.exp(logvar)
@@ -98,7 +98,7 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         self.world_optimizers.step()
 
         pred_s = self.world_model.customized_forward(s_n_a)
-        x = pred_s[:, :self.observation_size:]
+        x = pred_s[:, :self.observation_size]
         y_x = ((delta_targets_normalized - x) ** 2).detach()
         self.bnn.fit((s_n_a, torch.cat((delta_targets_normalized, y_x), dim=1)))
         self.bnn.optimize_prior_precision(pred_type="glm")
@@ -115,7 +115,7 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
             var_all = torch.diagonal(var.squeeze()).unsqueeze(dim=0).detach().cpu().numpy()
             # Aleatoric: Last part of the mean
             # Epistemic: First/Second half of the var.
-            epistemic = var_all[:, self.observation_size:]
+            epistemic = var_all[:, :self.observation_size]
             noises = mean[:, self.observation_size:]
             aleatoric = (noises ** 2).mean(axis=0) ** 0.5
             # epistemic = all_means.var(axis=0) ** 0.5

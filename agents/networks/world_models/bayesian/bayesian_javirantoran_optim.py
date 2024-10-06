@@ -80,9 +80,10 @@ class pSGLD(Optimizer):
                 alpha = group['alpha']
                 state['step'] += 1
                 if weight_decay != 0:
-                    d_p.add_(weight_decay, p.data)
+                    d_p.add_(alpha=weight_decay, other=p.data)
+                    # d_p.add_(weight_decay, p.data)
                 # sqavg x alpha + (1-alph) sqavg *(elemwise) sqavg
-                square_avg.mul_(alpha).addcmul_(1 - alpha, d_p, d_p)
+                square_avg.mul_(alpha).addcmul_(value=(1 - alpha), tensor1=d_p, tensor2=d_p)
                 if group['centered']:
                     grad_avg = state['grad_avg']
                     grad_avg.mul_(alpha).add_(1 - alpha, d_p)
@@ -92,8 +93,8 @@ class pSGLD(Optimizer):
                 #                 print(avg.shape)
                 if group['addnoise']:
                     langevin_noise = p.data.new(p.data.size()).normal_(mean=0, std=1) / np.sqrt(group['lr'])
-                    p.data.add_(-group['lr'],
-                                0.5 * d_p.div_(avg) + langevin_noise / torch.sqrt(avg))
+                    p.data.add_(alpha=-group['lr'],
+                                other=0.5 * d_p.div_(avg) + langevin_noise / torch.sqrt(avg))
                 else:
                     p.data.addcdiv_(-group['lr'], 0.5 * d_p, avg)
         return loss

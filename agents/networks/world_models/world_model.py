@@ -1,5 +1,6 @@
 import logging
 import torch
+import numpy as np
 
 
 class World_Model:
@@ -7,6 +8,7 @@ class World_Model:
     World Model
 
     """
+
     def __init__(
             self,
             observation_size: int,
@@ -15,6 +17,8 @@ class World_Model:
             device: str,
             hidden_size: int = 128,
     ):
+        self.statistics = {}
+        self.device = 'cuda'
         logging.info("World Model Init Not Implemented")
 
     def set_statistics(self, statistics: dict) -> None:
@@ -24,7 +28,10 @@ class World_Model:
 
         :param (Dictionary) statistics:
         """
-        logging.info("Set Statistics Not Implemented")
+        for key, value in statistics.items():
+            if isinstance(value, np.ndarray):
+                statistics[key] = torch.FloatTensor(statistics[key]).to(self.device)
+        self.statistics = statistics
 
     def train_world(
             self,
