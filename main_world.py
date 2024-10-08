@@ -41,7 +41,7 @@ def main():
 
     parent_dir = data["parent_direction"]
     # Switch
-    parent_dir = "statistics/"
+    # parent_dir = "statistics/"
 
     agents = ['cheetah', 'cartpole','finger','fish']
     tasks = ['run', 'swingup', 'turn_hard','swim']
