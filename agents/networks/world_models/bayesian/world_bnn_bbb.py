@@ -65,7 +65,7 @@ class Bayesian_World_Model_BBB(World_Model):
         mlpdw_cum = 0
         Edkl_cum = 0
         for i in range(samples):
-            out, tlqw, tlpw = self.world_model(x, sample=True)
+            out, tlqw, tlpw = self.world_model(x, sample=False)
             Edkl_i = (tlqw - tlpw)
             mean_pred = out[:, :self.observation_size]
             var_pred = out[:, self.observation_size:]

@@ -7,7 +7,6 @@ from agents.networks.world_models.bayesian.bayesian_javirantoran_util import (is
                                                                               isotropic_gauss_prior,
                                                                               gaussian)
 
-
 class BayesLinear_Normalq(nn.Module):
     """Linear Layer where weights are sampled from a fully factorised Normal with learnable parameters. The likelihood
      of the weight samples under the prior and the approximate posterior are returned with each forward pass in order
@@ -28,6 +27,7 @@ class BayesLinear_Normalq(nn.Module):
 
     def forward(self, X, sample=False):
         if not sample:
+            # Not Updating teh probability part.
             output = torch.mm(X, self.W_mu) + self.b_mu.expand(X.size()[0], self.n_out)
             return output, 0, 0
         else:
@@ -54,7 +54,6 @@ class bayes_linear_vi(nn.Module):
         self.output_dim = output_dim
         self.bfc1 = BayesLinear_Normalq(input_dim, n_hid, self.prior_instance)
         self.bfc2 = BayesLinear_Normalq(n_hid, n_hid, self.prior_instance)
-        self.bfc3 = BayesLinear_Normalq(n_hid, n_hid, self.prior_instance)
         self.bfc4 = BayesLinear_Normalq(n_hid, output_dim, self.prior_instance)
         self.act = nn.ReLU(inplace=True)
 
@@ -70,12 +69,6 @@ class bayes_linear_vi(nn.Module):
         x = self.act(x)
         # -----------------
         x, lqw, lpw = self.bfc2(x, sample)
-        tlqw = tlqw + lqw
-        tlpw = tlpw + lpw
-        # -----------------
-        x = self.act(x)
-        # -----------------
-        x, lqw, lpw = self.bfc3(x, sample)
         tlqw = tlqw + lqw
         tlpw = tlpw + lpw
         # -----------------
