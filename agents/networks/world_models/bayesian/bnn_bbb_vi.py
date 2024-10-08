@@ -86,7 +86,7 @@ class bayes_linear_vi(nn.Module):
         tlqw_vec = np.zeros(Nsamples)
         tlpw_vec = np.zeros(Nsamples)
         for i in range(Nsamples):
-            y, tlqw, tlpw = self.forward(x, sample=True)
+            y, tlqw, tlpw = self.forward(x)
             predictions[i] = y
             tlqw_vec[i] = tlqw
             tlpw_vec[i] = tlpw

@@ -373,11 +373,6 @@ class World_Model_Trainer:
                                                         boost_inter=int(self.parameter_a),
                                                         sas=self.sas,
                                                         prob_rwd=self.prob_rwd)
-        if self.world_model_name == "Bayesian_VI":
-            # Ratio: Small is better: 0.3, 0.1
-            self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
-                                                        l_r=0.001, device=self.device, ratio=self.parameter_a,
-                                                        sigma=self.parameter_b)
 
         if self.world_model_name == "Bayesian_Laplace_AX":
             # no change on temp, sigma
@@ -389,6 +384,15 @@ class World_Model_Trainer:
                                                                sigma=self.parameter_a,
                                                                temperature=self.parameter_b,
                                                                prior_precision=self.parameter_c)
+
+        if self.world_model_name == "Bayesian_VI":
+            # Ratio: Small is better: 0.3, 0.1
+            self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim,
+                                                        num_actions=self.action_dim,
+                                                        l_r=0.001,
+                                                        device=self.device,
+                                                        ratio=self.parameter_a,
+                                                        sigma=self.parameter_b)
 
         if self.world_model_name == "Bayesian_World_Model_SGLD_JA":
             self.world_model = Bayesian_World_Model_SGLD_JA(observation_size=self.state_dim,

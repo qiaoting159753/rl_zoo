@@ -32,14 +32,10 @@ class Bayesian_World_Model_BBB(World_Model):
         self.device = device
         self.sas = sas
         self.prob_rwd = prob_rwd
-        if option == 0:
-            self.world_model = Hyper_BBP_Heteroscedastic_Model(observation_size + num_actions, 2 * observation_size,
-                                                               hidden_size)
         if option == 1:
             self.world_model = bayes_linear_vi(observation_size + num_actions, 2 * observation_size, hidden_size, sigma)
         if option == 2:
             self.world_model = bayes_linear_lr(observation_size + num_actions, 2 * observation_size, hidden_size, sigma)
-
         self.inv_total_params = 1.0 / (sum(p.numel() for p in self.world_model.parameters()))
         self.world_optimizers = optim.Adam(self.world_model.parameters(), lr=self.l_r)
         self.world_model.to(self.device)
@@ -56,7 +52,7 @@ class Bayesian_World_Model_BBB(World_Model):
         :param actions:
         :param next_states:
         """
-        samples = 10
+        samples = 5
         target = next_states - states
         normalized_target = normalize_observation_delta(target, self.statistics)
         normlized_state = normalize_observation(states, self.statistics)
@@ -65,14 +61,13 @@ class Bayesian_World_Model_BBB(World_Model):
         mlpdw_cum = 0
         Edkl_cum = 0
         for i in range(samples):
-            out, tlqw, tlpw = self.world_model(x, sample=False)
+            out, tlqw, tlpw = self.world_model(x, sample=True)
             Edkl_i = (tlqw - tlpw)
             mean_pred = out[:, :self.observation_size]
             var_pred = out[:, self.observation_size:]
             var_pred = torch.tanh(var_pred)
             var_pred = torch.exp(var_pred)
             mlpdw_i = F.gaussian_nll_loss(input=mean_pred, target=normalized_target, var=var_pred).mean()
-            # mlpdw_i = F.mse_loss(out, y).mean()
             mlpdw_cum += mlpdw_i
             Edkl_cum = Edkl_cum + Edkl_i
         mlpdw = mlpdw_cum / samples
@@ -149,18 +144,8 @@ class Bayesian_World_Model_BBB(World_Model):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         normlized_state = normalize_observation(observation, self.statistics)
         normalized_obs_a = torch.cat((normlized_state, actions), dim=1)
-        # for i in range(sample):
-        #     pred, _, _ = self.world_model(normalized_obs_a)
-        #     mean_pred = pred[:, :self.observation_size]
-        #     var_pred = pred[:, self.observation_size:]
-        #     var_pred = torch.tanh(var_pred)
-        #     var_pred = torch.exp(var_pred)
-        #     sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
-        #     preds.append(sample1)
-        # preds = torch.vstack(preds).squeeze()
         pred, _, _ = self.world_model(normalized_obs_a, sample=False)
         preds = pred[:, :self.observation_size]
         mean_deltas = denormalize_observation_delta(preds, self.statistics)
         preds = mean_deltas + observation
-        # preds = torch.mean(preds, dim=0).unsqueeze(dim=0)
         return preds, None, None, None
