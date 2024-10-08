@@ -1,12 +1,10 @@
 {
-  "domain":"humanoid",
-  "task":"run",
   "loop_name": "World_Model",
   "agent_name":"Single_PNN",
   "device": "cpu",
   "seeds":[15],
   "G": 1,
-  "model_G": 0.5,
+  "model_G": 0.2,
   "random_goal": false,
   "batch_size": 256,
   "episode_steps": 257,
@@ -14,12 +12,15 @@
   "maximum_steps": 257000,
   "horizon": 5,
   "branch_factor": 10,
-  "on_policy": false,
+  "on_policy": true,
   "Parameter_A": [16],
   "Parameter_B" : [16],
   "Parameter_C" : [16],
   "flush": false,
-  "parent_direction": "/root/rl_zoo_data/"
+  "parent_direction": "/root/rl_zoo_data/",
+  "sas": true,
+  "prob_rwd": false,
+  "train_both": true
 }
 
 

@@ -16,8 +16,7 @@ from agents.mfrl import SAC
 from utils import PrioritizedReplayBuffer
 
 # World Models
-from agents.networks.world_models.deterministic import (Probabilistic_Dynamics,
-                                                        Gaussian_Process_World_Model,
+from agents.networks.world_models.deterministic import (Gaussian_Process_World_Model,
                                                         Single_PNN,
                                                         NVP_World_Model,
                                                         Prior_World_Model,
@@ -28,7 +27,6 @@ from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_SAS_R
                                                     Ensemble_Dyna_One_Reward)
 
 from agents.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
-                                                   Bayesian_World_Model_Laplace_JA,
                                                    Bayesian_World_Model_Laplace_AX,
                                                    Bayesian_World_Model_SGLD_JA)
 
@@ -55,6 +53,7 @@ class World_Model_Trainer:
                  directory: str,
                  sas: bool,
                  prob_rwd: bool,
+                 train_both:bool,
                  parameter_a: float,
                  parameter_b: float,
                  parameter_c: float):
@@ -75,6 +74,7 @@ class World_Model_Trainer:
         self.random_goal = random_goal
         self.sas = sas
         self.prob_rwd = prob_rwd
+        self.train_both = train_both
         # Save data
         self.evaluate_interval = evaluate_interval
         self.evaluation_array = []
@@ -129,7 +129,7 @@ class World_Model_Trainer:
             # One step prediction
             pred_ns, _, _, _ = self.world_model.pred_next_states(observation=tensor_state,
                                                                  actions=tensor_action)
-            pred_reward, _, _ = self.world_model.pred_rewards(observation=tensor_state,
+            pred_reward, _ = self.world_model.pred_rewards(observation=tensor_state,
                                                               action=tensor_action,
                                                               next_observation=pred_ns)
             # MSE. L1 of dynamics
@@ -143,7 +143,7 @@ class World_Model_Trainer:
             pred_reward = pred_reward.detach().squeeze().cpu().numpy()
             l1_one_rwd_error = abs(pred_reward - gt_rwd)
             l1_one_rwd_errors.append(l1_one_rwd_error)
-
+            episodic_rwd_pred_error += l1_one_rwd_error
             one_dyna_uncert, one_rwd_uncert = self.world_model.estimate_uncertainty(observation=tensor_state,
                                                                                     actions=tensor_action)
             one_dyna_uncerts.append(one_dyna_uncert)
@@ -169,7 +169,7 @@ class World_Model_Trainer:
             l2_multi_step_errors.append(0.0)
             # L1 of Rewards
             # np_multi_pred_rewards = multi_pred_rewards.detach().squeeze().cpu().numpy()
-            # episodic_rwd_pred_error += l1_one_rwd_error
+
             # l1_multi_rwd_error = abs(np_multi_pred_rewards - gt_rwd)
             # l1_multi_rwd_errors.append(l1_multi_rwd_error)
             l1_multi_rwd_errors.append(0.0)
@@ -305,7 +305,8 @@ class World_Model_Trainer:
                             else:
                                 self.agent.train_world_model(memory=self.memory,
                                                              batch_size=self.batch_size,
-                                                             world_model=self.world_model)
+                                                             world_model=self.world_model,
+                                                             train_both=self.train_both)
                     else:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
@@ -319,7 +320,8 @@ class World_Model_Trainer:
                             else:
                                 self.agent.train_world_model(memory=self.memory,
                                                              batch_size=self.batch_size,
-                                                             world_model=self.world_model)
+                                                             world_model=self.world_model,
+                                                             train_both=self.train_both)
                 # Evaluating
                 if self.counter % self.evaluate_interval == 0:
                     need_evaluate = True
@@ -355,10 +357,8 @@ class World_Model_Trainer:
                          reward_scale=1.0)
 
         if self.world_model_name == "Prior_World_Model":
-            self.world_model = Prior_World_Model(observation_size=self.state_dim,
-                                                 num_actions=self.action_dim,
-                                                 l_r=0.0001,
-                                                 device=self.device, hidden_size=256)
+            self.world_model = Prior_World_Model(observation_size=self.state_dim, num_actions=self.action_dim,
+                                                 device=self.device)
 
         if self.world_model_name == "Single_PNN":
             self.world_model = Single_PNN(observation_size=self.state_dim, num_actions=self.action_dim, l_r=0.001,
@@ -374,11 +374,13 @@ class World_Model_Trainer:
                                                         sas=self.sas,
                                                         prob_rwd=self.prob_rwd)
         if self.world_model_name == "Bayesian_VI":
+            # Ratio: Small is better: 0.3, 0.1
             self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim, num_actions=self.action_dim,
                                                         l_r=0.001, device=self.device, ratio=self.parameter_a,
                                                         sigma=self.parameter_b)
 
         if self.world_model_name == "Bayesian_Laplace_AX":
+            # no change on temp, sigma
             self.world_model = Bayesian_World_Model_Laplace_AX(observation_size=self.state_dim,
                                                                num_actions=self.action_dim,
                                                                l_r=0.001,
@@ -393,7 +395,10 @@ class World_Model_Trainer:
                                                             num_actions=self.action_dim,
                                                             l_r=0.001,
                                                             hidden_size=256,
-                                                            device=self.device)
+                                                            device=self.device,
+                                                            sas = self.sas,
+                                                            prob_rwd = self.prob_rwd
+                                                            )
 
         # if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
         #     self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,

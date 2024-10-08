@@ -6,7 +6,7 @@ from torch.autograd import Variable
 from utils import normalize_observation_delta
 import torch.nn.functional as F
 from torch import optim
-from agents.networks.world_models.deterministic import (
+from agents.networks.world_models.simple import (
     Probabilistic_SAS_Reward,
 )
 from utils import normalize_observation, denormalize_observation_delta

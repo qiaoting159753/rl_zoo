@@ -1,12 +1,16 @@
 import logging
 import torch
 import numpy as np
+from agents.networks.world_models.simple import Probabilistic_SAS_Reward, Probabilistic_NS_Reward
+from agents.networks.world_models.simple import Simple_SAS_Reward, Simple_NS_Reward
+import torch.nn.functional as F
+import torch.utils
+from torch import optim
 
 
 class World_Model:
     """
     World Model
-
     """
 
     def __init__(
@@ -16,10 +20,48 @@ class World_Model:
             l_r: float,
             device: str,
             hidden_size: int = 128,
+            sas: bool = True,
+            prob_rwd: bool = False,
     ):
+        self.sas = None
+        self.prob_rwd = None
         self.statistics = {}
-        self.device = 'cuda'
-        logging.info("World Model Init Not Implemented")
+        self.device = device
+        self.sas = sas
+        self.prob_rwd = prob_rwd
+        self.statistics = {}
+        if prob_rwd:
+            if sas:
+                self.reward_network = Probabilistic_SAS_Reward(
+                    observation_size=observation_size,
+                    num_actions=num_actions,
+                    hidden_size=hidden_size,
+                    normalize = True
+                )
+            else:
+                self.reward_network = Probabilistic_NS_Reward(
+                    observation_size=observation_size,
+                    num_actions=num_actions,
+                    hidden_size=hidden_size,
+                    normalize=True
+                )
+        else:
+            if sas:
+                self.reward_network = Simple_SAS_Reward(
+                    observation_size=observation_size,
+                    num_actions=num_actions,
+                    hidden_size=hidden_size,
+                    normalize=True
+                )
+            else:
+                self.reward_network = Simple_NS_Reward(
+                    observation_size=observation_size,
+                    num_actions=num_actions,
+                    hidden_size=hidden_size,
+                    normalize=True
+                )
+        self.reward_network.to(self.device)
+        self.reward_optimizer = optim.Adam(self.reward_network.parameters(), lr=l_r)
 
     def set_statistics(self, statistics: dict) -> None:
         """
@@ -74,7 +116,21 @@ class World_Model:
         :param next_states:
         :param rewards:
         """
-        logging.info("Train reward Not Implemented")
+        self.reward_optimizer.zero_grad()
+        if self.prob_rwd:
+            if self.sas:
+                rwd_mean, rwd_var = self.reward_network(states, actions, next_states)
+            else:
+                rwd_mean, rwd_var = self.reward_network(next_states, actions)
+            reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var)
+        else:
+            if self.sas:
+                rwd_mean = self.reward_network(states, actions, next_states)
+            else:
+                rwd_mean = self.reward_network(next_states, actions)
+            reward_loss = F.mse_loss(rwd_mean, rewards)
+        reward_loss.backward()
+        self.reward_optimizer.step()
 
     def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor
                      ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -85,8 +141,19 @@ class World_Model:
         :param next_observation:
         :return: Predicted rewards, Means of rewards, Variances of rewards
         """
-        logging.info("Predict reward Not Implemented")
-        return torch.zeros((1,)), torch.zeros((1,)), torch.zeros((1,))
+
+        if self.prob_rwd:
+            if self.sas:
+                pred_rewards, rwd_var = self.reward_network(observation, action, next_observation)
+            else:
+                pred_rewards, rwd_var = self.reward_network(next_observation, action)
+            return pred_rewards, rwd_var
+        else:
+            if self.sas:
+                pred_rewards = self.reward_network(observation, action, next_observation)
+            else:
+                pred_rewards = self.reward_network(next_observation, action)
+            return pred_rewards, None
 
     def estimate_uncertainty(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -100,3 +167,7 @@ class World_Model:
         """
         logging.info("Estimating Uncertainty Not Implemented")
         return 0.0, 0.0
+
+    def train_together(self, states: torch.Tensor, action: torch.Tensor, rewards: torch.Tensor,):
+        logging.info("Train Together Not Implemented")
+

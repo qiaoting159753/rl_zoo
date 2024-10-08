@@ -4,10 +4,6 @@ import torch
 import torch.nn.functional as F
 from agents.networks.world_models import World_Model
 from utils.helpers import normalize_observation_delta, denormalize_observation_delta
-from agents.networks.world_models.deterministic import (
-    Probabilistic_SAS_Reward,
-)
-from utils.common import MLP
 from .bayesian_aleximmer_la import KronLaplace
 import torch.nn as nn
 
@@ -15,7 +11,6 @@ import torch.nn as nn
 class CustomizedMLP(nn.Module):
     def __init__(self, input_size: int, hidden_sizes: list[int], output_size: int):
         super().__init__()
-
         self.fully_connected_layers = []
         for i, next_size in enumerate(hidden_sizes):
             fully_connected_layer = nn.Linear(input_size, next_size)
@@ -52,23 +47,20 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
                  sigma,
                  temperature,
                  prior_precision,
-                 device):
+                 device,
+                 sas: bool = True,
+                 prob_rwd:bool = False):
+        super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
+        self.sas = sas
+        self.prob_rwd = prob_rwd
         self.statistics = None
         self.device = device
         self.observation_size = observation_size
-
         self.world_model = CustomizedMLP(input_size=(observation_size + num_actions), output_size=2 * observation_size,
                                          hidden_sizes=[256, 256, 256])
-
         self.bnn = KronLaplace(model=self.world_model, likelihood="regression", sigma_noise=sigma,
                                temperature=temperature, prior_precision=prior_precision)
-
         self.world_optimizers = torch.optim.Adam(self.world_model.parameters(), lr=l_r)
-
-        self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
-                                                     hidden_size=hidden_size)
-        self.reward_optimizers = torch.optim.Adam(self.reward_model.parameters(), lr=l_r)
-        self.reward_model.to(self.device)
         self.world_model.to(self.device)
 
     def train_world(
@@ -140,19 +132,6 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
             # uncert = torch.mean(torch.var(second_sample, dim=0)).item()
         return uncert, 0.0
 
-    def set_statistics(self, statistics: dict) -> None:
-        """
-        Update all statistics for normalization for all world models and the
-        ensemble itself.
-
-        :param (Dictionary) statistics:
-        """
-        for key, value in statistics.items():
-            if isinstance(value, np.ndarray):
-                statistics[key] = torch.FloatTensor(statistics[key]).to(self.device)
-        self.statistics = statistics
-        self.world_model.statistics = statistics
-
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -162,33 +141,3 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         prediction = denormalize_observation_delta(n_mean_delta, self.statistics)
         prediction += observation
         return prediction, None, None, None
-
-    def pred_rewards(self, observation: torch.Tensor,
-                     action: torch.Tensor, next_observation: torch.Tensor):
-        """
-        predict reward based on current observation and action and next state
-        """
-        pred_reward, reward_var = self.reward_model.forward(observation, action, next_observation)
-        return pred_reward, None, reward_var
-
-    def train_reward(
-            self,
-            states: torch.Tensor,
-            actions: torch.Tensor,
-            next_states: torch.Tensor,
-            rewards: torch.Tensor,
-    ) -> None:
-        """
-        Train the reward with S, A, SN to eliminate difference between them.
-        Args:
-            states:
-            actions:
-            next_states:
-            rewards:
-        """
-        self.reward_optimizers.zero_grad()
-        rwd_mean, rwd_var = self.reward_model.forward(states, actions, next_states)
-        # reward_loss = F.mse_loss(rwd_mean, sub_rewards)
-        reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var).mean()
-        reward_loss.backward()
-        self.reward_optimizers.step()

@@ -175,7 +175,7 @@ class SAC:
         self.critic_net.load_state_dict(torch.load(f"{path}/{filename}_critic.pht"))
         logging.info("models has been loaded...")
 
-    def train_world_model(self, memory: PrioritizedReplayBuffer, batch_size: int, world_model):
+    def train_world_model(self, memory: PrioritizedReplayBuffer, batch_size: int, world_model, train_both:bool):
         experiences = memory.sample_uniform(batch_size)
         states, actions, rewards, next_states, _, _ = experiences
         batch_size = len(states)
@@ -187,4 +187,8 @@ class SAC:
         # Reshape to batch_size x whatever
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
         world_model.train_world(states, actions, next_states)
-        world_model.train_reward(states, actions, next_states, rewards)
+
+        if train_both:
+            world_model.train_together(states, actions, rewards)
+        else:
+            world_model.train_reward(states, actions, next_states, rewards)

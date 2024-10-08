@@ -503,7 +503,8 @@ class PrioritizedReplayBuffer:
 
         Returns:
             tuple: A tuple containing the sampled experiences_t and experiences_t+1 and their corresponding indices.
-                - Experiences are returned in the order: state_i, action_i, reward_i, next_state_i, done_i, ..._i, state_i+1, action_i+1, reward_i+1, next_state_i+1, done_i+1, ..._+i
+                - Experiences are returned in the order: state_i, action_i, reward_i, next_state_i, done_i, ..._i,
+                 state_i+1, action_i+1, reward_i+1, next_state_i+1, done_i+1, ..._+i
                 - The indices represent the indices of the sampled experiences in the buffer.
 
         """

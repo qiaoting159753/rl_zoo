@@ -173,9 +173,11 @@ class Dyna_SAC_NS:
             actions=actions,
             next_states=next_states,
         )
+
         self.world_model.train_reward(
             next_states=next_states,
             rewards=rewards,
+            actions=actions,
         )
 
     def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:

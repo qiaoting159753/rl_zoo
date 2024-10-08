@@ -1,6 +1,4 @@
 {
-  "domain":"cheetah",
-  "task":"run",
   "loop_name": "World_Model",
   "agent_name":"Bayesian_VI",
   "device": "cpu",
@@ -15,11 +13,14 @@
   "horizon": 5,
   "branch_factor": 10,
   "on_policy": false,
-  "Parameter_A" : [8, 16, 32, 96],
+  "Parameter_A" : [2, 8, 16, 32, 96],
   "Parameter_B" : [0.1, 0.3, 0.5, 0.7, 0.9],
   "Parameter_C" : [2],
   "flush": false,
-  "parent_direction": "/root/rl_zoo_data/"
+  "parent_direction": "/root/rl_zoo_data/",
+  "sas": true,
+  "prob_rwd": false,
+  "train_both": false
 }
 
 

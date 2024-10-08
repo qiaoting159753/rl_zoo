@@ -1,27 +1,26 @@
 {
-  "domain":"reacher",
-  "task":"hard",
   "loop_name": "World_Model",
   "agent_name":"Ensemble_Dyna_One_Reward",
   "device": "cpu",
-  "seeds":[15, 25,35],
+  "seeds":[15],
   "G": 1,
   "model_G": 0.2,
   "random_goal": false,
   "batch_size": 256,
-  "episode_steps": 1000,
-  "evaluate_interval": 1000,
-  "maximum_steps": 1000000,
+  "episode_steps": 257,
+  "evaluate_interval": 257,
+  "maximum_steps": 257000,
   "horizon": 5,
   "branch_factor": 10,
   "on_policy": true,
-  "Parameter_A": [16],
-  "Parameter_B" : [16],
-  "Parameter_C" : [16],
+  "Parameter_A": [15],
+  "Parameter_B" : [0],
+  "Parameter_C" : [0],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
-  "sas": false,
-  "prob_rwd": false
+  "sas": true,
+  "prob_rwd": false,
+  "train_both": false
 }
 
 

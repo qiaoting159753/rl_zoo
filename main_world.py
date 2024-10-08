@@ -8,15 +8,13 @@ import json
 
 
 def main():
-    config_file = 'configurations/ensemble_pnn.json'
+    config_file = 'configurations/bayesian_vi.json'
 
     with open(config_file, 'r') as file:
         data = json.load(file)
     logging.info(data)
 
     # EnV
-    env_domain = data["domain"]
-    env_task = data["task"]
     random_goal = data["random_goal"]
     seeds = data["seeds"]
     # Agents
@@ -37,58 +35,67 @@ def main():
     Parameter_C = data["Parameter_C"]
     sas = data["sas"]
     prob_rwd = data["prob_rwd"]
+    train_both = data["train_both"]
+
     flush = data["flush"]
 
     parent_dir = data["parent_direction"]
     # Switch
     parent_dir = "statistics/"
 
-    sub_directory = agent_name + "_" + env_domain + "_" + env_task + "/"
-    if not os.path.exists(parent_dir):
-        os.mkdir(parent_dir)
-    directory = os.path.join(parent_dir, sub_directory)
-    if not os.path.exists(directory):
-        os.mkdir(directory)
-    shutil.copyfile(config_file, directory + config_file[15:])
+    agents = ['cheetah', 'cartpole','finger','fish']
+    tasks = ['run', 'swingup', 'turn_hard','swim']
 
-    for parameter_a in Parameter_A:
-        for parameter_b in Parameter_B:
-            for parameter_c in Parameter_C:
-                direct_param = directory + str(parameter_a) + "_" + str(parameter_b) + "_" + str(parameter_c) + "_"
-                for seed in seeds:
-                    # Random Seed
-                    set_seed(seed)
-                    # Environment
-                    env = DMCSEnvironment(env_domain, env_task)
-                    env.set_seed(seed)
-                    # Agent
-                    # CHANGE THIS PART WHEN ON SCHOOL #
-                    trainer = World_Model_Trainer(env=env,
-                                                  evaluate_interval=evaluate_interval,
-                                                  world_model_name=agent_name,
-                                                  random_goal=random_goal,
-                                                  device=device,
-                                                  on_policy=on_policy,
-                                                  G=G,
-                                                  model_G=model_G,
-                                                  batch_size=batch_size,
-                                                  episode_steps=episode_steps,
-                                                  maximum_steps=maximum_steps,
-                                                  generate_results=True,
-                                                  seed=seed,
-                                                  directory=direct_param,
-                                                  parameter_a=parameter_a,
-                                                  parameter_b=parameter_b,
-                                                  parameter_c=parameter_c,
-                                                  sas=sas,
-                                                  prob_rwd=prob_rwd)
-                    trainer.train(flush=flush)
-                    # try:
-                    #     trainer.train(flush=flush)
-                    # except Exception as e:
-                    #     logging.info("--------------------")
-                    #     logging.info(e)
-                    #     pass
+    for i in range(10):
+        env_domain = agents[i]
+        env_task = tasks[i]
+        sub_directory = agent_name + "_" + env_domain + "_" + env_task + "/"
+        if not os.path.exists(parent_dir):
+            os.mkdir(parent_dir)
+        directory = os.path.join(parent_dir, sub_directory)
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+        shutil.copyfile(config_file, directory + config_file[15:])
+
+        for parameter_a in Parameter_A:
+            for parameter_b in Parameter_B:
+                for parameter_c in Parameter_C:
+                    direct_param = directory + str(parameter_a) + "_" + str(parameter_b) + "_" + str(parameter_c) + "_"
+                    for seed in seeds:
+                        # Random Seed
+                        set_seed(seed)
+                        # Environment
+                        env = DMCSEnvironment(env_domain, env_task)
+                        env.set_seed(seed)
+                        # Agent
+                        # CHANGE THIS PART WHEN ON SCHOOL #
+                        trainer = World_Model_Trainer(env=env,
+                                                      evaluate_interval=evaluate_interval,
+                                                      world_model_name=agent_name,
+                                                      random_goal=random_goal,
+                                                      device=device,
+                                                      on_policy=on_policy,
+                                                      G=G,
+                                                      model_G=model_G,
+                                                      batch_size=batch_size,
+                                                      episode_steps=episode_steps,
+                                                      maximum_steps=maximum_steps,
+                                                      generate_results=True,
+                                                      seed=seed,
+                                                      directory=direct_param,
+                                                      parameter_a=parameter_a,
+                                                      parameter_b=parameter_b,
+                                                      parameter_c=parameter_c,
+                                                      sas=sas,
+                                                      train_both=train_both,
+                                                      prob_rwd=prob_rwd)
+                        trainer.train(flush=flush)
+                        # try:
+                        #     trainer.train(flush=flush)
+                        # except Exception as e:
+                        #     logging.info("--------------------")
+                        #     logging.info(e)
+                        #     pass
 
 if __name__ == "__main__":
     main()

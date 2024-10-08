@@ -1,11 +1,7 @@
 import torch
-import numpy as np
 from agents.networks.world_models import World_Model
 import torch.nn.functional as F
 from torch import optim
-from agents.networks.world_models.deterministic import (
-    Probabilistic_SAS_Reward,
-)
 import pyro
 import pyro.contrib.gp as gp
 

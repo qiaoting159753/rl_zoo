@@ -3,20 +3,26 @@ import numpy as np
 from agents.networks.world_models import World_Model
 from agents.networks.world_models.bayesian.bnn_bbb_lr import bayes_linear_lr
 from agents.networks.world_models.bayesian.bnn_bbb_vi import bayes_linear_vi
-from agents.networks.world_models.bayesian.hyper_bnn_bbb import Hyper_BBP_Heteroscedastic_Model
+from agents.networks.world_models.bayesian.z_hyper_bnn_bbb import Hyper_BBP_Heteroscedastic_Model
 from utils import normalize_observation_delta
 import torch.nn.functional as F
 from torch import optim
-from agents.networks.world_models.deterministic import (
-    Probabilistic_SAS_Reward,
-)
 from utils import normalize_observation, denormalize_observation_delta
 
 
 class Bayesian_World_Model_BBB(World_Model):
-    def __init__(self, observation_size: int, num_actions: int, l_r: float, device: str, sigma: float, ratio: float,
-                 hidden_size: int = 256, option: int = 1):
-        super().__init__(observation_size, num_actions, l_r, device, hidden_size)
+    def __init__(self,
+                 observation_size: int,
+                 num_actions: int,
+                 l_r: float,
+                 device: str,
+                 sigma: float,
+                 ratio: float,
+                 hidden_size: int = 256,
+                 option: int = 1,
+                 sas: bool = True,
+                 prob_rwd: bool = False):
+        super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
         self.statistics = None
         self.observation_size = observation_size
         self.num_actions = num_actions
@@ -24,6 +30,8 @@ class Bayesian_World_Model_BBB(World_Model):
         self.l_r = l_r
         self.ratio = ratio
         self.device = device
+        self.sas = sas
+        self.prob_rwd = prob_rwd
         if option == 0:
             self.world_model = Hyper_BBP_Heteroscedastic_Model(observation_size + num_actions, 2 * observation_size,
                                                                hidden_size)
@@ -33,25 +41,8 @@ class Bayesian_World_Model_BBB(World_Model):
             self.world_model = bayes_linear_lr(observation_size + num_actions, 2 * observation_size, hidden_size, sigma)
 
         self.inv_total_params = 1.0 / (sum(p.numel() for p in self.world_model.parameters()))
-        self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
-                                                     hidden_size=hidden_size)
-        self.reward_optimizers = optim.Adam(self.reward_model.parameters(), lr=self.l_r)
         self.world_optimizers = optim.Adam(self.world_model.parameters(), lr=self.l_r)
-        self.reward_model.to(self.device)
         self.world_model.to(self.device)
-
-    def set_statistics(self, statistics: dict) -> None:
-        """
-        Update all statistics for normalization for all world models and the
-        ensemble itself.
-
-        :param (Dictionary) statistics:
-        """
-        for key, value in statistics.items():
-            if isinstance(value, np.ndarray):
-                statistics[key] = torch.FloatTensor(statistics[key]).to(self.device)
-        self.statistics = statistics
-        # self.world_model.statistics = statistics
 
     def train_world(
             self,
@@ -70,7 +61,6 @@ class Bayesian_World_Model_BBB(World_Model):
         normalized_target = normalize_observation_delta(target, self.statistics)
         normlized_state = normalize_observation(states, self.statistics)
         x = torch.cat((normlized_state, actions), dim=1)
-        # x, y = to_variable(var=(x, y.long()), cuda=self.cuda)
         self.world_optimizers.zero_grad()
         mlpdw_cum = 0
         Edkl_cum = 0
@@ -101,24 +91,6 @@ class Bayesian_World_Model_BBB(World_Model):
         :param actions:
         :return:
         """
-        # logging.info("Not Implemented")
-        # x = torch.cat((observation, actions), dim=1)
-        # sample = 5
-        # preds = []
-        # for _ in range(sample):
-        #     pred, _, _ = self.world_model.sample_predict(x, Nsamples=sample)
-        #     pred = pred.squeeze()
-        #     mean_pred = pred[:, :self.observation_size]
-        #     var_pred = pred[:, self.observation_size:]
-        #     var_pred = torch.tanh(var_pred)
-        #     var_pred = torch.exp(var_pred)
-        #     sample1 = torch.distributions.Normal(mean_pred, var_pred).sample([sample])
-        #     preds.append(sample1)
-        # preds = torch.vstack(preds).squeeze()
-        # preds = torch.reshape(preds, (preds.shape[0] * preds.shape[1], self.observation_size))
-        # mean_deltas = denormalize_observation_delta(preds, self.statistics)
-        # preds = mean_deltas + observation
-        # dyna_var = torch.sum(torch.var(preds, dim=0)).item()
         normlized_state = normalize_observation(observation, self.statistics)
         x = torch.cat((normlized_state, actions), dim=1)
         means = []
@@ -143,50 +115,38 @@ class Bayesian_World_Model_BBB(World_Model):
         epistemic = np.minimum(epistemic, 10e3)
         total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
         uncert = np.mean(total_unc).item()
-        return uncert, 0.0
 
-    def train_reward(
-            self,
-            states: torch.Tensor,
-            actions: torch.Tensor,
-            next_states: torch.Tensor,
-            rewards: torch.Tensor,
-    ) -> None:
-        """
-        Train the reward prediction with or without world model dynamics.
-
-        :param states:
-        :param actions:
-        :param next_states:
-        :param rewards:
-        """
-        # self.reward_optimizers.zero_grad()
-        # rwd_mean, rwd_var = self.reward_model.forward(states, actions, next_states)
-        # reward_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var).mean()
-        # reward_loss.backward()
-        # self.reward_optimizers.step()
-        return
-
-    def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor
-                     ):
-        """
-        Predict reward based on SAS
-        :param observation:
-        :param action:
-        :param next_observation:
-        :return:
-        """
-        # pred_reward, reward_var = self.reward_model.forward(observation, action, next_observation)
-        return 0.0, None, 0.0
+        # Reward Uncertainty
+        # sample_times = 100
+        # dist = torch.distributions.Normal(mu, var)
+        # samples = (dist.sample([sample_times]))
+        # samples = samples.squeeze()
+        # samples = denormalize_observation_delta(samples, self.statistics)
+        # samples += observation
+        # observationss = torch.repeat_interleave(observation, repeats=sample_times, dim=0)
+        # actionss = torch.repeat_interleave(actions, repeats=sample_times, dim=0)
+        # if self.sas:
+        #     if self.prob_rwd:
+        #         rewards, rwd_var = self.reward_network(observationss, actionss, samples)
+        #         epis_uncert = torch.var(rewards, dim=0).item()
+        #         uncert_rwd = epis_uncert + rwd_var
+        #     else:
+        #         rewards = self.reward_network(observationss, actionss, samples)
+        #         uncert_rwd = torch.var(rewards, dim=0).item()
+        # else:
+        #     if self.prob_rwd:
+        #         rewards, rwd_var = self.reward_network(samples, actionss)
+        #         epis_uncert = torch.var(rewards, dim=0).item()
+        #         uncert_rwd = epis_uncert + rwd_var
+        #     else:
+        #         rewards = self.reward_network(samples, actionss)
+        #         uncert_rwd = torch.var(rewards, dim=0).item()
+        uncert_rwd = 0.0
+        return uncert, uncert_rwd
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-
-        :param observation:
-        :param actions:
-        """
         normlized_state = normalize_observation(observation, self.statistics)
         normalized_obs_a = torch.cat((normlized_state, actions), dim=1)
         # for i in range(sample):
@@ -203,5 +163,4 @@ class Bayesian_World_Model_BBB(World_Model):
         mean_deltas = denormalize_observation_delta(preds, self.statistics)
         preds = mean_deltas + observation
         # preds = torch.mean(preds, dim=0).unsqueeze(dim=0)
-
         return preds, None, None, None

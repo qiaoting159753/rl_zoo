@@ -1,6 +1,4 @@
 {
-  "domain":"cheetah",
-  "task":"run",
   "loop_name": "World_Model",
   "agent_name":"Bayesian_Laplace_AX",
   "device": "cpu",

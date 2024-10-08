@@ -5,7 +5,7 @@ from utils import weight_init
 
 
 class Simple_SA_Reward(nn.Module):
-    def __init__(self, observation_size: int, num_actions: int, hidden_size: int):
+    def __init__(self, observation_size: int, num_actions: int, hidden_size: int, normalize:bool):
         """
         Note, This reward function is limited to 0 ~ 1 for dm_control.
         A reward model with fully connected layers. It takes current states (s)
@@ -16,6 +16,7 @@ class Simple_SA_Reward(nn.Module):
         :param (int) hidden_size -- size of neurons in hidden layers.
         """
         super().__init__()
+        self.normalize = normalize
         self.observation_size = observation_size
         self.num_actions = num_actions
         self.linear1 = nn.Linear(observation_size + num_actions, hidden_size)
@@ -24,7 +25,7 @@ class Simple_SA_Reward(nn.Module):
         self.apply(weight_init)
 
     def forward(
-        self, observation: torch.Tensor, actions: torch.Tensor, normalized: bool = False
+        self, observation: torch.Tensor, actions: torch.Tensor
     ) -> torch.Tensor:
         """
         Forward the inputs throught the network.
@@ -46,6 +47,6 @@ class Simple_SA_Reward(nn.Module):
         x = self.linear2(x)
         x = F.relu(x)
         rwd_mean = self.linear3(x)
-        if normalized:
+        if self.normalize:
             rwd_mean = F.sigmoid(rwd_mean)
         return rwd_mean

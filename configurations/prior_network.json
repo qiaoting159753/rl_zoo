@@ -1,6 +1,4 @@
 {
-  "domain":"cheetah",
-  "task":"run",
   "loop_name": "World_Model",
   "agent_name":"Prior_World_Model",
   "device": "cpu",
@@ -14,12 +12,14 @@
   "maximum_steps": 257000,
   "horizon": 5,
   "branch_factor": 10,
-  "on_policy": false,
+  "on_policy": true,
   "Parameter_A": [1.0],
   "Parameter_B" : [16],
   "Parameter_C" : [16],
   "flush": false,
-  "parent_direction": "/root/rl_zoo_data/"
+  "parent_direction": "/root/rl_zoo_data/",
+  "sas": false,
+  "prob_rwd": false
 }
 
 
