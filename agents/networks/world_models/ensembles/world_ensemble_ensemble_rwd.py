@@ -2,7 +2,7 @@ import math
 import torch
 import torch.utils
 from agents.networks.world_models.deterministic import Single_PNN
-from utils.helpers import normalize_observation_delta, normalize_observation, denormalize_observation_delta
+from utils.helpers import normalize_observation, denormalize_observation_delta
 import numpy as np
 
 
@@ -76,16 +76,35 @@ class Ensemble_Dyna_Ensemble_Reward:
         index = int(math.floor(self.update_counter / self.boost_inter))
         self.world_models[index].train_reward(states, actions, next_states, rewards)
 
+    def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor):
+        index = int(math.floor(self.update_counter / self.boost_inter))
+        self.world_models[index].train_together(states=states, actions=actions, rewards=rewards)
+
+
     def estimate_uncertainty(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[float, float]:
         means = []
         vars_s = []
+        pred_rwd_means = []
+        pred_rwd_vars = []
+        sample_times = 20
         for model in self.world_models:
             normalized_state = normalize_observation(observation, model.statistics)
             mean, var = model.world_model.forward(normalized_state, actions)
+            dist = torch.distributions.Normal(mean, var)
+            sampled_delta = dist.sample([sample_times])
+            sampled_delta = sampled_delta.squeeze()
+            denorm_delta = denormalize_observation_delta(sampled_delta, model.statistics)
+            pred_next = denorm_delta + observation
+            rwd_mean, rwd_var = model.pred_rewards(torch.repeat_interleave(observation, dim=0, repeats=sample_times),
+                                                   torch.repeat_interleave(actions, dim=0, repeats=sample_times),
+                                                   pred_next)
+            pred_rwd_means.append(rwd_mean)
+            pred_rwd_vars.append(rwd_var)
             means.append(mean)
             vars_s.append(var)
+
         noises = torch.stack(vars_s).squeeze().detach().numpy()
         aleatoric = (noises ** 2).mean(axis=0) ** 0.5
         all_means = torch.stack(means).squeeze().detach().numpy()
@@ -95,4 +114,13 @@ class Ensemble_Dyna_Ensemble_Reward:
         total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
         uncert = np.mean(total_unc)
 
-        return uncert, 0.0
+        rwd_noises = torch.vstack(pred_rwd_vars).detach().numpy()
+        rwd_aleatoric = (rwd_noises ** 2).mean(axis=0) ** 0.5
+        rwd_all_means = torch.vstack(pred_rwd_means).detach().numpy()
+        rwd_epistemic = rwd_all_means.var(axis=0) ** 0.5
+        rwd_aleatoric = np.minimum(rwd_aleatoric, 10e3)
+        rwd_epistemic = np.minimum(rwd_epistemic, 10e3)
+        rwd_total_unc = (rwd_aleatoric ** 2 + rwd_epistemic ** 2) ** 0.5
+        rwd_uncert = np.mean(rwd_total_unc)
+        return uncert, rwd_uncert
+

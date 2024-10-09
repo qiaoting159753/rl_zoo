@@ -71,6 +71,7 @@ class Single_PNN(World_Model):
         normalized_state = normalize_observation(observation, self.statistics)
         mean, var = self.world_model.forward(normalized_state, actions)
         uncert = torch.mean(var.squeeze()).item()
+
         # Reward Uncertainty
         sample_times = 100
         dist = torch.distributions.Normal(mean, var)
@@ -80,7 +81,6 @@ class Single_PNN(World_Model):
         samples += observation
         observationss = torch.repeat_interleave(observation, repeats=sample_times, dim=0)
         actionss = torch.repeat_interleave(actions, repeats=sample_times, dim=0)
-
         if self.sas:
             if self.prob_rwd:
                 rewards, rwd_var = self.reward_network(observationss, actionss, samples)
@@ -107,18 +107,12 @@ class Single_PNN(World_Model):
         samples = (dist.sample([sample_times]))
         samples = samples.squeeze()
         samples = denormalize_observation_delta(samples, self.statistics)
-
-        states = torch.repeat_interleave(states.unsqueeze(dim=0), sample_times, dim=0)
-        actions = torch.repeat_interleave(actions.unsqueeze(dim=0), sample_times, dim=0)
-        rewards = torch.repeat_interleave(rewards.unsqueeze(dim=0), sample_times, dim=0)
+        states = torch.repeat_interleave(states, sample_times, dim=0)
+        actions = torch.repeat_interleave(actions, sample_times, dim=0)
+        rewards = torch.repeat_interleave(rewards, sample_times, dim=0)
         samples += states
         samples = samples.detach()
-
-        actions = torch.reshape(actions, (actions.shape[0] * actions.shape[1], actions.shape[2]))
-        states = torch.reshape(states, (states.shape[0] * states.shape[1], states.shape[2]))
         samples = torch.reshape(samples, (samples.shape[0] * samples.shape[1], samples.shape[2]))
-        rewards = torch.reshape(rewards, (rewards.shape[0] * rewards.shape[1], rewards.shape[2]))
-
         if self.prob_rwd:
             if self.sas:
                 rwd_mean, rwd_var = self.reward_network(states, actions, samples)

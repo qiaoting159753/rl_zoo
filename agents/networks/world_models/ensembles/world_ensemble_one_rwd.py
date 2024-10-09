@@ -139,6 +139,7 @@ class Ensemble_Dyna_One_Reward(World_Model):
         epistemic = np.minimum(epistemic, 10e3)
         total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
         uncert = np.mean(total_unc)
+
         # Reward Uncertainty
         sample_times = 10
         samples = []
@@ -173,10 +174,11 @@ class Ensemble_Dyna_One_Reward(World_Model):
         return uncert, uncert_rwd
 
     def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor):
+        sample_times = 20
+        normalized_state = normalize_observation(states, self.statistics)
+
         for i in range(self.num_models):
-            normalized_state = normalize_observation(states, self.statistics)
             mean, var = self.world_model[i].forward(normalized_state, actions)
-            sample_times = 20
             dist = torch.distributions.Normal(mean, var)
             samples = (dist.sample([sample_times]))
             samples = samples.squeeze()

@@ -37,10 +37,10 @@ def main():
     flush = data["flush"]
     parent_dir = data["parent_direction"]
     # Switch
-    parent_dir = "statistics/"
+    # parent_dir = "statistics/"
 
-    agents = ['cheetah', 'cartpole', 'finger', 'fish']
-    tasks = ['run', 'swingup', 'turn_hard', 'swim']
+    agents = ['cheetah', 'hopper', 'reacher', 'walker',  'ball_in_cup', 'finger',    'acrobot', 'cartpole', 'humanoid', 'fish']
+    tasks =  ['run',     'hop',    'hard',     'walk',   'catch'     ,  'turn_hard', 'swingup', 'swingup',  'run', 'swim']
 
     for i in range(10):
         env_domain = agents[i]
