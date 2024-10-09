@@ -18,12 +18,9 @@ from utils import PrioritizedReplayBuffer
 # World Models
 from agents.networks.world_models.deterministic import (Gaussian_Process_World_Model,
                                                         Single_PNN,
-                                                        NVP_World_Model,
-                                                        Prior_World_Model,
-                                                        Conditional_NVP_World_Model)
+                                                        Prior_World_Model)
 
-from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_SAS_Reward,
-                                                    Ensemble_NF_One_SAS_Reward,
+from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_Reward,
                                                     Ensemble_Dyna_One_Reward)
 
 from agents.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
@@ -53,7 +50,7 @@ class World_Model_Trainer:
                  directory: str,
                  sas: bool,
                  prob_rwd: bool,
-                 train_both:bool,
+                 train_both: bool,
                  parameter_a: float,
                  parameter_b: float,
                  parameter_c: float):
@@ -130,8 +127,8 @@ class World_Model_Trainer:
             pred_ns, _, _, _ = self.world_model.pred_next_states(observation=tensor_state,
                                                                  actions=tensor_action)
             pred_reward, _ = self.world_model.pred_rewards(observation=tensor_state,
-                                                              action=tensor_action,
-                                                              next_observation=pred_ns)
+                                                           action=tensor_action,
+                                                           next_observation=pred_ns)
             # MSE. L1 of dynamics
             np_pred_ns = pred_ns.detach().squeeze().cpu().numpy()
             one_step_mse = (np.square(np_pred_ns - gt_ns)).mean()
@@ -374,6 +371,16 @@ class World_Model_Trainer:
                                                         sas=self.sas,
                                                         prob_rwd=self.prob_rwd)
 
+        if self.world_model_name == "Ensemble_Dyna_Ensemble_Reward":
+            self.world_model = Ensemble_Dyna_Ensemble_Reward(observation_size=self.state_dim,
+                                                             num_actions=self.action_dim,
+                                                             num_models=5,
+                                                             l_r=0.001,
+                                                             device=self.device,
+                                                             boost_inter=int(self.parameter_a),
+                                                             sas=self.sas,
+                                                             prob_rwd=self.prob_rwd)
+
         if self.world_model_name == "Bayesian_Laplace_AX":
             # no change on temp, sigma
             self.world_model = Bayesian_World_Model_Laplace_AX(observation_size=self.state_dim,
@@ -400,8 +407,8 @@ class World_Model_Trainer:
                                                             l_r=0.001,
                                                             hidden_size=256,
                                                             device=self.device,
-                                                            sas = self.sas,
-                                                            prob_rwd = self.prob_rwd
+                                                            sas=self.sas,
+                                                            prob_rwd=self.prob_rwd
                                                             )
 
         # if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":

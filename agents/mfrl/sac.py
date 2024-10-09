@@ -187,7 +187,6 @@ class SAC:
         # Reshape to batch_size x whatever
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
         world_model.train_world(states, actions, next_states)
-
         if train_both:
             world_model.train_together(states, actions, rewards)
         else:

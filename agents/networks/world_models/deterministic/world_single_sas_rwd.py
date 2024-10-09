@@ -21,6 +21,8 @@ class Single_PNN(World_Model):
                  sas: bool = True,
                  prob_rwd: bool = False):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
+        self.prob_rwd = prob_rwd
+        self.sas = sas
         self.observation_size = observation_size
         self.num_actions = num_actions
         self.device = device
@@ -28,7 +30,6 @@ class Single_PNN(World_Model):
                                                   hidden_size=hidden_size)
         self.world_optimizers = optim.Adam(self.world_model.parameters(), lr=l_r)
         self.world_model.to(self.device)
-        self.statistics = {}
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -97,3 +98,39 @@ class Single_PNN(World_Model):
                 rewards = self.reward_network(samples, actionss)
                 uncert_rwd = torch.var(rewards, dim=0).item()
         return uncert, uncert_rwd
+
+    def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor, ):
+        normalized_state = normalize_observation(states, self.statistics)
+        mean, var = self.world_model.forward(normalized_state, actions)
+        sample_times = 100
+        dist = torch.distributions.Normal(mean, var)
+        samples = (dist.sample([sample_times]))
+        samples = samples.squeeze()
+        samples = denormalize_observation_delta(samples, self.statistics)
+
+        states = torch.repeat_interleave(states.unsqueeze(dim=0), sample_times, dim=0)
+        actions = torch.repeat_interleave(actions.unsqueeze(dim=0), sample_times, dim=0)
+        rewards = torch.repeat_interleave(rewards.unsqueeze(dim=0), sample_times, dim=0)
+        samples += states
+        samples = samples.detach()
+
+        actions = torch.reshape(actions, (actions.shape[0] * actions.shape[1], actions.shape[2]))
+        states = torch.reshape(states, (states.shape[0] * states.shape[1], states.shape[2]))
+        samples = torch.reshape(samples, (samples.shape[0] * samples.shape[1], samples.shape[2]))
+        rewards = torch.reshape(rewards, (rewards.shape[0] * rewards.shape[1], rewards.shape[2]))
+
+        if self.prob_rwd:
+            if self.sas:
+                rwd_mean, rwd_var = self.reward_network(states, actions, samples)
+            else:
+                rwd_mean, rwd_var = self.reward_network(samples, actions)
+            rwd_loss = F.gaussian_nll_loss(rwd_mean, rewards, rwd_var)
+        else:
+            if self.sas:
+                rwd_mean = self.reward_network(states, actions, samples)
+            else:
+                rwd_mean = self.reward_network(samples, actions)
+            rwd_loss = F.mse_loss(rwd_mean, rewards)
+        self.reward_optimizer.zero_grad()
+        rwd_loss.backward()
+        self.reward_optimizer.step()

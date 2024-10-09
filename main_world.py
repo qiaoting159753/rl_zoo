@@ -8,12 +8,10 @@ import json
 
 
 def main():
-    config_file = 'configurations/bayesian_vi.json'
-
+    config_file = 'configurations/ensemble_ensemble.json'
     with open(config_file, 'r') as file:
         data = json.load(file)
     logging.info(data)
-
     # EnV
     random_goal = data["random_goal"]
     seeds = data["seeds"]
@@ -36,15 +34,13 @@ def main():
     sas = data["sas"]
     prob_rwd = data["prob_rwd"]
     train_both = data["train_both"]
-
     flush = data["flush"]
-
     parent_dir = data["parent_direction"]
     # Switch
-    # parent_dir = "statistics/"
+    parent_dir = "statistics/"
 
-    agents = ['cheetah', 'cartpole','finger','fish']
-    tasks = ['run', 'swingup', 'turn_hard','swim']
+    agents = ['cheetah', 'cartpole', 'finger', 'fish']
+    tasks = ['run', 'swingup', 'turn_hard', 'swim']
 
     for i in range(10):
         env_domain = agents[i]
@@ -96,6 +92,7 @@ def main():
                         #     logging.info("--------------------")
                         #     logging.info(e)
                         #     pass
+
 
 if __name__ == "__main__":
     main()

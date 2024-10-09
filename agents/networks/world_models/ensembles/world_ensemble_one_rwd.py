@@ -173,19 +173,37 @@ class Ensemble_Dyna_One_Reward(World_Model):
         return uncert, uncert_rwd
 
     def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor):
-        n_states = normalize_observation(states, self.statistics)
         for i in range(self.num_models):
-            mean_state, _ = self.world_models[i].forward(n_states, actions)
-            denorm_mean_state = denormalize_observation_delta(mean_state, self.statistics)
-            prediction = denorm_mean_state + states
+            normalized_state = normalize_observation(states, self.statistics)
+            mean, var = self.world_model[i].forward(normalized_state, actions)
+            sample_times = 20
+            dist = torch.distributions.Normal(mean, var)
+            samples = (dist.sample([sample_times]))
+            samples = samples.squeeze()
+            samples = denormalize_observation_delta(samples, self.statistics)
+
+            states = torch.repeat_interleave(states.unsqueeze(dim=0), sample_times, dim=0)
+            actions = torch.repeat_interleave(actions.unsqueeze(dim=0), sample_times, dim=0)
+            rewards = torch.repeat_interleave(rewards.unsqueeze(dim=0), sample_times, dim=0)
+            samples += states
+
+            actions = torch.reshape(actions, (actions.shape[0] * actions.shape[1], actions.shape[2]))
+            states = torch.reshape(states, (states.shape[0] * states.shape[1], states.shape[2]))
+            samples = torch.reshape(samples, (samples.shape[0] * samples.shape[1], samples.shape[2]))
+            rewards = torch.reshape(rewards, (rewards.shape[0] * rewards.shape[1], rewards.shape[2]))
 
             if self.prob_rwd:
                 if self.sas:
-                    self.reward_network(states, actions, prediction)
+                    rwd_mean, rwd_var = self.reward_network(states, actions, samples)
                 else:
-                    self.reward_network(prediction, actions)
+                    rwd_mean, rwd_var = self.reward_network(samples, actions)
+                rwd_loss = F.gaussian_nll_loss(rwd_mean, rewards, rwd_var)
             else:
                 if self.sas:
-                    self.reward_network()
+                    rwd_mean = self.reward_network(states, actions, samples)
                 else:
-                    self.reward_network()
+                    rwd_mean = self.reward_network(samples, actions)
+                rwd_loss = F.mse_loss(rwd_mean, rewards)
+            self.reward_optimizer.zero_grad()
+            rwd_loss.backward()
+            self.reward_optimizer.step()
