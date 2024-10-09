@@ -8,7 +8,7 @@ import json
 
 
 def main():
-    config_file = 'configurations/ensemble_ensemble.json'
+    config_file = 'configurations/single_pnn.json'
     with open(config_file, 'r') as file:
         data = json.load(file)
     logging.info(data)

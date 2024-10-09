@@ -76,6 +76,7 @@ class Ensemble_Dyna_Ensemble_Reward:
         index = int(math.floor(self.update_counter / self.boost_inter))
         self.world_models[index].train_reward(states, actions, next_states, rewards)
 
+
     def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor):
         index = int(math.floor(self.update_counter / self.boost_inter))
         self.world_models[index].train_together(states=states, actions=actions, rewards=rewards)

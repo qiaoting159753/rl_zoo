@@ -85,7 +85,8 @@ class Single_PNN(World_Model):
             if self.prob_rwd:
                 rewards, rwd_var = self.reward_network(observationss, actionss, samples)
                 epis_uncert = torch.var(rewards, dim=0).item()
-                uncert_rwd = epis_uncert + rwd_var
+                aleatoric = (rwd_var.cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
+                uncert_rwd = (epis_uncert + aleatoric) ** 0.5
             else:
                 rewards = self.reward_network(observationss, actionss, samples)
                 uncert_rwd = torch.var(rewards, dim=0).item()
@@ -93,7 +94,8 @@ class Single_PNN(World_Model):
             if self.prob_rwd:
                 rewards, rwd_var = self.reward_network(samples, actionss)
                 epis_uncert = torch.var(rewards, dim=0).item()
-                uncert_rwd = epis_uncert + rwd_var
+                aleatoric = (rwd_var.cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
+                uncert_rwd = epis_uncert + aleatoric
             else:
                 rewards = self.reward_network(samples, actionss)
                 uncert_rwd = torch.var(rewards, dim=0).item()
@@ -112,7 +114,6 @@ class Single_PNN(World_Model):
         actions = torch.repeat_interleave(actions.unsqueeze(dim=0), sample_times, dim=0)
         rewards = torch.repeat_interleave(rewards.unsqueeze(dim=0), sample_times, dim=0)
         samples += states
-
         samples = samples.detach()
         actions = torch.reshape(actions, (actions.shape[0] * actions.shape[1], actions.shape[2]))
         states = torch.reshape(states, (states.shape[0] * states.shape[1], states.shape[2]))

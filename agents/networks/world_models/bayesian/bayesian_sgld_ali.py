@@ -9,7 +9,6 @@ class SGLD(Optimizer):
     Built on the PyTorch SGD implementation
     (https://github.com/pytorch/pytorch/blob/v1.4.0/torch/optim/sgd.py)
     """
-
     def __init__(self,
                  params,
                  lr=required,
@@ -52,7 +51,6 @@ class SGLD(Optimizer):
                 p.data.add_(d_p, alpha=-group['lr'])
                 noise_std = torch.tensor([2 * group['lr']])
                 noise_std = noise_std.sqrt()
-                noise = p.data.new(p.data.size()).normal_(mean=0,
-                                                          std=1) * noise_std
+                noise = p.data.new(p.data.size()).normal_(mean=0, std=1) * noise_std
                 p.data.add_(noise)
         return 1.0

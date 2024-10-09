@@ -19,7 +19,8 @@
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
   "sas": false,
-  "prob_rwd": false
+  "prob_rwd": false,
+  "train_both": false
 }
 
 

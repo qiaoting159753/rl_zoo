@@ -126,7 +126,6 @@ class Prior_World_Model(World_Model):
                 rewards, rwd_var = self.reward_network(observationss, actionss, samples)
                 epis_uncert = torch.var(rewards, dim=0).item()
                 uncert_rwd = epis_uncert + rwd_var
-
             else:
                 rewards = self.reward_network(observationss, actionss, samples)
                 uncert_rwd = torch.var(rewards, dim=0).item()
