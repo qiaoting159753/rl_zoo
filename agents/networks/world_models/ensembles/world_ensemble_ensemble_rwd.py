@@ -105,18 +105,18 @@ class Ensemble_Dyna_Ensemble_Reward:
             means.append(mean)
             vars_s.append(var)
 
-        noises = torch.stack(vars_s).squeeze().detach().numpy()
+        noises = torch.stack(vars_s).cpu().squeeze().detach().numpy()
         aleatoric = (noises ** 2).mean(axis=0) ** 0.5
-        all_means = torch.stack(means).squeeze().detach().numpy()
+        all_means = torch.stack(means).cpu().squeeze().detach().numpy()
         epistemic = all_means.var(axis=0) ** 0.5
         aleatoric = np.minimum(aleatoric, 10e3)
         epistemic = np.minimum(epistemic, 10e3)
         total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
         uncert = np.mean(total_unc)
 
-        rwd_noises = torch.vstack(pred_rwd_vars).detach().numpy()
+        rwd_noises = torch.vstack(pred_rwd_vars).cpu().detach().numpy()
         rwd_aleatoric = (rwd_noises ** 2).mean(axis=0) ** 0.5
-        rwd_all_means = torch.vstack(pred_rwd_means).detach().numpy()
+        rwd_all_means = torch.vstack(pred_rwd_means).cpu().detach().numpy()
         rwd_epistemic = rwd_all_means.var(axis=0) ** 0.5
         rwd_aleatoric = np.minimum(rwd_aleatoric, 10e3)
         rwd_epistemic = np.minimum(rwd_epistemic, 10e3)
