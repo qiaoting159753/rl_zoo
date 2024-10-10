@@ -168,6 +168,6 @@ class World_Model:
         logging.info("Estimating Uncertainty Not Implemented")
         return 0.0, 0.0
 
-    def train_together(self, states: torch.Tensor, action: torch.Tensor, rewards: torch.Tensor,):
+    def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor,):
         logging.info("Train Together Not Implemented")
 

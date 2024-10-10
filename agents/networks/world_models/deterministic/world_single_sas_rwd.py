@@ -108,17 +108,18 @@ class Single_PNN(World_Model):
         dist = torch.distributions.Normal(mean, var)
         samples = (dist.sample([sample_times]))
         samples = samples.squeeze()
-        samples = denormalize_observation_delta(samples, self.statistics)
 
         states = torch.repeat_interleave(states.unsqueeze(dim=0), sample_times, dim=0)
         actions = torch.repeat_interleave(actions.unsqueeze(dim=0), sample_times, dim=0)
         rewards = torch.repeat_interleave(rewards.unsqueeze(dim=0), sample_times, dim=0)
-        samples += states
-        samples = samples.detach()
         actions = torch.reshape(actions, (actions.shape[0] * actions.shape[1], actions.shape[2]))
         states = torch.reshape(states, (states.shape[0] * states.shape[1], states.shape[2]))
         samples = torch.reshape(samples, (samples.shape[0] * samples.shape[1], samples.shape[2]))
         rewards = torch.reshape(rewards, (rewards.shape[0] * rewards.shape[1], rewards.shape[2]))
+
+        samples = denormalize_observation_delta(samples, self.statistics)
+        samples += states
+        samples = samples.detach()
 
         if self.prob_rwd:
             if self.sas:

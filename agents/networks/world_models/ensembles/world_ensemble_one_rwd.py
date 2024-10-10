@@ -202,17 +202,19 @@ class Ensemble_Dyna_One_Reward(World_Model):
 
         dist = torch.distributions.Normal(mean_s, var_s)
         samples = (dist.sample([sample_times]))
-        samples = denormalize_observation_delta(samples, self.statistics)
 
         actions = torch.repeat_interleave(act_s.unsqueeze(dim=0), repeats=sample_times, dim=0)
         states = torch.repeat_interleave(state_s.unsqueeze(dim=0), repeats=sample_times,dim=0)
         rwd_s = torch.repeat_interleave(rwd_s.unsqueeze(dim=0), repeats=sample_times, dim=0)
-        samples += states
 
         samples = torch.reshape(samples, (samples.shape[0] * samples.shape[1], self.observation_size))
         states = torch.reshape(states, (states.shape[0] * states.shape[1], states.shape[2]))
         actions = torch.reshape(actions, (actions.shape[0] * actions.shape[1], actions.shape[2]))
         rwd_s = torch.reshape(rwd_s, (rwd_s.shape[0] * rwd_s.shape[1], rwd_s.shape[2]))
+
+        samples = denormalize_observation_delta(samples, self.statistics)
+        samples += states
+
 
         if self.prob_rwd:
             if self.sas:

@@ -49,7 +49,8 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
                  prior_precision,
                  device,
                  sas: bool = True,
-                 prob_rwd:bool = False):
+                 prob_rwd:bool = False,
+                 train_both=False):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
         self.sas = sas
         self.prob_rwd = prob_rwd
@@ -57,7 +58,7 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         self.device = device
         self.observation_size = observation_size
         self.world_model = CustomizedMLP(input_size=(observation_size + num_actions), output_size=2 * observation_size,
-                                         hidden_sizes=[256, 256, 256])
+                                         hidden_sizes=[128, 128])
         self.bnn = KronLaplace(model=self.world_model, likelihood="regression", sigma_noise=sigma,
                                temperature=temperature, prior_precision=prior_precision)
         self.world_optimizers = torch.optim.Adam(self.world_model.parameters(), lr=l_r)
