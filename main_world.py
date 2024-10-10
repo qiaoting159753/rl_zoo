@@ -8,7 +8,7 @@ import json
 
 
 def main():
-    config_file = 'configurations/bayesian_vi.json'
+    config_file = 'configurations/bayesian_la.json'
     with open(config_file, 'r') as file:
         data = json.load(file)
     logging.info(data)
@@ -39,10 +39,10 @@ def main():
     # Switch
     # parent_dir = "statistics/"
 
-    agents = ['cheetah', 'hopper', 'reacher', 'walker',  'ball_in_cup', 'finger',    'acrobot', 'cartpole', 'humanoid', 'fish']
-    tasks =  ['run',     'hop',    'hard',     'walk',   'catch'     ,  'turn_hard', 'swingup', 'swingup',  'run', 'swim']
+    agents = ['cheetah', 'hopper', 'reacher', 'walker', 'cartpole', 'humanoid', 'ball_in_cup']
+    tasks =  ['run',     'hop',    'hard',    'walk',   'swingup',  'run',      'catch']
 
-    for i in range(10):
+    for i in range(6):
         env_domain = agents[i]
         env_task = tasks[i]
         sub_directory = agent_name + "_" + env_domain + "_" + env_task + "/"
