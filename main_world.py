@@ -37,7 +37,7 @@ def main():
     flush = data["flush"]
     parent_dir = data["parent_direction"]
     # Switch
-    # parent_dir = "statistics/"
+    parent_dir = "statistics/"
 
     agents = ['cheetah', 'hopper', 'reacher', 'walker', 'cartpole', 'humanoid', 'ball_in_cup']
     tasks =  ['run',     'hop',    'hard',    'walk',   'swingup',  'run',      'catch']

@@ -5,69 +5,7 @@ import torch.nn.functional as F
 from agents.networks.world_models import World_Model
 from utils.helpers import normalize_observation_delta, denormalize_observation_delta, normalize_observation
 from .bayesian_aleximmer_la import KronLaplace
-import torch.nn as nn
-from agents.networks.world_models.simple import Probabilistic_SAS_Reward, Probabilistic_NS_Reward
-from agents.networks.world_models.simple import Simple_SAS_Reward, Simple_NS_Reward
-import copy
-
-
-class CustomizedMLP(nn.Module):
-    def __init__(self, input_size: int, hidden_sizes: list[int], output_size: int):
-        super().__init__()
-        self.fully_connected_layers = []
-        for i, next_size in enumerate(hidden_sizes):
-            fully_connected_layer = nn.Linear(input_size, next_size)
-            self.add_module(f"fully_connected_layer_{i}", fully_connected_layer)
-            self.fully_connected_layers.append(fully_connected_layer)
-            input_size = next_size
-        self.obs_length = int(output_size / 2)
-        self.output_layer = nn.Linear(input_size, output_size)
-
-    def forward(self, state):
-        for fully_connected_layer in self.fully_connected_layers:
-            state = F.relu(fully_connected_layer(state))
-        output = self.output_layer(state)
-        mean_out = output[:, :self.obs_length]
-        var_out = output[:, self.obs_length:]
-        logvar = torch.tanh(var_out)
-        normalized_var = torch.exp(logvar)
-        output = torch.concatenate((mean_out, normalized_var), dim=1)
-        return output
-
-
-class Template(nn.Module):
-    def __init__(self, prob_rwd, sas, input_size: int, hidden_sizes: list[int], output_size: int):
-        super().__init__()
-        self.world_model = CustomizedMLP(input_size, hidden_sizes, output_size)
-        self.add_module("world_model", self.world_model)
-        self.statistics = {}
-        self.observation_size = int(output_size / 2)
-        num_actions = input_size - self.observation_size
-        self.reward_network = Probabilistic_SAS_Reward(
-            observation_size=self.observation_size,
-            num_actions=num_actions,
-            hidden_size=128,
-            normalize=True
-        )
-        self.add_module("reward_network", self.reward_network)
-
-    def forward(self, s_n_a):
-        state = s_n_a[:, :self.observation_size]
-        action = s_n_a[:, self.observation_size:]
-        normalized_state = normalize_observation(state, self.statistics)
-        new_s_n_a = torch.cat((normalized_state, action), dim=1)
-        output = self.world_model(new_s_n_a)
-        mean_s = output[:, :self.observation_size]
-        var_s = output[:, self.observation_size:]
-        dist = torch.distributions.Normal(mean_s, var_s)
-        if mean_s.shape[0] == 1:
-            predictions = torch.reshape(dist.rsample([1]), (1, self.observation_size))
-        else:
-            predictions = dist.rsample([1]).squeeze()
-        predictions = denormalize_observation_delta(predictions, self.statistics)
-        predictions += state
-        rwd_mean, rwd_var = self.reward_network(state, action, predictions)
-        return torch.cat((rwd_mean, rwd_var), dim=1)
+from utils.common import MLP
 
 
 class Bayesian_World_Model_Laplace_AX(World_Model):
@@ -89,23 +27,14 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         self.statistics = None
         self.device = device
         self.observation_size = observation_size
-        self.world_model = CustomizedMLP(input_size=(observation_size + num_actions), output_size=2 * observation_size,
-                                         hidden_sizes=[128, 128])
+        self.world_model = MLP(input_size=(observation_size + num_actions), output_size=2 * observation_size,
+                               hidden_sizes=[128, 128])
+
         self.bnn = KronLaplace(model=self.world_model, likelihood="regression", sigma_noise=sigma,
                                temperature=temperature, prior_precision=prior_precision)
+
         self.world_optimizers = torch.optim.Adam(self.world_model.parameters(), lr=l_r)
         self.world_model.to(self.device)
-
-        self.train_both = train_both
-        if self.train_both:
-            self.templete = Template(sas=sas,
-                                     prob_rwd=prob_rwd,
-                                     input_size=(observation_size + num_actions),
-                                     output_size=2 * observation_size,
-                                     hidden_sizes=[128, 128])
-            self.templete.to(self.device)
-            self.bnn_all = KronLaplace(model=self.templete, likelihood="regression", sigma_noise=sigma,
-                                       temperature=temperature, prior_precision=prior_precision)
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -134,12 +63,12 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         delta_targets_normalized = normalize_observation_delta(target, self.statistics)
         normalized_states = normalize_observation(states, self.statistics)
         s_n_a = torch.cat((normalized_states, actions), dim=1)
-
         pred_s = self.world_model(s_n_a)
         n_mean_delta = pred_s[:, :self.observation_size]
         n_log_delta = pred_s[:, self.observation_size:]
+        var_s = torch.tanh(n_log_delta)
+        n_log_delta = torch.exp(var_s)
         model_loss = F.gaussian_nll_loss(input=n_mean_delta, target=delta_targets_normalized, var=n_log_delta).mean()
-
         self.world_optimizers.zero_grad()
         model_loss.backward()
         self.world_optimizers.step()
@@ -232,25 +161,8 @@ class Bayesian_World_Model_Laplace_AX(World_Model):
         return uncert, uncert_rwd
 
     def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor, ):
-
-        if self.train_both:
-            # # Copy model to templete.
-            self.templete.world_model.load_state_dict(self.world_model.state_dict())
-            self.templete.reward_network.load_state_dict(self.reward_network.state_dict())
-            # # Train the templete as a whole.
-            self.templete.statistics = copy.deepcopy(self.statistics)
-            nn_s_n_a = torch.cat((states, actions), dim=1)
-            pred_s = self.templete(nn_s_n_a)
-            # # Update the LA.
-            pred_reward = pred_s[:, 0].unsqueeze(1)
-            y_x = ((pred_reward - rewards) ** 2).detach()
-            target_n = torch.cat((rewards, y_x), dim=1)
-            self.bnn_all.fit((nn_s_n_a, target_n))
-            self.bnn_all.optimize_prior_precision(pred_type="glm")
-
         normalized_states = normalize_observation(states, self.statistics)
         s_n_a = torch.cat((normalized_states, actions), dim=1)
-
         # pred = self.bnn(s_n_a, pred_type="glm", link_approx="probit")
         pred = self.world_model(s_n_a)
         mean, var = pred[:, :self.observation_size], pred[:, self.observation_size:]

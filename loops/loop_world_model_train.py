@@ -25,7 +25,8 @@ from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_Rewar
 
 from agents.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
                                                    Bayesian_World_Model_Laplace_AX,
-                                                   Bayesian_World_Model_SGLD_JA)
+                                                   Bayesian_World_Model_SGLD_JA,
+                                                   Bayesian_World_Model_LA_ALL)
 
 
 class World_Model_Trainer:
@@ -402,6 +403,19 @@ class World_Model_Trainer:
                                                                prior_precision=self.parameter_c,
                                                                sas=self.sas,
                                                                prob_rwd=self.prob_rwd)
+
+        if self.world_model_name == "Bayesian_Laplace_ALL":
+            # no change on temp, sigma
+            self.world_model = Bayesian_World_Model_LA_ALL(observation_size=self.state_dim,
+                                                           num_actions=self.action_dim,
+                                                           l_r=0.001,
+                                                           hidden_size=128,
+                                                           device=self.device,
+                                                           sigma=self.parameter_a,
+                                                           temperature=self.parameter_b,
+                                                           prior_precision=self.parameter_c,
+                                                           sas=self.sas,
+                                                           prob_rwd=self.prob_rwd)
 
         if self.world_model_name == "Bayesian_World_Model_SGLD_JA":
             self.world_model = Bayesian_World_Model_SGLD_JA(observation_size=self.state_dim,
