@@ -19,10 +19,12 @@ class World_Model:
             num_actions: int,
             l_r: float,
             device: str,
-            hidden_size: int = 128,
+            hidden_size=None,
             sas: bool = True,
             prob_rwd: bool = False,
     ):
+        if hidden_size is None:
+            hidden_size = [128, 128]
         self.sas = None
         self.prob_rwd = None
         self.statistics = {}
@@ -36,14 +38,14 @@ class World_Model:
                     observation_size=observation_size,
                     num_actions=num_actions,
                     hidden_size=hidden_size,
-                    normalize = True
+                    normalize=False
                 )
             else:
                 self.reward_network = Probabilistic_NS_Reward(
                     observation_size=observation_size,
                     num_actions=num_actions,
                     hidden_size=hidden_size,
-                    normalize=True
+                    normalize=False
                 )
         else:
             if sas:
@@ -51,14 +53,14 @@ class World_Model:
                     observation_size=observation_size,
                     num_actions=num_actions,
                     hidden_size=hidden_size,
-                    normalize=True
+                    normalize=False
                 )
             else:
                 self.reward_network = Simple_NS_Reward(
                     observation_size=observation_size,
                     num_actions=num_actions,
                     hidden_size=hidden_size,
-                    normalize=True
+                    normalize=False
                 )
         self.reward_network.to(self.device)
         self.reward_optimizer = optim.Adam(self.reward_network.parameters(), lr=l_r)
@@ -146,13 +148,13 @@ class World_Model:
             if self.sas:
                 pred_rewards, rwd_var = self.reward_network(observation, action, next_observation)
             else:
-                pred_rewards, rwd_var = self.reward_network(next_observation, action)
+                pred_rewards, rwd_var = self.reward_network(next_observation)
             return pred_rewards, rwd_var
         else:
             if self.sas:
                 pred_rewards = self.reward_network(observation, action, next_observation)
             else:
-                pred_rewards = self.reward_network(next_observation, action)
+                pred_rewards = self.reward_network(next_observation)
             return pred_rewards, None
 
     def estimate_uncertainty(
@@ -168,6 +170,5 @@ class World_Model:
         logging.info("Estimating Uncertainty Not Implemented")
         return 0.0, 0.0
 
-    def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor,):
+    def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor, ):
         logging.info("Train Together Not Implemented")
-

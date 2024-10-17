@@ -5,6 +5,8 @@ from dm_control import suite
 import gymnasium as gym
 from gymnasium import spaces
 import logging
+from utils.reward_functions import get_dmcs_reacher_reward, get_dmcs_finger_reward, get_dmcs_fish_reward
+from utils.reward_functions import get_openai_hopper_reward, get_openai_walker_reward, get_openai_halfcheetah_reward
 
 
 class Environment:
@@ -95,9 +97,20 @@ class DMCSEnvironment(Environment):
         # cv2.imwrite("original_" + self.domain + "_" + self.task + ".png", frame)
         return frame
 
+    def get_gt_reward(self, state, action, next_state):
+        if self.domain == "reacher":
+            return get_dmcs_reacher_reward(self, next_state)
+        elif self.domain == "finger":
+            return get_dmcs_finger_reward(self, next_state)
+        elif self.domain == "fish":
+            return get_dmcs_fish_reward(self, next_state)
+        else:
+            raise NotImplementedError("Ground Truth Reward function is not implemented!")
 
 class OpenAIEnvrionment:
     def __init__(self, task_name, param) -> None:
+        self.task_name = task_name
+        self.param = param
         self.env = gym.make(task_name, render_mode="rgb_array", exclude_current_positions_from_observation=param)
 
     @cached_property
@@ -146,3 +159,13 @@ class OpenAIEnvrionment:
         # Convert to BGR for use with OpenCV
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         return frame
+
+    def get_gt_reward(self, state, action, next_state):
+        if self.task_name == "HalfCheetah-v5" and not self.param:
+            return get_openai_halfcheetah_reward(state, action, next_state)
+        elif self.task_name == "Hopper-v5" and not self.param:
+            return get_openai_hopper_reward(state, action, next_state)
+        elif self.task_name == "Walker2d-v5" and not self.param:
+            return get_openai_walker_reward(state, action, next_state)
+        else:
+            raise NotImplementedError("Ground Truth Reward function is not implemented!")

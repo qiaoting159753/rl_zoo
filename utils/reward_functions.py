@@ -1,6 +1,5 @@
 from dm_control.utils import rewards
 import numpy as np
-from envs import DMCSEnvironment, OpenAIEnvrionment
 import math
 
 

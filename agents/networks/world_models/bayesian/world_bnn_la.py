@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from laplace import Laplace
 from torch.utils.data import DataLoader, TensorDataset
+from agents.networks.world_models import World_Model
 
 
 class PNN_MLP(nn.Module):
@@ -31,27 +32,31 @@ class PNN_MLP(nn.Module):
         return output
 
 
-class Bayesian_World_Model_LA_ALL:
+class Bayesian_World_Model_LA(World_Model):
     def __init__(self,
-                 observation_size,
-                 num_actions,
-                 l_r,
-                 hidden_size,
-                 sigma,
-                 temperature,
-                 prior_precision,
-                 device,
-                 sas,
-                 prob_rwd):
+                 observation_size: int,
+                 num_actions: int,
+                 device: str,
+                 l_r: float = 0.001,
+                 hidden_size=None,
+                 temperature: float = 1.0,
+                 prior_precision: float = 1.0,
+                 sas: bool = True,
+                 prob_rwd: bool = True):
+        super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
+        if hidden_size is None:
+            hidden_size = [128, 128]
         self.statistics = None
         self.device = device
         self.observation_size = observation_size
-        self.world_model = PNN_MLP(observation_size + num_actions, [128, 128], 2 * observation_size)
-        self.dyna_optimizer = torch.optim.Adam(self.world_model.parameters(), 0.001)
+        self.world_model = PNN_MLP(observation_size + num_actions, hidden_size, 2 * observation_size)
+        self.dyna_optimizer = torch.optim.Adam(self.world_model.parameters(), l_r)
         self.l_a = Laplace(self.world_model,
                            "regression",
                            subset_of_weights="all",
-                           hessian_structure="kron")
+                           hessian_structure="kron",
+                           temperature=temperature,
+                           prior_precision=prior_precision)
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -115,28 +120,3 @@ class Bayesian_World_Model_LA_ALL:
             total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
             uncert = np.mean(total_unc).item()
         return uncert, rwd_uncert
-
-    def train_reward(
-            self,
-            states: torch.Tensor,
-            actions: torch.Tensor,
-            next_states: torch.Tensor,
-            rewards: torch.Tensor,
-    ) -> None:
-        return
-
-    def pred_rewards(self, observation: torch.Tensor, action: torch.Tensor, next_observation: torch.Tensor
-                     ) -> tuple[torch.Tensor, torch.Tensor]:
-        return torch.ones((observation.shape[0], 1)), torch.ones((observation.shape[0], 1))
-
-    def set_statistics(self, statistics: dict) -> None:
-        """
-        Update all statistics for normalization for all world models and the
-        ensemble itself.
-
-        :param (Dictionary) statistics:
-        """
-        for key, value in statistics.items():
-            if isinstance(value, np.ndarray):
-                statistics[key] = torch.FloatTensor(statistics[key]).to(self.device)
-        self.statistics = statistics

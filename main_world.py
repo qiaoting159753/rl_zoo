@@ -1,14 +1,16 @@
 import logging
 import shutil
 from loops import World_Model_Trainer
-from envs import DMCSEnvironment
+from envs import DMCSEnvironment, OpenAIEnvrionment
 from utils import set_seed
 import os
 import json
 
 
 def main():
-    config_file = 'configurations/bayesian_la.json'
+    config_file = 'configurations/ensemble_ensemble.json'
+    openai_or_dmcs = True
+
     with open(config_file, 'r') as file:
         data = json.load(file)
     logging.info(data)
@@ -35,12 +37,17 @@ def main():
     prob_rwd = data["prob_rwd"]
     train_both = data["train_both"]
     flush = data["flush"]
+    train_reward = data['train_reward']
     parent_dir = data["parent_direction"]
     # Switch
     parent_dir = "statistics/"
 
-    agents = ['cheetah', 'hopper', 'reacher', 'walker', 'cartpole', 'humanoid', 'ball_in_cup']
-    tasks =  ['run',     'hop',    'hard',    'walk',   'swingup',  'run',      'catch']
+    if openai_or_dmcs:
+        agents = ["HalfCheetah-v5", "Hopper-v5", "Walker2d-v5"]
+        tasks = ["", "", ""]
+    else:
+        agents = ['reacher', 'finger', 'fish']
+        tasks = [ 'hard', 'turn_hard', 'swim']
 
     for i in range(6):
         env_domain = agents[i]
@@ -61,7 +68,10 @@ def main():
                         # Random Seed
                         set_seed(seed)
                         # Environment
-                        env = DMCSEnvironment(env_domain, env_task)
+                        if openai_or_dmcs:
+                            env = OpenAIEnvrionment(env_domain, param=False)
+                        else:
+                            env = DMCSEnvironment(env_domain, env_task)
                         env.set_seed(seed)
                         # Agent
                         # CHANGE THIS PART WHEN ON SCHOOL #
@@ -84,6 +94,7 @@ def main():
                                                       parameter_c=parameter_c,
                                                       sas=sas,
                                                       train_both=train_both,
+                                                      train_reward=train_reward,
                                                       prob_rwd=prob_rwd)
                         trainer.train(flush=flush)
                         # try:

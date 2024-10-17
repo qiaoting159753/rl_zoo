@@ -1,4 +1,3 @@
 from .world_bnn_bbb import Bayesian_World_Model_BBB
-from .world_bnn_laplace_aleximmer import Bayesian_World_Model_Laplace_AX
+from .world_bnn_la import Bayesian_World_Model_LA
 from .world_bnn_sgld_ali import Bayesian_World_Model_SGLD_JA
-from .world_bnn_la_all import Bayesian_World_Model_LA_ALL

@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from agents.networks.world_models import World_Model
-from utils.helpers import normalize_observation_delta, denormalize_observation_delta, normalize_observation
+from utils import normalize_observation_delta, denormalize_observation_delta, normalize_observation
 
 
 class NormalInvGamma(nn.Module):
@@ -19,6 +19,7 @@ class NormalInvGamma(nn.Module):
         alpha = F.softplus(logalpha) + 1.0001
         beta = F.softplus(logbeta) + 0.0001
         return mu, v, alpha, beta
+
 
 # Normal Inverse Gamma Negative Log-Likelihood
 # from https://arxiv.org/abs/1910.02600:
@@ -43,31 +44,52 @@ def nig_reg(gamma, v, alpha, _beta, y):
     reg = (y - gamma).abs() * (2 * v + alpha)
     return reg.mean()
 
+
 def evidential_regression(dist_params, y, lamb=1.0):
     return nig_nll(*dist_params, y) + lamb * nig_reg(*dist_params, y)
 
 
 class Prior_World_Model(World_Model):
     def __init__(self,
-                 observation_size,
-                 num_actions,
-                 l_r=0.0001,
-                 hidden_size=128,
-                 device='cpu',
+                 observation_size: int,
+                 num_actions: int,
+                 device: str,
+                 l_r: float = 0.001,
+                 hidden_size=None,
+                 lamb:float = 0.1,
                  sas: bool = True,
-                 prob_rwd:bool = False):
+                 prob_rwd: bool = True):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
+
+        if hidden_size is None:
+            hidden_size = [128, 128]
 
         self.statistics = None
         self.device = device
         self.observation_size = observation_size
-        self.world_model = nn.Sequential(
-            nn.Linear(self.observation_size + num_actions, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            NormalInvGamma(hidden_size, self.observation_size),
-        )
+        self.lamb = lamb
+
+        if len(hidden_size) == 2:
+            self.world_model = nn.Sequential(
+                nn.Linear(self.observation_size + num_actions, hidden_size[0]),
+                nn.ReLU(),
+                nn.Linear(hidden_size[0], hidden_size[1]),
+                nn.ReLU(),
+                NormalInvGamma(hidden_size[1], self.observation_size),
+            )
+        elif len(hidden_size) == 3:
+            self.world_model = nn.Sequential(
+                nn.Linear(self.observation_size + num_actions, hidden_size[0]),
+                nn.ReLU(),
+                nn.Linear(hidden_size[0], hidden_size[1]),
+                nn.ReLU(),
+                nn.Linear(hidden_size[1], hidden_size[2]),
+                nn.ReLU(),
+                NormalInvGamma(hidden_size[2], self.observation_size),
+            )
+        else:
+            raise NotImplementedError("Prior Network can only has 2-3 layers for now.")
+
         self.world_optimizers = torch.optim.Adam(self.world_model.parameters(), lr=l_r)
         self.world_model.to(self.device)
 
@@ -85,7 +107,7 @@ class Prior_World_Model(World_Model):
         normalized_state = normalize_observation(states, self.statistics)
         s_n_a = torch.cat((normalized_state, actions), dim=1)
         pred = self.world_model.forward(s_n_a)
-        loss = evidential_regression(pred, delta_targets_normalized, lamb=1e-1)
+        loss = evidential_regression(pred, delta_targets_normalized, lamb=self.lamb)
         self.world_optimizers.zero_grad()
         loss.backward()
         self.world_optimizers.step()
@@ -111,7 +133,6 @@ class Prior_World_Model(World_Model):
         mu, v, alpha, beta = (d.squeeze() for d in pred)
         var = torch.sqrt(beta / (v * (alpha - 1)))
         uncert = torch.mean(var).item()
-
         # Reward Uncertainty
         sample_times = 100
         dist = torch.distributions.Normal(mu, var)
@@ -124,16 +145,18 @@ class Prior_World_Model(World_Model):
         if self.sas:
             if self.prob_rwd:
                 rewards, rwd_var = self.reward_network(observationss, actionss, samples)
+                aleatoric = (rwd_var.squeeze().cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
                 epis_uncert = torch.var(rewards, dim=0).item()
-                uncert_rwd = epis_uncert + rwd_var
+                uncert_rwd = epis_uncert + aleatoric
             else:
                 rewards = self.reward_network(observationss, actionss, samples)
                 uncert_rwd = torch.var(rewards, dim=0).item()
         else:
             if self.prob_rwd:
                 rewards, rwd_var = self.reward_network(samples, actionss)
+                aleatoric = (rwd_var.squeeze().cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
                 epis_uncert = torch.var(rewards, dim=0).item()
-                uncert_rwd = epis_uncert + rwd_var
+                uncert_rwd = epis_uncert + aleatoric
             else:
                 rewards = self.reward_network(samples, actionss)
                 uncert_rwd = torch.var(rewards, dim=0).item()

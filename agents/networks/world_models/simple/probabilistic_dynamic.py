@@ -1,13 +1,8 @@
 import torch
-import torch.nn.functional as F
 import torch.utils
 from torch import nn
 
-from utils.helpers import (
-    denormalize_observation_delta,
-    normalize_observation,
-    weight_init,
-)
+from utils import weight_init, MLP
 
 
 class Probabilistic_Dynamics(nn.Module):
@@ -26,17 +21,19 @@ class Probabilistic_Dynamics(nn.Module):
     :param (int) hidden_size -- size of neurons in hidden layers.
     """
 
-    def __init__(self, observation_size: int, num_actions: int, hidden_size: int):
+    def __init__(self, observation_size: int, num_actions: int, hidden_size: list):
+        print("Create a Prob Dynamics")
         super().__init__()
-        print(hidden_size)
         self.observation_size = observation_size
         self.num_actions = num_actions
-        self.layer1 = nn.Linear(observation_size + num_actions, hidden_size)
-        self.layer2 = nn.Linear(hidden_size, hidden_size)
-        self.layer3 = nn.Linear(hidden_size, hidden_size)
-        self.mean_layer = nn.Linear(hidden_size, observation_size)
-        self.logvar_layer = nn.Linear(hidden_size, observation_size)
-        self.apply(weight_init)
+
+        self.model = MLP(input_size=observation_size + num_actions,
+                         hidden_sizes=hidden_size,
+                         output_size=2 * observation_size)
+
+        self.add_module('mlp', self.model)
+        self.model.apply(weight_init)
+
         self.statistics = {}
 
     def forward(
@@ -61,14 +58,9 @@ class Probabilistic_Dynamics(nn.Module):
         )
         # Always normalized obs
         x = torch.cat((observation, actions), dim=1)
-        x = self.layer1(x)
-        x = F.relu(x)
-        x = self.layer2(x)
-        x = F.relu(x)
-        x = self.layer3(x)
-        x = F.relu(x)
-        normalized_mean = self.mean_layer(x)
-        logvar = self.logvar_layer(x)
+        pred = self.model(x)
+        logvar = pred[:, :self.observation_size]
+        normalized_mean = pred[:, self.observation_size:]
         logvar = torch.tanh(logvar)
         normalized_var = torch.exp(logvar)
         # Always denormalized delta

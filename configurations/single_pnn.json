@@ -2,7 +2,7 @@
   "loop_name": "World_Model",
   "agent_name":"Single_PNN",
   "device": "cuda",
-  "seeds":[15],
+  "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 0.2,
   "random_goal": false,
@@ -20,7 +20,8 @@
   "parent_direction": "/root/rl_zoo_data/",
   "sas": true,
   "prob_rwd": true,
-  "train_both": true
+  "train_both": true,
+  "train_reward": true
 }
 
 

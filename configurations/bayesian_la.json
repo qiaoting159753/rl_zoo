@@ -1,6 +1,6 @@
 {
   "loop_name": "World_Model",
-  "agent_name":"Bayesian_Laplace_ALL",
+  "agent_name":"Bayesian_Laplace",
   "device": "cpu",
   "seeds":[15],
   "G": 1,
@@ -20,7 +20,8 @@
   "parent_direction": "/root/rl_zoo_data/",
   "sas": true,
   "prob_rwd": true,
-  "train_both": false
+  "train_both": false,
+  "train_reward": true
 }
 
 

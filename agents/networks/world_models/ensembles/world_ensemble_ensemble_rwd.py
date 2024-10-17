@@ -10,13 +10,15 @@ class Ensemble_Dyna_Ensemble_Reward:
     def __init__(self,
                  observation_size: int,
                  num_actions: int,
-                 num_models: int,
-                 l_r: float,
                  device: str,
-                 boost_inter: int,
+                 num_models: int = 5,
+                 l_r: float = 0.001,
+                 boost_inter: int = 3,
                  sas: bool = True,
-                 prob_rwd: bool = False,
-                 hidden_size: int = 128, ):
+                 prob_rwd: bool = True,
+                 hidden_size=None):
+        if hidden_size is None:
+            hidden_size = [128, 128, 128]
         self.num_models = num_models
         self.boost_inter = boost_inter
         self.update_counter = 0
@@ -34,7 +36,7 @@ class Ensemble_Dyna_Ensemble_Reward:
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, None, None, None]:
         preds = []
         for world_model in self.world_models:
             a, b, _, _ = world_model.pred_next_states(observation, actions)
@@ -116,9 +118,9 @@ class Ensemble_Dyna_Ensemble_Reward:
         uncert = np.mean(total_unc)
 
         rwd_noises = torch.vstack(pred_rwd_vars).cpu().detach().numpy()
-        rwd_aleatoric = (rwd_noises ** 2).mean(axis=0) ** 0.5
+        rwd_aleatoric = (rwd_noises.squeeze() ** 2).mean(axis=0) ** 0.5
         rwd_all_means = torch.vstack(pred_rwd_means).cpu().detach().numpy()
-        rwd_epistemic = rwd_all_means.var(axis=0) ** 0.5
+        rwd_epistemic = rwd_all_means.squeeze().var(axis=0) ** 0.5
         rwd_aleatoric = np.minimum(rwd_aleatoric, 10e3)
         rwd_epistemic = np.minimum(rwd_epistemic, 10e3)
         rwd_total_unc = (rwd_aleatoric ** 2 + rwd_epistemic ** 2) ** 0.5

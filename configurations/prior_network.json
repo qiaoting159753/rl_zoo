@@ -18,8 +18,10 @@
   "Parameter_C" : [16],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
-  "sas": false,
-  "prob_rwd": false
+  "sas": true,
+  "prob_rwd": true,
+  "train_both": false,
+  "train_reward": true
 }
 
 

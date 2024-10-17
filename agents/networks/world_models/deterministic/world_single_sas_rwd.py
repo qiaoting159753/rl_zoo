@@ -15,12 +15,14 @@ class Single_PNN(World_Model):
     def __init__(self,
                  observation_size: int,
                  num_actions: int,
-                 l_r: float,
                  device: str,
-                 hidden_size: int = 256,
+                 l_r: float = 0.001,
+                 hidden_size=None,
                  sas: bool = True,
-                 prob_rwd: bool = False):
+                 prob_rwd: bool = True):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
+        if hidden_size is None:
+            hidden_size = [128, 128]
         self.prob_rwd = prob_rwd
         self.sas = sas
         self.observation_size = observation_size
@@ -85,7 +87,7 @@ class Single_PNN(World_Model):
             if self.prob_rwd:
                 rewards, rwd_var = self.reward_network(observationss, actionss, samples)
                 epis_uncert = torch.var(rewards, dim=0).item()
-                aleatoric = (rwd_var.cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
+                aleatoric = (rwd_var.squeeze().cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
                 uncert_rwd = (epis_uncert + aleatoric) ** 0.5
             else:
                 rewards = self.reward_network(observationss, actionss, samples)
@@ -94,7 +96,7 @@ class Single_PNN(World_Model):
             if self.prob_rwd:
                 rewards, rwd_var = self.reward_network(samples, actionss)
                 epis_uncert = torch.var(rewards, dim=0).item()
-                aleatoric = (rwd_var.cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
+                aleatoric = (rwd_var.squeeze().cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
                 uncert_rwd = epis_uncert + aleatoric
             else:
                 rewards = self.reward_network(samples, actionss)
@@ -126,7 +128,7 @@ class Single_PNN(World_Model):
                 rwd_mean, rwd_var = self.reward_network(states, actions, samples)
             else:
                 rwd_mean, rwd_var = self.reward_network(samples, actions)
-            rwd_loss = F.gaussian_nll_loss(rwd_mean, rewards, rwd_var)
+            rwd_loss = F.gaussian_nll_loss(input=rwd_mean, target=rewards, var=rwd_var)
         else:
             if self.sas:
                 rwd_mean = self.reward_network(states, actions, samples)

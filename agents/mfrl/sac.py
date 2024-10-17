@@ -20,18 +20,19 @@ class SAC:
     """
     Soft Actor-Critic
     """
+
     def __init__(
-        self,
-        actor_network: torch.nn.Module,
-        critic_network: torch.nn.Module,
-        gamma: float,
-        tau: float,
-        reward_scale: float,
-        action_num: int,
-        actor_lr: float,
-        critic_lr: float,
-        alpha_lr: float,
-        device: torch.device,
+            self,
+            actor_network: torch.nn.Module,
+            critic_network: torch.nn.Module,
+            gamma: float,
+            tau: float,
+            reward_scale: float,
+            action_num: int,
+            actor_lr: float,
+            critic_lr: float,
+            alpha_lr: float,
+            device: torch.device,
     ):
         self.type = "policy"
         self.device = device
@@ -68,7 +69,7 @@ class SAC:
 
     # pylint: disable-next=unused-argument
     def select_action_from_policy(
-        self, state: np.ndarray, evaluation: bool = False, noise_scale: float = 0
+            self, state: np.ndarray, evaluation: bool = False, noise_scale: float = 0
     ) -> np.ndarray:
         # note that when evaluating this algorithm we need to select mu as action
         self.actor_net.eval()
@@ -112,12 +113,12 @@ class SAC:
                 next_states, next_actions
             )
             target_q_values = (
-                torch.minimum(target_q_values_one, target_q_values_two)
-                - self.alpha * next_log_pi
+                    torch.minimum(target_q_values_one, target_q_values_two)
+                    - self.alpha * next_log_pi
             )
 
             q_target = (
-                rewards * self.reward_scale + self.gamma * (1 - dones) * target_q_values
+                    rewards * self.reward_scale + self.gamma * (1 - dones) * target_q_values
             )
 
         q_values_one, q_values_two = self.critic_net(states, actions)
@@ -151,7 +152,7 @@ class SAC:
 
         if self.learn_counter % self.policy_update_freq == 0:
             for target_param, param in zip(
-                self.target_critic_net.parameters(), self.critic_net.parameters()
+                    self.target_critic_net.parameters(), self.critic_net.parameters()
             ):
                 target_param.data.copy_(
                     param.data * self.tau + target_param.data * (1.0 - self.tau)
@@ -175,19 +176,20 @@ class SAC:
         self.critic_net.load_state_dict(torch.load(f"{path}/{filename}_critic.pht"))
         logging.info("models has been loaded...")
 
-    def train_world_model(self, memory: PrioritizedReplayBuffer, batch_size: int, world_model, train_both:bool):
+    def train_world_model(self, memory: PrioritizedReplayBuffer, batch_size: int, world_model, train_both: bool, train_reward: bool):
         experiences = memory.sample_uniform(batch_size)
         states, actions, rewards, next_states, _, _ = experiences
         batch_size = len(states)
         # Convert into tensor
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
-        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
         # Reshape to batch_size x whatever
-        rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
         world_model.train_world(states, actions, next_states)
-        if train_both:
-            world_model.train_together(states, actions, rewards)
-        else:
-            world_model.train_reward(states, actions, next_states, rewards)
+        if train_reward:
+            rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+            rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+            if train_both:
+                world_model.train_together(states, actions, rewards)
+            else:
+                world_model.train_reward(states, actions, next_states, rewards)

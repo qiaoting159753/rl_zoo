@@ -5,9 +5,9 @@ from tqdm import trange
 from datetime import datetime
 from tqdm.contrib.logging import logging_redirect_tqdm
 import math
+from utils import normalize
 
 logging.basicConfig(level=logging.INFO)
-from envs import DMCSEnvironment
 
 # Agents
 from agents.networks.mfrl.common import Actor
@@ -24,9 +24,8 @@ from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_Rewar
                                                     Ensemble_Dyna_One_Reward)
 
 from agents.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
-                                                   Bayesian_World_Model_Laplace_AX,
-                                                   Bayesian_World_Model_SGLD_JA,
-                                                   Bayesian_World_Model_LA_ALL)
+                                                   Bayesian_World_Model_LA,
+                                                   Bayesian_World_Model_SGLD_JA)
 
 
 class World_Model_Trainer:
@@ -35,7 +34,7 @@ class World_Model_Trainer:
     """
 
     def __init__(self,
-                 env: DMCSEnvironment,
+                 env,
                  world_model_name: str,
                  on_policy: bool,
                  random_goal: bool,
@@ -52,6 +51,7 @@ class World_Model_Trainer:
                  sas: bool,
                  prob_rwd: bool,
                  train_both: bool,
+                 train_reward:bool,
                  parameter_a: float,
                  parameter_b: float,
                  parameter_c: float):
@@ -73,6 +73,7 @@ class World_Model_Trainer:
         self.sas = sas
         self.prob_rwd = prob_rwd
         self.train_both = train_both
+        self.train_reward = train_reward
         # Save data
         self.evaluate_interval = evaluate_interval
         self.evaluation_array = []
@@ -98,20 +99,13 @@ class World_Model_Trainer:
         """
         # Evaluate 10 times
         l2_one_step_errors = []
-        l2_multi_step_errors = []
         l1_one_step_errors = []
-        l1_multi_step_errors = []
-
         l1_one_rwd_errors = []
-        l1_multi_rwd_errors = []
+        l1_one_gt_rwd_errors = []
         one_dyna_uncerts = []
         one_rwd_uncerts = []
 
-        multi_dyna_uncerts = []
-        multi_rwd_uncerts = []
-
         gt_s = self.env.reset()
-        # multi_state = torch.FloatTensor(gt_s).to(self.device).unsqueeze(dim=0)
         episodic_pred_error = 0.0
         episodic_rwd_pred_error = 0.0
 
@@ -120,6 +114,9 @@ class World_Model_Trainer:
                 action = self.agent.select_action_from_policy(gt_s)
             else:
                 action = self.env.sample_action()
+
+            action = normalize(action, self.env.max_action_value, self.env.min_action_value)
+
             gt_ns, gt_rwd, gt_done, _ = self.env.step(action)
             # Converting to tensor
             tensor_action = torch.FloatTensor(action).to(self.device).unsqueeze(dim=0)
@@ -127,81 +124,54 @@ class World_Model_Trainer:
             # One step prediction
             pred_ns, _, _, _ = self.world_model.pred_next_states(observation=tensor_state,
                                                                  actions=tensor_action)
-            pred_reward, _ = self.world_model.pred_rewards(observation=tensor_state,
-                                                           action=tensor_action,
-                                                           next_observation=pred_ns)
+            if self.train_reward:
+                pred_reward, _ = self.world_model.pred_rewards(observation=tensor_state,
+                                                               action=tensor_action,
+                                                               next_observation=pred_ns)
+                pred_reward = pred_reward.detach().squeeze().cpu().numpy()
+            else:
+                pred_reward = 0.0
+            # Ground Truth Reward function prediction
+            pred_gt_rewrad = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(), pred_ns.detach().cpu().numpy().squeeze())
+            # pred_gt_rewrad = 0.0
             # MSE. L1 of dynamics
             np_pred_ns = pred_ns.detach().squeeze().cpu().numpy()
             one_step_mse = (np.square(np_pred_ns - gt_ns)).mean()
-            episodic_pred_error += one_step_mse
             one_step_l1 = (abs(np_pred_ns - gt_ns)).mean()
             l1_one_step_errors.append(one_step_l1)
             l2_one_step_errors.append(one_step_mse)
+            episodic_pred_error += one_step_mse
 
-            pred_reward = pred_reward.detach().squeeze().cpu().numpy()
             l1_one_rwd_error = abs(pred_reward - gt_rwd)
             l1_one_rwd_errors.append(l1_one_rwd_error)
             episodic_rwd_pred_error += l1_one_rwd_error
+
+            l1_one_gt_rwd_error = abs(pred_gt_rewrad - gt_rwd)
+            l1_one_gt_rwd_errors.append(l1_one_gt_rwd_error)
+
             one_dyna_uncert, one_rwd_uncert = self.world_model.estimate_uncertainty(observation=tensor_state,
                                                                                     actions=tensor_action)
             one_dyna_uncerts.append(one_dyna_uncert)
             one_rwd_uncerts.append(one_rwd_uncert)
-
-            # Multi-step prediction with different actions.
-            # if self.on_policy:
-            #     np_multi_state = multi_state.detach().squeeze().cpu().numpy()
-            #     multi_action = self.agent.select_action_from_policy(np_multi_state)
-            # else:
-            #     multi_action = action
-            # multi_tensor_action = torch.FloatTensor(multi_action).to(self.device).unsqueeze(dim=0)
-            # # Make accumulative multi-step predictions.
-            # multi_state_pred, _, _, _ = self.world_model.pred_next_states(observation=multi_state,
-            #                                                               actions=multi_tensor_action)
-            # multi_pred_rewards, _, _ = self.world_model.pred_rewards(observation=multi_state,
-            #                                                          action=multi_tensor_action,
-            #                                                          next_observation=multi_state_pred)
-            # np_multi_state = multi_state_pred.detach().squeeze().cpu().numpy()
-            # multi_step_mse = (np.square(np_multi_state - gt_ns)).mean()
-            # multi_step_l1 = (abs(np_multi_state - gt_ns)).mean()
-            l1_multi_step_errors.append(0.0)
-            l2_multi_step_errors.append(0.0)
-            # L1 of Rewards
-            # np_multi_pred_rewards = multi_pred_rewards.detach().squeeze().cpu().numpy()
-
-            # l1_multi_rwd_error = abs(np_multi_pred_rewards - gt_rwd)
-            # l1_multi_rwd_errors.append(l1_multi_rwd_error)
-            l1_multi_rwd_errors.append(0.0)
             #################    Uncertainty Estimation and Quantification    ################
-            # one_dyna_uncert, one_rwd_uncert = self.world_model.estimate_uncertainty(observation=multi_state,
-            #                                                                         actions=multi_tensor_action)
-            # multi_dyna_uncerts.append(multi_dyna_uncert)
-            # multi_rwd_uncerts.append(multi_rwd_uncert)
-            multi_dyna_uncerts.append(0.0)
-            multi_rwd_uncerts.append(0.0)
-
             gt_s = gt_ns
             if gt_done:
                 break
 
+        l1_one_step_errors = np.array(l1_one_step_errors)
         l2_one_step_errors = np.array(l2_one_step_errors)
-        l1_multi_step_errors = np.array(l1_multi_step_errors)
-        l2_multi_step_errors = np.array(l2_multi_step_errors)
         l1_one_rwd_errors = np.array(l1_one_rwd_errors)
-        l1_multi_rwd_errors = np.array(l1_multi_rwd_errors)
+        l1_one_gt_rwd_errors = np.array(l1_one_gt_rwd_errors)
         one_dyna_uncerts = np.array(one_dyna_uncerts)
         one_rwd_uncerts = np.array(one_rwd_uncerts)
-        multi_dyna_uncerts = np.array(multi_dyna_uncerts)
-        multi_rwd_uncerts = np.array(multi_rwd_uncerts)
 
         c_1 = np.corrcoef(l2_one_step_errors, one_dyna_uncerts)
         c_2 = np.corrcoef(l1_one_step_errors, one_dyna_uncerts)
-        # c_3 = np.corrcoef(l2_multi_step_errors, multi_dyna_uncerts)
-        # c_4 = np.corrcoef(l1_multi_step_errors, multi_dyna_uncerts)
-        c_5 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
-        # c_6 = np.corrcoef(l1_multi_rwd_errors, multi_rwd_uncerts)
+        c_3 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
+        c_4 = np.corrcoef(l1_one_gt_rwd_errors, one_dyna_uncerts)
 
-        logging.info(f"Prediction Error: {episodic_pred_error}")
-        all_data = np.zeros((9,))
+        logging.info(f"Prediction Error dynamics: {episodic_pred_error}, reward:{episodic_rwd_pred_error}")
+        all_data = np.zeros((7,))
         all_data[0] = self.counter
         all_data[1] = episodic_pred_error
         all_data[2] = episodic_rwd_pred_error
@@ -209,41 +179,21 @@ class World_Model_Trainer:
             c_1[0, 1] = 0.0
         if math.isnan(c_2[0, 1]):
             c_2[0, 1] = 0.0
+        if math.isnan(c_3[0, 1]):
+            c_3[0, 1] = 0.0
+        if math.isnan(c_4[0, 1]):
+            c_4[0, 1] = 0.0
         all_data[3] = c_1[0, 1]
         all_data[4] = c_2[0, 1]
-        # all_data[5] = c_3[0, 1]
-        # all_data[6] = c_4[0, 1]
-        all_data[7] = c_5[0, 1]
-        # all_data[8] = c_6[0, 1]
+        all_data[5] = c_3[0, 1]
+        all_data[6] = c_4[0, 1]
+
         self.evaluation_array.append(all_data)
 
         if self.generate_results:
-            # l2_one_step_errors = np.expand_dims(l2_one_step_errors, axis=0)
-            # l1_one_step_errors = np.expand_dims(l1_one_step_errors, axis=0)
-            # one_dyna_uncerts = np.expand_dims(one_dyna_uncerts, axis=0)
-            # l2_multi_step_errors = np.expand_dims(l2_multi_step_errors, axis=0)
-            # l1_multi_step_errors = np.expand_dims(l1_multi_step_errors, axis=0)
-            # multi_dyna_uncerts = np.expand_dims(multi_dyna_uncerts, axis=0)
-            # l1_one_rwd_errors = np.expand_dims(l1_one_rwd_errors, axis=0)
-            # one_rwd_uncerts = np.expand_dims(one_rwd_uncerts, axis=0)
-            # l1_multi_rwd_errors = np.expand_dims(l1_multi_rwd_errors, axis=0)
-            # multi_rwd_uncerts = np.expand_dims(multi_rwd_uncerts, axis=0)
-            # all_data = np.concatenate((l2_one_step_errors,
-            #                            l1_one_step_errors,
-            #                            one_dyna_uncerts,
-            #                            l2_multi_step_errors,
-            #                            l1_multi_step_errors,
-            #                            multi_dyna_uncerts,
-            #                            l1_one_rwd_errors,
-            #                            one_rwd_uncerts,
-            #                            l1_multi_rwd_errors,
-            #                            multi_rwd_uncerts), axis=0)
             # Save the metrics
             file_name = self.directory + str(self.seed) + "_" + self.date_and_time + ".csv"
             np.savetxt(file_name + ".csv", np.array(self.evaluation_array), delimiter=",")
-            # with open(file_name, 'ab') as fff:
-            #     np.savetxt(fff, all_data, delimiter=",")
-            # fff.close()
 
     def train(self, flush=False):
         """
@@ -304,7 +254,8 @@ class World_Model_Trainer:
                                 self.agent.train_world_model(memory=self.memory,
                                                              batch_size=self.batch_size,
                                                              world_model=self.world_model,
-                                                             train_both=self.train_both)
+                                                             train_both=self.train_both,
+                                                             train_reward=self.train_reward)
                     else:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
@@ -319,7 +270,8 @@ class World_Model_Trainer:
                                 self.agent.train_world_model(memory=self.memory,
                                                              batch_size=self.batch_size,
                                                              world_model=self.world_model,
-                                                             train_both=self.train_both)
+                                                             train_both=self.train_both,
+                                                             train_reward=self.train_reward)
                 # Evaluating
                 if self.counter % self.evaluate_interval == 0:
                     need_evaluate = True
@@ -354,19 +306,25 @@ class World_Model_Trainer:
                          device=torch.device(self.device),
                          reward_scale=1.0)
 
-        if self.world_model_name == "Prior_World_Model":
-            self.world_model = Prior_World_Model(observation_size=self.state_dim, num_actions=self.action_dim,
-                                                 device=self.device)
-
         if self.world_model_name == "Single_PNN":
-            self.world_model = Single_PNN(observation_size=self.state_dim, num_actions=self.action_dim, l_r=0.001,
-                                          device=self.device)
+            self.world_model = Single_PNN(observation_size=self.state_dim,
+                                          num_actions=self.action_dim,
+                                          device=self.device,
+                                          sas=self.sas,
+                                          prob_rwd=self.prob_rwd
+                                          )
+
+        if self.world_model_name == "Prior_World_Model":
+            self.world_model = Prior_World_Model(observation_size=self.state_dim,
+                                                 num_actions=self.action_dim,
+                                                 device=self.device,
+                                                 sas=self.sas,
+                                                 prob_rwd=self.prob_rwd
+                                                 )
 
         if self.world_model_name == "Ensemble_Dyna_One_Reward":
             self.world_model = Ensemble_Dyna_One_Reward(observation_size=self.state_dim,
                                                         num_actions=self.action_dim,
-                                                        num_models=5,
-                                                        l_r=0.001,
                                                         device=self.device,
                                                         boost_inter=int(self.parameter_a),
                                                         sas=self.sas,
@@ -375,8 +333,6 @@ class World_Model_Trainer:
         if self.world_model_name == "Ensemble_Dyna_Ensemble_Reward":
             self.world_model = Ensemble_Dyna_Ensemble_Reward(observation_size=self.state_dim,
                                                              num_actions=self.action_dim,
-                                                             num_models=5,
-                                                             l_r=0.001,
                                                              device=self.device,
                                                              boost_inter=int(self.parameter_a),
                                                              sas=self.sas,
@@ -386,42 +342,26 @@ class World_Model_Trainer:
             # Ratio: Small is better: 0.3, 0.1
             self.world_model = Bayesian_World_Model_BBB(observation_size=self.state_dim,
                                                         num_actions=self.action_dim,
-                                                        l_r=0.001,
                                                         device=self.device,
                                                         ratio=self.parameter_a,
-                                                        sigma=self.parameter_b)
+                                                        sigma=self.parameter_b,
+                                                        sas=self.sas,
+                                                        prob_rwd=self.prob_rwd)
 
-        if self.world_model_name == "Bayesian_Laplace_AX":
+        if self.world_model_name == "Bayesian_Laplace":
             # no change on temp, sigma
-            self.world_model = Bayesian_World_Model_Laplace_AX(observation_size=self.state_dim,
-                                                               num_actions=self.action_dim,
-                                                               l_r=0.001,
-                                                               hidden_size=128,
-                                                               device=self.device,
-                                                               sigma=self.parameter_a,
-                                                               temperature=self.parameter_b,
-                                                               prior_precision=self.parameter_c,
-                                                               sas=self.sas,
-                                                               prob_rwd=self.prob_rwd)
-
-        if self.world_model_name == "Bayesian_Laplace_ALL":
-            # no change on temp, sigma
-            self.world_model = Bayesian_World_Model_LA_ALL(observation_size=self.state_dim,
-                                                           num_actions=self.action_dim,
-                                                           l_r=0.001,
-                                                           hidden_size=128,
-                                                           device=self.device,
-                                                           sigma=self.parameter_a,
-                                                           temperature=self.parameter_b,
-                                                           prior_precision=self.parameter_c,
-                                                           sas=self.sas,
-                                                           prob_rwd=self.prob_rwd)
+            self.world_model = Bayesian_World_Model_LA(observation_size=self.state_dim,
+                                                       num_actions=self.action_dim,
+                                                       device=self.device,
+                                                       temperature=self.parameter_a,
+                                                       prior_precision=self.parameter_b,
+                                                       sas=self.sas,
+                                                       prob_rwd=self.prob_rwd)
 
         if self.world_model_name == "Bayesian_World_Model_SGLD_JA":
             self.world_model = Bayesian_World_Model_SGLD_JA(observation_size=self.state_dim,
                                                             num_actions=self.action_dim,
                                                             l_r=0.001,
-                                                            hidden_size=256,
                                                             device=self.device,
                                                             sas=self.sas,
                                                             prob_rwd=self.prob_rwd

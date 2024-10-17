@@ -25,13 +25,16 @@ class Ensemble_Dyna_One_Reward(World_Model):
     def __init__(self,
                  observation_size: int,
                  num_actions: int,
-                 num_models: int,
-                 l_r: float, device: str,
+                 device: str,
+                 num_models: int = 5,
+                 l_r: float = 0.001,
                  boost_inter: int = 3,
-                 hidden_size: int = 128,
+                 hidden_size=None,
                  sas: bool = True,
-                 prob_rwd: bool = False):
+                 prob_rwd: bool = True):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
+        if hidden_size is None:
+            hidden_size = [128, 128]
         self.num_models = num_models
         self.observation_size = observation_size
         self.num_actions = num_actions
@@ -156,7 +159,7 @@ class Ensemble_Dyna_One_Reward(World_Model):
             if self.prob_rwd:
                 rewards, rwd_var = self.reward_network(observationss, actionss, samples)
                 epis_uncert = torch.var(rewards, dim=0).item()
-                rwd_var = rwd_var.squeeze().detach().cpu().numpy()
+                rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
                 alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
                 epis_uncert = np.minimum(epis_uncert, 10e3)
                 alea_uncert = np.minimum(alea_uncert, 10e3)
@@ -168,7 +171,7 @@ class Ensemble_Dyna_One_Reward(World_Model):
             if self.prob_rwd:
                 rewards, rwd_var = self.reward_network(samples, actionss)
                 epis_uncert = torch.var(rewards, dim=0).item()
-                rwd_var = rwd_var.squeeze().detach().cpu().numpy()
+                rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
                 alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
                 epis_uncert = np.minimum(epis_uncert, 10e3)
                 alea_uncert = np.minimum(alea_uncert, 10e3)

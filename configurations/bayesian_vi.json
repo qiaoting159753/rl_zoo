@@ -1,7 +1,7 @@
 {
   "loop_name": "World_Model",
   "agent_name":"Bayesian_VI",
-  "device": "cuda",
+  "device": "cpu",
   "seeds":[15],
   "G": 1,
   "model_G": 0.2,
@@ -13,14 +13,15 @@
   "horizon": 5,
   "branch_factor": 10,
   "on_policy": false,
-  "Parameter_A" : [1000, 2000, 5000, 10000, 50000],
+  "Parameter_A" : [100000],
   "Parameter_B" : [0.1],
   "Parameter_C" : [0.0],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
   "sas": true,
   "prob_rwd": true,
-  "train_both": true
+  "train_both": false,
+  "train_reward": true
 }
 
 
