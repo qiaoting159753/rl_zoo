@@ -273,7 +273,7 @@ class World_Model_Trainer:
                                                              train_both=self.train_both,
                                                              train_reward=self.train_reward)
                 # Evaluating
-                if self.counter % self.evaluate_interval == 0:
+                if (self.counter % self.evaluate_interval == 0) and (self.counter > self.batch_size) :
                     need_evaluate = True
                 # End of Episode
                 if done or ((step_counter % self.episode_steps) == 0):

@@ -8,7 +8,7 @@ import json
 
 
 def main():
-    config_file = 'configurations/bayesian_vi.json'
+    config_file = 'configurations/single_pnn.json'
     openai_or_dmcs = True
 
     with open(config_file, 'r') as file:
@@ -43,8 +43,8 @@ def main():
     parent_dir = "statistics/"
 
     if openai_or_dmcs:
-        agents = ["HalfCheetah-v5", "Hopper-v5", "Walker2d-v5"]
-        tasks = ["", "", ""]
+        agents = ["Hopper-v5", "Walker2d-v5"]
+        tasks = ["", ""]
     else:
         agents = ['reacher', 'finger', 'fish']
         tasks = [ 'hard', 'turn_hard', 'swim']

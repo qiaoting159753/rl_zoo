@@ -1,114 +1,131 @@
-import numpy as np
-import torch
-import pyro
-import pyro.contrib.gp as gp
-assert pyro.__version__.startswith('1.9.1')
-pyro.set_rng_seed(1)
-from envs import DMCSEnvironment
-from utils import set_seed
-import logging
-logging.basicConfig(level=logging.INFO)
-logging.getLogger().setLevel(logging.INFO)
+from envs import OpenAIEnvrionment
+from utils.reward_functions import get_openai_swimmer_reward
 
-domain_names = ['cheetah', 'reacher', 'walker', 'humanoid', 'cartpole', 'hopper', 'fish', 'finger', 'acrobot',
-                'ball_in_cup']
-task_names = ['run', 'hard', 'walk', 'run', 'swingup', 'hop', 'swim', 'turn_hard', 'swingup', 'catch']
-seed_list = [10, 25]
-train_collect_epis = [10, 20, 50]
-train_iters = [10, 50, 100, 200, 300]
+env = OpenAIEnvrionment("Swimmer-v5", param=False)
 
-# ENV 10 * SEED 5 * COLLECT 6 * ITER 7 = 50 * 42 * 10 = 33600
-total_errors = np.zeros((len(domain_names), len(seed_list), len(train_collect_epis), len(train_iters), 10))
-corr_results = np.zeros((len(domain_names), len(seed_list), len(train_collect_epis), len(train_iters), 10))
+for i in range(1000):
+    state = env.reset()
+    for j in range(1000):
+        action = env.sample_action()
+        next_state, reward, done, info = env.step(action)
+        pred_reward = get_openai_swimmer_reward(state, action, next_state)
 
-# directory = "statistics/"
-directory = "/root/rl_zoo_data/"
+        if not (pred_reward == reward):
+            print("Different!")
 
+        state = next_state
 
-def test(env, gaussian_model, i_i, j_j, k_k, l_l):
-    logging.info("---------Test-------")
-    logging.info(domain_names[i_i] + "_" + task_names[i_i])
-    logging.info(f"seed: {seed_list[j_j]}, collection: {train_collect_epis[k_k]}, iter: {train_iters[l_l]}")
-    for m_m in range(10):
-        tstate = env.reset()
-        mse_errors = 0.0
-        errors = []
-        covs = []
-        for _ in range(100):
-            t_action = env.sample_action()
-            tn_state, _, _, _ = env.step(t_action)
-            ttensor_state = torch.FloatTensor(tstate).unsqueeze(dim=0)
-            ttensor_action = torch.FloatTensor(t_action).unsqueeze(dim=0)
-            ttensor_input = torch.cat((ttensor_state, ttensor_action), dim=1)
-
-            tmean, tcov = gaussian_model(ttensor_input, full_cov=True)
-
-            covs.append(torch.sum(torch.squeeze(tcov)).detach().cpu().numpy())
-            tmean = tmean.detach().squeeze().cpu().numpy()
-            mse_loss = np.mean((tn_state - tmean) ** 2)
-            errors.append(mse_loss)
-            mse_errors += mse_loss
-            tstate = tn_state
-
-        errors = np.array(errors)
-        covs = np.array(covs)
-        corr = np.corrcoef(errors, covs)
-        total_errors[i_i, j_j, k_k, l_l, m_m] = mse_errors
-        corr_results[i_i, j_j, k_k, l_l, m_m] = corr[0, 1]
-
-        logging.info(f"error: {mse_errors}, corr: {corr[0,1]}")
-
-
-for i in range(len(domain_names)):
-    for j in range(len(seed_list)):
-        set_seed(seed_list[j])
-        env = DMCSEnvironment(domain_names[i], task_names[i])
-        env.set_seed(seed_list[j])
-        state_dim = env.observation_space
-        action_dim = env.action_num
-
-        kernel = gp.kernels.RBF(input_dim=state_dim + action_dim)
-
-        for k in range(len(train_collect_epis)):
-            for l in range(len(train_iters)):
-                states = []
-                actions = []
-                next_states = []
-                for _ in range(train_collect_epis[k]):
-                    state = env.reset()
-                    for _ in range(100):
-                        action = env.sample_action()
-                        n_state, _, _, _ = env.step(action)
-                        states.append(state)
-                        next_states.append(n_state)
-                        actions.append(action)
-                        state = n_state
-
-                states = np.stack(states)
-                actions = np.stack(actions)
-                next_states = np.stack(next_states)
-
-                tensor_states = torch.FloatTensor(states)
-                tensor_actions = torch.FloatTensor(actions)
-                tensor_n_states = torch.FloatTensor(next_states)
-
-                tensor_x = torch.cat((tensor_states, tensor_actions), dim=1)
-
-                tensor_y = tensor_n_states.T
-                gpr = gp.models.GPRegression(tensor_x, tensor_y, kernel)
-                optimizer = torch.optim.Adam(gpr.parameters(), lr=0.005)
-                # losses = gp.util.train(gpr, num_steps=10)
-                loss_fn = pyro.infer.Trace_ELBO().differentiable_loss
-                for _ in range(train_iters[l]):
-                    optimizer.zero_grad()
-                    loss = loss_fn(gpr.model, gpr.guide)
-                    loss.backward()
-                    optimizer.step()
-
-                test(env, gpr, i, j, k, l)
-
-    np.save(directory + domain_names[i] + "gp_errors.npy", total_errors)
-    np.save(directory + domain_names[i] + "gp_corrs.npy", corr_results)
+# import numpy as np
+# import torch
+# import pyro
+# import pyro.contrib.gp as gp
+# assert pyro.__version__.startswith('1.9.1')
+# pyro.set_rng_seed(1)
+# from envs import DMCSEnvironment
+# from utils import set_seed
+# import logging
+# logging.basicConfig(level=logging.INFO)
+# logging.getLogger().setLevel(logging.INFO)
+#
+# domain_names = ['cheetah', 'reacher', 'walker', 'humanoid', 'cartpole', 'hopper', 'fish', 'finger', 'acrobot',
+#                 'ball_in_cup']
+# task_names = ['run', 'hard', 'walk', 'run', 'swingup', 'hop', 'swim', 'turn_hard', 'swingup', 'catch']
+# seed_list = [10, 25]
+# train_collect_epis = [10, 20, 50]
+# train_iters = [10, 50, 100, 200, 300]
+#
+# # ENV 10 * SEED 5 * COLLECT 6 * ITER 7 = 50 * 42 * 10 = 33600
+# total_errors = np.zeros((len(domain_names), len(seed_list), len(train_collect_epis), len(train_iters), 10))
+# corr_results = np.zeros((len(domain_names), len(seed_list), len(train_collect_epis), len(train_iters), 10))
+#
+# # directory = "statistics/"
+# directory = "/root/rl_zoo_data/"
+#
+#
+# def test(env, gaussian_model, i_i, j_j, k_k, l_l):
+#     logging.info("---------Test-------")
+#     logging.info(domain_names[i_i] + "_" + task_names[i_i])
+#     logging.info(f"seed: {seed_list[j_j]}, collection: {train_collect_epis[k_k]}, iter: {train_iters[l_l]}")
+#     for m_m in range(10):
+#         tstate = env.reset()
+#         mse_errors = 0.0
+#         errors = []
+#         covs = []
+#         for _ in range(100):
+#             t_action = env.sample_action()
+#             tn_state, _, _, _ = env.step(t_action)
+#             ttensor_state = torch.FloatTensor(tstate).unsqueeze(dim=0)
+#             ttensor_action = torch.FloatTensor(t_action).unsqueeze(dim=0)
+#             ttensor_input = torch.cat((ttensor_state, ttensor_action), dim=1)
+#
+#             tmean, tcov = gaussian_model(ttensor_input, full_cov=True)
+#
+#             covs.append(torch.sum(torch.squeeze(tcov)).detach().cpu().numpy())
+#             tmean = tmean.detach().squeeze().cpu().numpy()
+#             mse_loss = np.mean((tn_state - tmean) ** 2)
+#             errors.append(mse_loss)
+#             mse_errors += mse_loss
+#             tstate = tn_state
+#
+#         errors = np.array(errors)
+#         covs = np.array(covs)
+#         corr = np.corrcoef(errors, covs)
+#         total_errors[i_i, j_j, k_k, l_l, m_m] = mse_errors
+#         corr_results[i_i, j_j, k_k, l_l, m_m] = corr[0, 1]
+#
+#         logging.info(f"error: {mse_errors}, corr: {corr[0,1]}")
+#
+#
+# for i in range(len(domain_names)):
+#     for j in range(len(seed_list)):
+#         set_seed(seed_list[j])
+#         env = DMCSEnvironment(domain_names[i], task_names[i])
+#         env.set_seed(seed_list[j])
+#         state_dim = env.observation_space
+#         action_dim = env.action_num
+#
+#         kernel = gp.kernels.RBF(input_dim=state_dim + action_dim)
+#
+#         for k in range(len(train_collect_epis)):
+#             for l in range(len(train_iters)):
+#                 states = []
+#                 actions = []
+#                 next_states = []
+#                 for _ in range(train_collect_epis[k]):
+#                     state = env.reset()
+#                     for _ in range(100):
+#                         action = env.sample_action()
+#                         n_state, _, _, _ = env.step(action)
+#                         states.append(state)
+#                         next_states.append(n_state)
+#                         actions.append(action)
+#                         state = n_state
+#
+#                 states = np.stack(states)
+#                 actions = np.stack(actions)
+#                 next_states = np.stack(next_states)
+#
+#                 tensor_states = torch.FloatTensor(states)
+#                 tensor_actions = torch.FloatTensor(actions)
+#                 tensor_n_states = torch.FloatTensor(next_states)
+#
+#                 tensor_x = torch.cat((tensor_states, tensor_actions), dim=1)
+#
+#                 tensor_y = tensor_n_states.T
+#                 gpr = gp.models.GPRegression(tensor_x, tensor_y, kernel)
+#                 optimizer = torch.optim.Adam(gpr.parameters(), lr=0.005)
+#                 # losses = gp.util.train(gpr, num_steps=10)
+#                 loss_fn = pyro.infer.Trace_ELBO().differentiable_loss
+#                 for _ in range(train_iters[l]):
+#                     optimizer.zero_grad()
+#                     loss = loss_fn(gpr.model, gpr.guide)
+#                     loss.backward()
+#                     optimizer.step()
+#
+#                 test(env, gpr, i, j, k, l)
+#
+#     np.save(directory + domain_names[i] + "gp_errors.npy", total_errors)
+#     np.save(directory + domain_names[i] + "gp_corrs.npy", corr_results)
 
 
 # def f(x):

@@ -3,6 +3,17 @@ import numpy as np
 import math
 
 
+def get_openai_swimmer_reward(prev_obs, action, curr_obs):
+    xy_position_before = prev_obs[0:2].copy()
+    xy_position_after = curr_obs[0:2].copy()
+    xy_velocity = (xy_position_after - xy_position_before) / 0.04
+    x_velocity, y_velocity = xy_velocity
+    forward_reward = x_velocity
+    ctrl_cost = 0.0001 * np.sum(np.square(action))
+    reward = forward_reward - ctrl_cost
+    return reward
+
+
 def get_openai_walker_reward(prev_obs, action, curr_obs):
     dt = 0.008
     x_position_before = prev_obs[0]

@@ -167,5 +167,7 @@ class OpenAIEnvrionment:
             return get_openai_hopper_reward(state, action, next_state)
         elif self.task_name == "Walker2d-v5" and not self.param:
             return get_openai_walker_reward(state, action, next_state)
+        elif self.task_name == "Swimmer-v5" and not self.param:
+            return get_openai_walker_reward(state, action, next_state)
         else:
             raise NotImplementedError("Ground Truth Reward function is not implemented!")
