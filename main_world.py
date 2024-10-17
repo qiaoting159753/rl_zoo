@@ -8,7 +8,7 @@ import json
 
 
 def main():
-    config_file = 'configurations/ensemble_ensemble.json'
+    config_file = 'configurations/bayesian_vi.json'
     openai_or_dmcs = True
 
     with open(config_file, 'r') as file:

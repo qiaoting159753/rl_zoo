@@ -20,7 +20,7 @@
   "parent_direction": "/root/rl_zoo_data/",
   "sas": true,
   "prob_rwd": true,
-  "train_both": false,
+  "train_both": true,
   "train_reward": true
 }
 
