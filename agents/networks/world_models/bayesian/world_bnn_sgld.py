@@ -138,7 +138,6 @@ class Bayesian_World_Model_SGLD(World_Model):
         if self.counter > self.stack_layers:
             self.world_model_2.data = copy.deepcopy(self.data)
             self.world_model_2.data.to(self.device)
-
             self.world_model_2.target = copy.deepcopy(self.target)
             self.world_model_2.target.to(self.device)
             self.trained_once = True
@@ -152,8 +151,8 @@ class Bayesian_World_Model_SGLD(World_Model):
         if self.counter > self.stack_layers:
             normalized_state = normalize_observation(observation, self.statistics)
             data = torch.cat((normalized_state, actions), dim=1)
+
             self.world_model_2.load_state_dict(copy.deepcopy(self.world_model.state_dict()))
-            self.world_model_2.to(self.device)
             sampler = SGLD_Sampler(self.world_model_2,
                                    step_size=0.01,
                                    num_steps=10,
@@ -162,6 +161,7 @@ class Bayesian_World_Model_SGLD(World_Model):
                                    pretrain=False,
                                    tune=False)
             chains = sampler.sample_chains()
+
             # # Estimation from chains.
             preds = []
             aleatorics = []
