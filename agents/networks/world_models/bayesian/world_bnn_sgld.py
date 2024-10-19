@@ -79,9 +79,11 @@ class Bayesian_World_Model_SGLD(World_Model):
         self.observation_size = observation_size
         self.world_model = CustomizedMLP(observation_size=observation_size,
                                          num_actions=num_actions,
+                                         device=device,
                                          hidden_sizes=hidden_size)
         self.world_model_2 = CustomizedMLP(observation_size=observation_size,
                                            num_actions=num_actions,
+                                           device=device,
                                            hidden_sizes=hidden_size)
 
         self.world_model.to(self.device)
