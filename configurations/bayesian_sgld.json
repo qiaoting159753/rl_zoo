@@ -1,7 +1,7 @@
 {
   "loop_name": "World_Model",
   "agent_name":"Bayesian_World_Model_SGLD",
-  "device": "cuda",
+  "device": "cpu",
   "seeds":[15],
   "G": 1,
   "model_G": 0.2,

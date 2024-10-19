@@ -8,6 +8,7 @@ from utils.helpers import denormalize_observation_delta, normalize_observation, 
 from agents.networks.world_models.bayesian.bayesian_sgld_classes import SGLD_Sampler
 from torch.utils.data import DataLoader, TensorDataset
 
+
 class CustomizedMLP(nn.Module):
     def __init__(self,
                  observation_size,
@@ -86,8 +87,9 @@ class Bayesian_World_Model_SGLD(World_Model):
         self.trained_once = False
         self.counter = 0
         self.stack_layers = 5
-        self.data = torch.ones((self.stack_layers * 256, observation_size+num_actions))
+        self.data = torch.ones((self.stack_layers * 256, observation_size + num_actions))
         self.target = torch.ones((self.stack_layers * 256, observation_size))
+
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -121,8 +123,10 @@ class Bayesian_World_Model_SGLD(World_Model):
         model_loss.backward()
         self.world_optimizers.step()
 
-        self.data[256 * (self.counter % self.stack_layers):256*((self.counter % self.stack_layers)+1),:] = copy.deepcopy(data)
-        self.target[256*(self.counter % self.stack_layers):256*((self.counter % self.stack_layers)+1),:] = copy.deepcopy(delta_targets_normalized)
+        self.data[256 * (self.counter % self.stack_layers):256 * ((self.counter % self.stack_layers) + 1),
+        :] = copy.deepcopy(data)
+        self.target[256 * (self.counter % self.stack_layers):256 * ((self.counter % self.stack_layers) + 1),
+        :] = copy.deepcopy(delta_targets_normalized)
 
         if self.counter > self.stack_layers:
             self.world_model_2.data = copy.deepcopy(self.data)
@@ -139,7 +143,13 @@ class Bayesian_World_Model_SGLD(World_Model):
             normalized_state = normalize_observation(observation, self.statistics)
             data = torch.cat((normalized_state, actions), dim=1)
             self.world_model_2.load_state_dict(copy.deepcopy(self.world_model.state_dict()))
-            sampler = SGLD_Sampler(self.world_model_2, step_size=0.001, num_steps=10, burn_in=3)
+            sampler = SGLD_Sampler(self.world_model_2,
+                                   step_size=0.01,
+                                   num_steps=10,
+                                   num_chains=5,
+                                   burn_in=3,
+                                   pretrain=False,
+                                   tune=False)
             chains = sampler.sample_chains()
             # # Estimation from chains.
             preds = []
