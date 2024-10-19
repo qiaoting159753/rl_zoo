@@ -11,9 +11,11 @@ from torch.utils.data import DataLoader, TensorDataset
 class CustomizedMLP(nn.Module):
     def __init__(self,
                  observation_size,
+                 device,
                  num_actions,
                  hidden_sizes=None):
         super().__init__()
+        self.device = device
         self.dataloader = None
         self.observation_size = observation_size
         input_size = observation_size + num_actions
@@ -50,6 +52,9 @@ class CustomizedMLP(nn.Module):
         return means, var_s
 
     def log_prob(self, data, target):
+        data = data.to(self.device)
+        target = target.to(self.device)
+        self.model.to(self.device)
         mu, var_s = self.forward(data)
         mse = F.mse_loss(mu, target)
         # log_prob = torch.distributions.Normal(mu, F.softplus(self.log_std)).log_prob(self.target).mean()
