@@ -12,7 +12,6 @@ class CustomizedMLP(nn.Module):
     def __init__(self,
                  observation_size,
                  num_actions,
-                 device,
                  hidden_sizes=None):
         super().__init__()
         self.dataloader = None
@@ -51,8 +50,6 @@ class CustomizedMLP(nn.Module):
         return means, var_s
 
     def log_prob(self, data, target):
-        data = data.to(self.device)
-        target = target.to(device)
         mu, var_s = self.forward(data)
         mse = F.mse_loss(mu, target)
         # log_prob = torch.distributions.Normal(mu, F.softplus(self.log_std)).log_prob(self.target).mean()
@@ -77,11 +74,9 @@ class Bayesian_World_Model_SGLD(World_Model):
         self.observation_size = observation_size
         self.world_model = CustomizedMLP(observation_size=observation_size,
                                          num_actions=num_actions,
-                                         device=device,
                                          hidden_sizes=hidden_size)
         self.world_model_2 = CustomizedMLP(observation_size=observation_size,
                                            num_actions=num_actions,
-                                           device=device,
                                            hidden_sizes=hidden_size)
 
         self.world_model.to(self.device)
