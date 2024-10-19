@@ -40,14 +40,14 @@ def main():
     train_reward = data['train_reward']
     parent_dir = data["parent_direction"]
     # Switch
-    parent_dir = "statistics/"
+    # parent_dir = "statistics/"
 
     if openai_or_dmcs:
         agents = ["HalfCheetah-v5", "Swimmer-v5", "Hopper-v5", "Walker2d-v5"]
         tasks = ["", "", "", ""]
     else:
-        agents = ['cheetah', 'reacher', 'finger', 'fish']
-        tasks = ['run', 'hard', 'turn_hard', 'swim']
+        agents = ['reacher', 'finger', 'fish']
+        tasks = ['hard', 'turn_hard', 'swim']
 
     for i in range(6):
         env_domain = agents[i]

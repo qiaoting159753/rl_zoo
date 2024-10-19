@@ -132,8 +132,8 @@ class World_Model_Trainer:
             else:
                 pred_reward = 0.0
             # Ground Truth Reward function prediction
-            # pred_gt_rewrad = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(), pred_ns.detach().cpu().numpy().squeeze())
-            pred_gt_rewrad = 0.0
+            pred_gt_rewrad = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(), pred_ns.detach().cpu().numpy().squeeze())
+            # pred_gt_rewrad = 0.0
             # MSE. L1 of dynamics
             np_pred_ns = pred_ns.detach().squeeze().cpu().numpy()
             one_step_mse = (np.square(np_pred_ns - gt_ns)).mean()
