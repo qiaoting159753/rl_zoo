@@ -1,3 +1,3 @@
 from .world_bnn_bbb import Bayesian_World_Model_BBB
 from .world_bnn_la import Bayesian_World_Model_LA
-from .world_bnn_sgld_ali import Bayesian_World_Model_SGLD_JA
+from .world_bnn_sgld import Bayesian_World_Model_SGLD

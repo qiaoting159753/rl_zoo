@@ -1,6 +1,6 @@
 {
   "loop_name": "World_Model",
-  "agent_name":"Bayesian_World_Model_SGLD_JA",
+  "agent_name":"Bayesian_World_Model_SGLD",
   "device": "cpu",
   "seeds":[15],
   "G": 1,
@@ -18,9 +18,10 @@
   "Parameter_C" : [16],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
-  "sas": false,
-  "prob_rwd": false,
-  "train_both": false
+  "sas": true,
+  "prob_rwd": true,
+  "train_both": false,
+  "train_reward": true
 }
 
 

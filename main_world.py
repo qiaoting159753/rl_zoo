@@ -8,8 +8,8 @@ import json
 
 
 def main():
-    config_file = 'configurations/single_pnn.json'
-    openai_or_dmcs = True
+    config_file = 'configurations/bayesian_sgld.json'
+    openai_or_dmcs = False
 
     with open(config_file, 'r') as file:
         data = json.load(file)
@@ -43,11 +43,11 @@ def main():
     parent_dir = "statistics/"
 
     if openai_or_dmcs:
-        agents = ["Hopper-v5", "Walker2d-v5"]
-        tasks = ["", ""]
+        agents = ["HalfCheetah-v5", "Swimmer-v5", "Hopper-v5", "Walker2d-v5"]
+        tasks = ["", "", "", ""]
     else:
-        agents = ['reacher', 'finger', 'fish']
-        tasks = [ 'hard', 'turn_hard', 'swim']
+        agents = ['cheetah', 'reacher', 'finger', 'fish']
+        tasks = ['run', 'hard', 'turn_hard', 'swim']
 
     for i in range(6):
         env_domain = agents[i]

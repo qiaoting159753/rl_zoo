@@ -25,7 +25,7 @@ from agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_Rewar
 
 from agents.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
                                                    Bayesian_World_Model_LA,
-                                                   Bayesian_World_Model_SGLD_JA)
+                                                   Bayesian_World_Model_SGLD)
 
 
 class World_Model_Trainer:
@@ -51,7 +51,7 @@ class World_Model_Trainer:
                  sas: bool,
                  prob_rwd: bool,
                  train_both: bool,
-                 train_reward:bool,
+                 train_reward: bool,
                  parameter_a: float,
                  parameter_b: float,
                  parameter_c: float):
@@ -132,8 +132,8 @@ class World_Model_Trainer:
             else:
                 pred_reward = 0.0
             # Ground Truth Reward function prediction
-            pred_gt_rewrad = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(), pred_ns.detach().cpu().numpy().squeeze())
-            # pred_gt_rewrad = 0.0
+            # pred_gt_rewrad = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(), pred_ns.detach().cpu().numpy().squeeze())
+            pred_gt_rewrad = 0.0
             # MSE. L1 of dynamics
             np_pred_ns = pred_ns.detach().squeeze().cpu().numpy()
             one_step_mse = (np.square(np_pred_ns - gt_ns)).mean()
@@ -273,7 +273,7 @@ class World_Model_Trainer:
                                                              train_both=self.train_both,
                                                              train_reward=self.train_reward)
                 # Evaluating
-                if (self.counter % self.evaluate_interval == 0) and (self.counter > self.batch_size) :
+                if (self.counter % self.evaluate_interval == 0) and (self.counter > self.batch_size):
                     need_evaluate = True
                 # End of Episode
                 if done or ((step_counter % self.episode_steps) == 0):
@@ -358,14 +358,13 @@ class World_Model_Trainer:
                                                        sas=self.sas,
                                                        prob_rwd=self.prob_rwd)
 
-        if self.world_model_name == "Bayesian_World_Model_SGLD_JA":
-            self.world_model = Bayesian_World_Model_SGLD_JA(observation_size=self.state_dim,
-                                                            num_actions=self.action_dim,
-                                                            l_r=0.001,
-                                                            device=self.device,
-                                                            sas=self.sas,
-                                                            prob_rwd=self.prob_rwd
-                                                            )
+        if self.world_model_name == "Bayesian_World_Model_SGLD":
+            self.world_model = Bayesian_World_Model_SGLD(observation_size=self.state_dim,
+                                                         num_actions=self.action_dim,
+                                                         device=self.device,
+                                                         sas=self.sas,
+                                                         prob_rwd=self.prob_rwd
+                                                         )
 
         # if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
         #     self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,

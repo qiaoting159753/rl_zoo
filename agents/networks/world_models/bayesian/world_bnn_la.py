@@ -50,6 +50,7 @@ class Bayesian_World_Model_LA(World_Model):
         self.device = device
         self.observation_size = observation_size
         self.world_model = PNN_MLP(observation_size + num_actions, hidden_size, 2 * observation_size)
+        self.world_model.to(device)
         self.dyna_optimizer = torch.optim.Adam(self.world_model.parameters(), l_r)
         self.l_a = Laplace(self.world_model,
                            "regression",
