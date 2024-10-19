@@ -12,9 +12,11 @@ from torch.utils.data import DataLoader, TensorDataset
 class CustomizedMLP(nn.Module):
     def __init__(self,
                  observation_size,
+                 device,
                  num_actions,
                  hidden_sizes=None):
         super().__init__()
+        self.device = device
         self.dataloader = None
         self.observation_size = observation_size
         input_size = observation_size + num_actions
@@ -51,6 +53,9 @@ class CustomizedMLP(nn.Module):
         return means, var_s
 
     def log_prob(self, data, target):
+        data = data.to(self.device)
+        target = target.to(self.device)
+        self.model.to(self.device)
         mu, var_s = self.forward(data)
         mse = F.mse_loss(mu, target)
         # log_prob = torch.distributions.Normal(mu, F.softplus(self.log_std)).log_prob(self.target).mean()
@@ -75,9 +80,11 @@ class Bayesian_World_Model_SGLD(World_Model):
         self.observation_size = observation_size
         self.world_model = CustomizedMLP(observation_size=observation_size,
                                          num_actions=num_actions,
+                                         device=device,
                                          hidden_sizes=hidden_size)
         self.world_model_2 = CustomizedMLP(observation_size=observation_size,
                                            num_actions=num_actions,
+                                           device=device,
                                            hidden_sizes=hidden_size)
 
         self.world_model.to(self.device)
@@ -130,7 +137,10 @@ class Bayesian_World_Model_SGLD(World_Model):
 
         if self.counter > self.stack_layers:
             self.world_model_2.data = copy.deepcopy(self.data)
+            self.world_model_2.data.to(self.device)
+
             self.world_model_2.target = copy.deepcopy(self.target)
+            self.world_model_2.target.to(self.device)
             self.trained_once = True
             self.world_model_2.dataloader = DataLoader(TensorDataset(self.data, self.target), batch_size=50)
         self.counter += 1
@@ -143,6 +153,7 @@ class Bayesian_World_Model_SGLD(World_Model):
             normalized_state = normalize_observation(observation, self.statistics)
             data = torch.cat((normalized_state, actions), dim=1)
             self.world_model_2.load_state_dict(copy.deepcopy(self.world_model.state_dict()))
+            self.world_model_2.to(self.device)
             sampler = SGLD_Sampler(self.world_model_2,
                                    step_size=0.01,
                                    num_steps=10,

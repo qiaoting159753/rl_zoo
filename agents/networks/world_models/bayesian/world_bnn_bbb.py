@@ -14,7 +14,7 @@ class Bayesian_World_Model_BBB(World_Model):
                  observation_size: int,
                  num_actions: int,
                  device: str,
-                 ratio: float = 100000,
+                 ratio: float,
                  sigma: float = 0.1,
                  l_r: float = 0.001,
                  hidden_size=None,
