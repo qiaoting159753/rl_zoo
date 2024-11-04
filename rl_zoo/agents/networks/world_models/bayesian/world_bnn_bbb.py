@@ -1,0 +1,201 @@
+import torch
+import numpy as np
+from torch import optim
+from rl_zoo.agents.networks.world_models.bayesian.bnn_bbb_torchbnn import CustomizedMLP
+from rl_zoo.agents.networks.world_models import World_Model
+from rl_zoo.utils import normalize_observation, denormalize_observation_delta, normalize_observation_delta
+import torchbnn as bnn
+
+import torch.nn.functional as F
+
+
+class Bayesian_World_Model_BBB(World_Model):
+    def __init__(self,
+                 observation_size: int,
+                 num_actions: int,
+                 device: str,
+                 ratio: float,
+                 sigma: float = 0.1,
+                 l_r: float = 0.001,
+                 hidden_size=None,
+                 sas: bool = True,
+                 prob_rwd: bool = True):
+        super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
+        if hidden_size is None:
+            hidden_size = [128, 128]
+        self.statistics = None
+        self.observation_size = observation_size
+        self.num_actions = num_actions
+        self.hidden_size = hidden_size
+        self.l_r = l_r
+        self.ratio = ratio
+        self.device = device
+        self.sas = sas
+        self.prob_rwd = prob_rwd
+
+        self.world_model = CustomizedMLP(input_size=(observation_size+num_actions),
+                                         hidden_sizes=hidden_size,
+                                         output_size=2 * observation_size,
+                                         sigma=sigma)
+
+        self.kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False)
+        self.world_optimizers = optim.Adam(self.world_model.parameters(), lr=self.l_r)
+        self.world_model.to(self.device)
+
+    def train_world(
+            self,
+            states: torch.Tensor,
+            actions: torch.Tensor,
+            next_states: torch.Tensor,
+    ) -> None:
+        target = next_states - states
+        normalized_target = normalize_observation_delta(target, self.statistics)
+        normlized_state = normalize_observation(states, self.statistics)
+        x = torch.cat((normlized_state, actions), dim=1)
+        preds = self.world_model(x)
+        mean_pred = preds[:, :self.observation_size]
+        var_pred = preds[:, self.observation_size:]
+        var_pred = torch.tanh(var_pred)
+        var_pred = torch.exp(var_pred)
+        self.world_optimizers.zero_grad()
+        kl_loss = self.kl_loss(self.world_model)
+        nll_loss = F.gaussian_nll_loss(input=mean_pred, target=normalized_target, var=var_pred).mean()
+        loss = nll_loss + self.ratio * kl_loss
+        loss.backward()
+        self.world_optimizers.step()
+
+    def estimate_uncertainty(
+            self, observation: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[float, float]:
+        normlized_state = normalize_observation(observation, self.statistics)
+        x = torch.cat((normlized_state, actions), dim=1)
+        mean_s = []
+        var_s = []
+        sample_world_times = 5
+        # for _ in range(sample_times):
+        for i in range(sample_world_times):
+            pred = self.world_model(x)
+            mean_pred = pred[:, :self.observation_size]
+            var_pred = pred[:, self.observation_size:]
+            var_pred = torch.tanh(var_pred)
+            var_pred = torch.exp(var_pred)
+            mean_s.append(mean_pred)
+            var_s.append(var_pred)
+        all_vars = torch.vstack(var_s).squeeze().detach().cpu().numpy()
+        all_means = torch.vstack(mean_s).squeeze().detach().cpu().numpy()
+        noises = all_vars ** 0.5
+        aleatoric = (noises ** 2).mean(axis=0) ** 0.5
+        epistemic = all_means.var(axis=0) ** 0.5
+        aleatoric = np.minimum(aleatoric, 10e3)
+        epistemic = np.minimum(epistemic, 10e3)
+        total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
+        uncert = np.mean(total_unc).item()
+
+        # Reward Uncertainty
+        sample_times = 20
+        mean_s = torch.vstack(mean_s)
+        vars_s = torch.vstack(var_s)
+        dist = torch.distributions.Normal(mean_s, vars_s)
+        samples = dist.sample([sample_times])
+        samples = torch.reshape(samples, (sample_times * sample_world_times, self.observation_size))
+        samples = denormalize_observation_delta(samples, self.statistics)
+        observationss = torch.repeat_interleave(observation, repeats=sample_times * sample_world_times, dim=0)
+        actionss = torch.repeat_interleave(actions, repeats=sample_times * sample_world_times, dim=0)
+        samples += observationss
+
+        if self.sas:
+            if self.prob_rwd:
+                rewards, rwd_var = self.reward_network(observationss, actionss, samples)
+                epis_uncert = torch.var(rewards, dim=0).item()
+                rwd_var = rwd_var.squeeze().detach().cpu().numpy()
+                alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
+                epis_uncert = np.minimum(epis_uncert, 10e3)
+                alea_uncert = np.minimum(alea_uncert, 10e3)
+                uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
+            else:
+                rewards = self.reward_network(observationss, actionss, samples)
+                uncert_rwd = torch.var(rewards, dim=0).item()
+        else:
+            if self.prob_rwd:
+                rewards, rwd_var = self.reward_network(samples, actionss)
+                epis_uncert = torch.var(rewards, dim=0).item()
+                rwd_var = rwd_var.squeeze().detach().cpu().numpy()
+                alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
+                epis_uncert = np.minimum(epis_uncert, 10e3)
+                alea_uncert = np.minimum(alea_uncert, 10e3)
+                uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
+            else:
+                rewards = self.reward_network(samples, actionss)
+                uncert_rwd = torch.var(rewards, dim=0).item()
+        return uncert, uncert_rwd
+
+    def pred_next_states(
+            self, observation: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        normlized_state = normalize_observation(observation, self.statistics)
+        normalized_obs_a = torch.cat((normlized_state, actions), dim=1)
+        pred = self.world_model(normalized_obs_a, sample=False)
+        preds = pred[:, :self.observation_size]
+        mean_deltas = denormalize_observation_delta(preds, self.statistics)
+        preds = mean_deltas + observation
+        return preds, None, None, None
+
+    def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor, ):
+        normlized_state = normalize_observation(states, self.statistics)
+        x = torch.cat((normlized_state, actions), dim=1)
+        mean_s = []
+        var_s = []
+        act_s = []
+        state_s = []
+        rwd_s = []
+        sample_world_times = 5
+        # for _ in range(sample_times):
+        for i in range(sample_world_times):
+            pred = self.world_model(x)
+            mean_pred = pred[:, :self.observation_size]
+            var_pred = pred[:, self.observation_size:]
+            var_pred = torch.tanh(var_pred)
+            var_pred = torch.exp(var_pred)
+            mean_s.append(mean_pred)
+            var_s.append(var_pred)
+            act_s.append(actions)
+            state_s.append(states)
+            rwd_s.append(rewards)
+        mean_s = torch.vstack(mean_s)
+        vars_s = torch.vstack(var_s)
+        act_s = torch.vstack(act_s)
+        state_s = torch.vstack(state_s)
+        rwd_s = torch.vstack(rwd_s)
+
+        sample_times = 20
+        dist = torch.distributions.Normal(mean_s, vars_s)
+        samples = dist.sample([sample_times])
+
+        state_s = torch.repeat_interleave(state_s.unsqueeze(dim=0), sample_times, dim=0)
+        act_s = torch.repeat_interleave(act_s.unsqueeze(dim=0), sample_times, dim=0)
+        rwd_s = torch.repeat_interleave(rwd_s.unsqueeze(dim=0), sample_times, dim=0)
+
+        act_s = torch.reshape(act_s, (act_s.shape[0] * act_s.shape[1], act_s.shape[2]))
+        state_s = torch.reshape(state_s, (state_s.shape[0] * state_s.shape[1], state_s.shape[2]))
+        rwd_s = torch.reshape(rwd_s, (rwd_s.shape[0] * rwd_s.shape[1], rwd_s.shape[2]))
+        samples = torch.reshape(samples, (samples.shape[0] * samples.shape[1], samples.shape[2]))
+
+        samples = denormalize_observation_delta(samples, self.statistics)
+        samples += state_s
+        samples = samples.detach()
+
+        if self.prob_rwd:
+            if self.sas:
+                rwd_mean, rwd_var = self.reward_network(state_s, act_s, samples)
+            else:
+                rwd_mean, rwd_var = self.reward_network(samples, act_s)
+            rwd_loss = F.gaussian_nll_loss(rwd_mean, rwd_s, rwd_var)
+        else:
+            if self.sas:
+                rwd_mean = self.reward_network(state_s, act_s, samples)
+            else:
+                rwd_mean = self.reward_network(samples, act_s)
+            rwd_loss = F.mse_loss(rwd_mean, rwd_s)
+        self.reward_optimizer.zero_grad()
+        rwd_loss.backward()
+        self.reward_optimizer.step()
