@@ -8,7 +8,9 @@ import json
 
 
 def main():
-    config_file = '../rl_zoo/configurations/bayesian_sgld.json'
+    curr_path = os.getcwd()
+    alg_name = "bayesian_sgld.json"
+    config_file = curr_path + '/rl_zoo/configurations/' + alg_name
     openai_or_dmcs = False
 
     with open(config_file, 'r') as file:
@@ -40,14 +42,14 @@ def main():
     train_reward = data['train_reward']
     parent_dir = data["parent_direction"]
     # Switch
-    parent_dir = "../statistics/"
+    parent_dir = curr_path + "/statistics/"
 
     if openai_or_dmcs:
         agents = ["HalfCheetah-v5", "Swimmer-v5", "Hopper-v5", "Walker2d-v5"]
         tasks = ["", "", "", ""]
     else:
-        agents = ['reacher', 'finger', 'fish']
-        tasks = ['hard', 'turn_hard', 'swim']
+        agents = ['finger', 'fish']
+        tasks = ['turn_hard', 'swim']
 
     for i in range(6):
         env_domain = agents[i]
@@ -58,7 +60,7 @@ def main():
         directory = os.path.join(parent_dir, sub_directory)
         if not os.path.exists(directory):
             os.mkdir(directory)
-        shutil.copyfile(config_file, directory + config_file[15:])
+        shutil.copyfile(config_file, directory + alg_name)
 
         for parameter_a in Parameter_A:
             for parameter_b in Parameter_B:

@@ -24,9 +24,11 @@ class RunningAverageMeter(object):
     def __init__(self, momentum=0.99):
         self.momentum = momentum
         self.reset()
+
     def reset(self):
         self.val = None
         self.avg = 0
+
     def update(self, val):
         if self.val is None:
             self.avg = val
@@ -38,6 +40,7 @@ class RunningAverageMeter(object):
 class MetropolisHastingsAcceptance():
     def __init__(self):
         pass
+
     def __call__(self, log_prob_proposal, log_prob_state):
         if not torch.isnan(log_prob_proposal) or not torch.isinf(log_prob_proposal):
             log_ratio = (log_prob_proposal - log_prob_state)
@@ -54,6 +57,7 @@ class MetropolisHastingsAcceptance():
 class SDE_Acceptance():
     def __init__(self):
         pass
+
     def __call__(self, log_prob_proposal, log_prob_state):
         return True, torch.Tensor([0.])
 
@@ -68,6 +72,7 @@ class MCMC_Optim:
                             'mu': 0.,
                             'H': 0,
                             'log_eps': 1.}
+
     def tune(self, accepts):
         avg_acc = sum(accepts) / len(accepts)
         if avg_acc < 0.001:
@@ -99,25 +104,6 @@ class MCMC_Optim:
         self.tune_params["log_eps"] = log_eps
         for group in self.param_groups:
             group["step_size"] = np.exp(log_eps)
-
-
-class MetropolisHastings_Optim(Optimizer, MCMC_Optim):
-    def __init__(self, model, step_length):
-        if step_length < 0.0:
-            raise ValueError("Invalid learning rate: {}".format(step_length))
-        defaults = dict(lr=step_length)
-        params = model.parameters()
-        self.model = model
-        Optimizer.__init__(self, params=params, defaults=defaults)
-        MCMC_Optim.__init__(self)
-
-    def step(self):
-        log_prob = None
-        for group in self.param_groups:
-            for p in group['params']:
-                p.data.add_(other=torch.randn_like(p), alpha=group['lr'], )
-        return log_prob
-
 
 class SGLD_Optim(Optimizer, MCMC_Optim):
     def __init__(self, model, step_size=0.1, prior_std=1., addnoise=True):
@@ -199,8 +185,8 @@ class HMC_Optim(Optimizer, MCMC_Optim):
         if step_size < 0.0:
             raise ValueError("Invalid learning rate: {}".format(step_size))
         defaults = dict(step_size=step_size,
-                        weight_decay=weight_decay,
-                        traj_step=0)
+                weight_decay=weight_decay,
+                traj_step=0)
         self.model = model
         params = self.model.parameters()
         Optimizer.__init__(self, params=params, defaults=defaults)
@@ -209,8 +195,10 @@ class HMC_Optim(Optimizer, MCMC_Optim):
     def step(self):
         for group in self.param_groups:
             for p in group['params']:
+                if p.grad is None:
+                    continue
                 grad = p.grad.data
-                state = self.state[p]  # contains state['velocity']
+                state = self.state[p] # contains state['velocity']
                 state['velocity'].add_(other=-group['step_size'] * grad)
                 p.data.add_(other=state['velocity'], alpha=group['step_size'])
             group['traj_step'] += 1
@@ -219,73 +207,29 @@ class HMC_Optim(Optimizer, MCMC_Optim):
         for group in self.param_groups:
             group['traj_step'] = 0
             for p in group['params']:
-                # print(p)
                 state = self.state[p]
-                state['velocity'] = 1. * torch.randn_like(p)
+                state['velocity'] = 1.*torch.randn_like(p)
 
     def leapfrog_step(self, closure):
         for group in self.param_groups:
             for p in group['params']:
+                if p.grad is None:
+                    continue
                 grad = p.grad.data
-                grad.clamp_(-1000,1000)
+                grad.clamp_(-1000, 1000)
                 state = self.state[p]  # contains state['velocity']
-                state['velocity'].add_(other=-0.5 * group['step_size'] * grad)
+                state['velocity'].add_(other=-0.5*group['step_size'] * grad)
                 p.data.add_(other=state['velocity'], alpha=group['step_size'])
         log_prob = closure()
         for group in self.param_groups:
             for p in group['params']:
+                if p.grad is None:
+                    continue
                 grad = p.grad.data
                 grad.clamp_(-1000, 1000)
                 state = self.state[p]  # contains state['velocity']
                 state['velocity'].add_(other=-0.5 * group['step_size'] * grad)
         return log_prob
-
-
-class SGNHT_Optim(Optimizer, MCMC_Optim):
-    def __init__(self, model, step_size=0.1, prior_std=1.):
-        weight_decay = 1 / (prior_std ** 2) if prior_std != 0 else 0
-        if weight_decay < 0.0:
-            raise ValueError("Invalid weight_decay value: {}".format(weight_decay))
-        if step_size < 0.0:
-            raise ValueError("Invalid learning rate: {}".format(step_size))
-        self.num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        self.A = 1.
-        defaults = dict(step_size=step_size,
-                        weight_decay=weight_decay,
-                        traj_step=0,
-                        num_params=self.num_params,
-                        A=self.A)
-        self.model = model
-        params = self.model.parameters()
-        Optimizer.__init__(self, params=params, defaults=defaults)
-        MCMC_Optim.__init__(self)
-
-    def step(self):
-        for group in self.param_groups:
-            step_size = group['step_size']
-            for p in group['params']:
-                grad = p.grad.data
-                state = self.state[p]  # contains 'velocity' and 'thermostat'
-                state['velocity'].add_(other=-step_size * grad - step_size * state['thermostat'] * state['velocity'])
-                state['velocity'].add_(other=(2 * group['A'] * step_size) ** 0.5 * torch.randn_like(p))
-                state['thermostat'].add_(other=step_size * (state['velocity'] ** 2 - 1))
-                p.data.add_(other=state['velocity'], alpha=group['step_size'])
-            group['traj_step'] += 1
-
-    def sample_momentum(self):
-        for group in self.param_groups:
-            group['traj_step'] = 0
-            for p in group['params']:
-                state = self.state[p]
-                state['velocity'] = 1. * torch.randn_like(p)
-
-    def sample_thermostat(self):
-        for group in self.param_groups:
-            group['traj_step'] = 0
-            for p in group['params']:
-                state = self.state[p]
-                state['thermostat'] = group['A'] * torch.ones_like(p)
-
 
 class Chain(MutableSequence):
     def __init__(self, probmodel=None):
@@ -399,18 +343,14 @@ class Chain(MutableSequence):
             self.state_dicts.append(False)
             self.log_probs.append(False)
 
-
 class Sampler_Chain:
 
     def __init__(self, probmodel, step_size, num_steps, burn_in, pretrain, tune):
-
         self.probmodel = probmodel
         self.chain = Chain(probmodel=self.probmodel)
-
         self.step_size = step_size
         self.num_steps = num_steps
         self.burn_in = burn_in
-
         self.pretrain = pretrain
         self.tune = tune
 
@@ -423,7 +363,6 @@ class Sampler_Chain:
     def tune_step_size(self):
         tune_interval_length = 100
         print(f'Tuning: Init Step Size: {self.optim.param_groups[0]["step_size"]:.5f}')
-
         self.probmodel.reset_parameters()
         tune_chain = Chain(probmodel=self.probmodel)
         tune_chain.running_accepts.momentum = 0.5
@@ -446,8 +385,6 @@ class Sampler_Chain:
 
     def sample_chain(self):
         self.probmodel.reset_parameters()
-        if self.tune:
-            self.tune_step_size()
         self.chain = Chain(probmodel=self.probmodel)
         for step in range(self.num_steps):
             proposal_log_prob, sample = self.propose()
@@ -455,84 +392,20 @@ class Sampler_Chain:
             self.chain += (self.probmodel, proposal_log_prob, accept)
             if not accept:
                 if torch.isnan(proposal_log_prob['log_prob']):
-                    print(self.chain.state)
+                    print("nnnnnnnnnannnannannana" + self.chain.state)
                     exit()
                 self.probmodel.load_state_dict(self.chain.state['state_dict'])
         self.chain = self.chain[self.burn_in:]
         return self.chain
 
-
-class SGLD_Chain(Sampler_Chain):
-
-    def __init__(self, probmodel, step_size=0.0001, num_steps=2000, burn_in=100, pretrain=False, tune=False):
-        Sampler_Chain.__init__(self, probmodel, step_size, num_steps, burn_in, pretrain, tune)
-
-        self.optim = SGLD_Optim(self.probmodel,
-                                step_size=step_size,
-                                prior_std=1.,
-                                addnoise=True)
-
-        self.acceptance = SDE_Acceptance()
-
-    def __repr__(self):
-        return 'SGLD'
-
-    @torch.enable_grad()
-    def propose(self):
-        self.optim.zero_grad()
-        batch = next(self.probmodel.dataloader.__iter__())
-        log_prob = self.probmodel.log_prob(*batch)
-        (-log_prob['log_prob']).backward()
-        self.optim.step()
-
-        return log_prob, self.probmodel
-
-
-class MALA_Chain(Sampler_Chain):
-
-    def __init__(self, probmodel, step_size=0.1, num_steps=2000, burn_in=100, pretrain=False, tune=False, num_chain=0):
-        Sampler_Chain.__init__(self, probmodel, step_size, num_steps, burn_in, pretrain, tune)
-
-        self.num_chain = num_chain
-
-        self.optim = MALA_Optim(self.probmodel,
-                                step_size=step_size,
-                                prior_std=1.,
-                                addnoise=True)
-
-        self.acceptance = MetropolisHastingsAcceptance()
-
-    # self.acceptance = SDE_Acceptance()
-
-    def __repr__(self):
-        return 'MALA'
-
-    @torch.enable_grad()
-    def propose(self):
-        self.optim.zero_grad()
-        batch = next(self.probmodel.dataloader.__iter__())
-        log_prob = self.probmodel.log_prob(*batch)
-        (-log_prob['log_prob']).backward()
-        self.optim.step()
-
-        return log_prob, self.probmodel
-
-
 class HMC_Chain(Sampler_Chain):
-
     def __init__(self, probmodel, step_size=0.0001, num_steps=2000, burn_in=100, pretrain=False, tune=False,
                  traj_length=20):
-
-        # assert probmodel.log_prob().keys()[:3] == ['log_prob', 'data', ]
-
         Sampler_Chain.__init__(self, probmodel, step_size, num_steps, burn_in, pretrain, tune)
-
         self.traj_length = traj_length
-
         self.optim = HMC_Optim(self.probmodel,
                                step_size=step_size,
                                prior_std=1.)
-
         # self.acceptance = SDE_Acceptance()
         self.acceptance = MetropolisHastingsAcceptance()
 
@@ -541,15 +414,14 @@ class HMC_Chain(Sampler_Chain):
 
     def sample_chain(self):
         self.probmodel.reset_parameters()
-        if self.tune: self.tune_step_size()
         self.chain = Chain(probmodel=self.probmodel)
         for step in range(self.num_steps):
-            _ = self.propose()  # values are added directly to self.chain
+            self.propose()
         self.chain = self.chain[self.burn_in:]
         return self.chain
 
     def propose(self):
-        hamiltonian_solver = ['euler', 'leapfrog'][0]
+        hamiltonian_solver = ['euler', 'leapfrog'][1]
         self.optim.sample_momentum()
         batch = next(self.probmodel.dataloader.__iter__())  # samples one minibatch from dataloader
         def closure():
@@ -557,7 +429,8 @@ class HMC_Chain(Sampler_Chain):
             log_prob = self.probmodel.log_prob(*batch)
             (-log_prob['log_prob']).backward()
             return log_prob
-        if hamiltonian_solver == 'leapfrog': log_prob = closure()  # compute initial grads
+        if hamiltonian_solver == 'leapfrog':
+            log_prob = closure()  # compute initial grads
         for traj_step in range(self.traj_length):
             if hamiltonian_solver == 'euler':
                 proposal_log_prob = closure()
@@ -574,41 +447,49 @@ class HMC_Chain(Sampler_Chain):
         self.chain += (self.probmodel, proposal_log_prob, accept)
 
 
-class SGNHT_Chain(Sampler_Chain):
-
-    def __init__(self, probmodel, step_size=0.0001, num_steps=2000, burn_in=100, pretrain=False, tune=False,
-                 traj_length=20):
+class SGLD_Chain(Sampler_Chain):
+    def __init__(self, probmodel, step_size=0.0001, num_steps=2000, burn_in=100, pretrain=False, tune=False):
         Sampler_Chain.__init__(self, probmodel, step_size, num_steps, burn_in, pretrain, tune)
-        self.traj_length = traj_length
-        self.optim = SGNHT_Optim(self.probmodel,
-                                 step_size=step_size,
-                                 prior_std=1.)
+        self.optim = SGLD_Optim(self.probmodel,
+                                step_size=step_size,
+                                prior_std=1.,
+                                addnoise=True)
+        self.acceptance = SDE_Acceptance()
+
+    def __repr__(self):
+        return 'SGLD'
+
+    @torch.enable_grad()
+    def propose(self):
+        self.optim.zero_grad()
+        batch = next(self.probmodel.dataloader.__iter__())
+        log_prob = self.probmodel.log_prob(*batch)
+        (-log_prob['log_prob']).backward()
+        self.optim.step()
+        return log_prob, self.probmodel
+
+
+class MALA_Chain(Sampler_Chain):
+    def __init__(self, probmodel, step_size=0.001, num_steps=10, burn_in=0, pretrain=False, tune=False, num_chain=10):
+        Sampler_Chain.__init__(self, probmodel, step_size, num_steps, burn_in, pretrain, tune)
+        self.num_chain = num_chain
+        self.optim = MALA_Optim(self.probmodel,
+                                step_size=step_size,
+                                prior_std=1.,
+                                addnoise=True)
         self.acceptance = MetropolisHastingsAcceptance()
 
     def __repr__(self):
-        return 'SGNHT'
+        return 'MALA'
 
-    def sample_chain(self):
-        self.probmodel.reset_parameters()
-        if self.tune: self.tune_step_size()
-        self.chain = Chain(probmodel=self.probmodel)
-        self.optim.sample_momentum()
-        self.optim.sample_thermostat()
-        for step in range(self.num_steps):
-            proposal_log_prob, sample = self.propose()
-            accept, log_ratio = self.acceptance(proposal_log_prob['log_prob'], self.chain.state['log_prob']['log_prob'])
-            self.chain += (self.probmodel, proposal_log_prob, accept)
-        self.chain = self.chain[self.burn_in:]
-        return self.chain
-
+    @torch.enable_grad()
     def propose(self):
-        hamiltonian_solver = ['euler', 'leapfrog'][0]
-        batch = next(self.probmodel.dataloader.__iter__())  # samples one minibatch from dataloader
         self.optim.zero_grad()
-        proposal_log_prob = self.probmodel.log_prob(*batch)
-        (-proposal_log_prob['log_prob']).backward()
+        batch = next(self.probmodel.dataloader.__iter__())
+        log_prob = self.probmodel.log_prob(*batch)
+        (-log_prob['log_prob']).backward()
         self.optim.step()
-        return proposal_log_prob, self.probmodel
+        return log_prob, self.probmodel
 
 
 class Sampler:
@@ -671,22 +552,6 @@ class Sampler:
         assert len(self.chain.accepted_steps) > self.burn_in, f'{len(self.chain.accepted_steps)=} <= {self.burn_in=}'
         self.chain.accepted_steps = self.chain.accepted_steps[self.burn_in:]
 
-class MetropolisHastings_Sampler(Sampler):
-    def __init__(self, probmodel, step_size=1., num_steps=10000, burn_in=100, pretrain=False, tune=True):
-        super().__init__(probmodel, step_size, num_steps, burn_in, pretrain, tune)
-        self.optim = MetropolisHastings_Optim(self.probmodel,
-                                              step_length=step_size)
-        self.acceptance = MetropolisHastingsAcceptance()
-
-    def __str__(self):
-        return 'MH'
-
-    @torch.no_grad()
-    def propose(self):
-        self.optim.step()
-        log_prob = self.probmodel.log_prob()
-        return log_prob, self.probmodel
-
 
 class SGLD_Sampler(Sampler):
 
@@ -720,43 +585,8 @@ class SGLD_Sampler(Sampler):
         return 'SGLD'
 
 
-class MALA_Sampler(Sampler):
-
-    def __init__(self, probmodel, step_size=0.01, num_steps=10000, num_chains=4, burn_in=500, pretrain=True, tune=True):
-        super().__init__(probmodel, step_size, num_steps, num_chains, burn_in, pretrain, tune)
-
-    def sample_chains(self):
-        if self.num_chains > 1:
-            self.parallel_chains = [MALA_Chain(copy.deepcopy(self.probmodel),
-                                               step_size=self.step_size,
-                                               num_steps=self.num_steps,
-                                               burn_in=self.burn_in,
-                                               pretrain=self.pretrain,
-                                               tune=self.tune,
-                                               num_chain=i)
-                                    for i in range(self.num_chains)]
-            chains = Parallel(n_jobs=self.num_chains)(delayed(chain.sample_chain)() for chain in self.parallel_chains)
-        elif self.num_chains == 1:
-            chain = MALA_Chain(copy.deepcopy(self.probmodel),
-                               step_size=self.step_size,
-                               num_steps=self.num_steps,
-                               burn_in=self.burn_in,
-                               pretrain=self.pretrain,
-                               tune=self.tune,
-                               num_chain=0)
-            chains = [chain.sample_chain()]
-        self.chain = Chain(probmodel=self.probmodel)
-        for chain in chains:
-            self.chain += chain
-        return chains
-
-    def __str__(self):
-        return 'SGLD'
-
-
 class HMC_Sampler(Sampler):
-
-    def __init__(self, probmodel, step_size=0.01, num_steps=10000, num_chains=7, burn_in=500, pretrain=True, tune=True,
+    def __init__(self, probmodel, step_size=0.01, num_steps=10000, num_chains=7, burn_in=500, pretrain=True, tune=False,
                  traj_length=21):
         Sampler.__init__(self, probmodel, step_size, num_steps, num_chains, burn_in, pretrain, tune)
         self.traj_length = traj_length
@@ -788,34 +618,31 @@ class HMC_Sampler(Sampler):
         return chains
 
 
-class SGNHT_Sampler(Sampler):
-    def __init__(self, probmodel, step_size=0.01, num_steps=10000, num_chains=7, burn_in=500, pretrain=True, tune=True,
-                 traj_length=21):
-        Sampler.__init__(self, probmodel, step_size, num_steps, num_chains, burn_in, pretrain, tune)
-        self.traj_length = traj_length
-
-    def __str__(self):
-        return 'SGNHT'
+class MALA_Sampler(Sampler):
+    def __init__(self, probmodel, step_size=0.001, num_steps=10, num_chains=10, burn_in=0, pretrain=False, tune=False):
+        super().__init__(probmodel, step_size, num_steps, num_chains, burn_in, pretrain, tune)
 
     def sample_chains(self):
         if self.num_chains > 1:
-            self.parallel_chains = [SGNHT_Chain(copy.deepcopy(self.probmodel),
-                                                step_size=self.step_size,
-                                                num_steps=self.num_steps,
-                                                burn_in=self.burn_in,
-                                                pretrain=self.pretrain,
-                                                tune=self.tune)
+            self.parallel_chains = [MALA_Chain(copy.deepcopy(self.probmodel),
+                                               step_size=self.step_size,
+                                               num_steps=self.num_steps,
+                                               burn_in=self.burn_in,
+                                               pretrain=self.pretrain,
+                                               tune=self.tune,
+                                               num_chain=i)
                                     for i in range(self.num_chains)]
             chains = Parallel(n_jobs=self.num_chains)(delayed(chain.sample_chain)() for chain in self.parallel_chains)
         elif self.num_chains == 1:
-            chain = SGNHT_Chain(copy.deepcopy(self.probmodel),
-                                step_size=self.step_size,
-                                num_steps=self.num_steps,
-                                burn_in=self.burn_in,
-                                pretrain=self.pretrain,
-                                tune=self.tune)
+            chain = MALA_Chain(copy.deepcopy(self.probmodel),
+                               step_size=self.step_size,
+                               num_steps=self.num_steps,
+                               burn_in=self.burn_in,
+                               pretrain=self.pretrain,
+                               tune=self.tune,
+                               num_chain=0)
             chains = [chain.sample_chain()]
-        self.chain = Chain(probmodel=self.probmodel)  # the aggregating chai
+        self.chain = Chain(probmodel=self.probmodel)
         for chain in chains:
             self.chain += chain
         return chains
@@ -829,6 +656,7 @@ if __name__ == "__main__":
         y = m * x + b
         y += y_noise * torch.randn_like(y)
         return x, y
+
 
     class RegressionNNHomo(torch.nn.Module):
         def __init__(self, x, y, batch_size=1):
@@ -844,23 +672,29 @@ if __name__ == "__main__":
                                        nn.ReLU(),
                                        nn.Linear(num_hidden, 1))
             self.log_std = nn.Parameter(FloatTensor([-1]))
+
         def reset_parameters(self):
             for module in self.model.modules():
                 if isinstance(module, nn.Linear):
                     module.reset_parameters()
             self.log_std.data = FloatTensor([3.])
+
         def sample(self):
             self.reset_parameters()
+
         def forward(self, x):
             pred = self.model(x)
             return pred
+
         def log_prob(self, data, target):
             mu = self.forward(data)
             mse = F.mse_loss(mu, target)
             log_prob = torch.distributions.Normal(mu, F.softplus(self.log_std)).log_prob(target).mean() * len(
                 self.dataloader.dataset)
             return {'log_prob': log_prob, 'MSE': mse.detach_()}
+
+
     x, y = generate_linear_regression_data(num_samples=1000, m=-2., b=-1, y_noise=0.5)
     linreg = RegressionNNHomo(x, y, batch_size=50)
-    sampler = SGLD_Sampler(probmodel=linreg, step_size=0.001, num_steps=500, burn_in=50)
+    sampler = HMC_Sampler(probmodel=linreg, step_size=0.001, num_steps=500, burn_in=50)
     sampler.sample_chains()
