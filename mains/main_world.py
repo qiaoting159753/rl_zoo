@@ -48,8 +48,8 @@ def main():
         agents = ["HalfCheetah-v5", "Swimmer-v5", "Hopper-v5", "Walker2d-v5"]
         tasks = ["", "", "", ""]
     else:
-        agents = ['finger', 'fish']
-        tasks = ['turn_hard', 'swim']
+        agents = ['finger', 'fish', 'reacher']
+        tasks = ['turn_hard', 'swim','hard']
 
     for i in range(6):
         env_domain = agents[i]
