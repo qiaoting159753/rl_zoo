@@ -9,9 +9,9 @@ import json
 
 def main():
     curr_path = os.getcwd()
-    alg_name = "bayesian_sgld.json"
+    alg_name = "single_pnn.json"
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
-    openai_or_dmcs = False
+    openai_or_dmcs = True
 
     with open(config_file, 'r') as file:
         data = json.load(file)

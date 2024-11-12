@@ -21,7 +21,7 @@
   "sas": true,
   "prob_rwd": true,
   "train_both": true,
-  "train_reward": true
+  "train_reward": false
 }
 
 

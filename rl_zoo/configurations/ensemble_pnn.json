@@ -2,7 +2,7 @@
   "loop_name": "World_Model",
   "agent_name":"Ensemble_Dyna_One_Reward",
   "device": "cpu",
-  "seeds":[15],
+  "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 0.2,
   "random_goal": false,
@@ -21,7 +21,7 @@
   "sas": true,
   "prob_rwd": true,
   "train_both": false,
-  "train_reward": true
+  "train_reward": false
 }
 
 

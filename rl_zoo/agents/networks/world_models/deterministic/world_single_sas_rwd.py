@@ -65,43 +65,50 @@ class Single_PNN(World_Model):
         self.world_optimizers.step()
 
     def estimate_uncertainty(
-            self, observation: torch.Tensor, actions: torch.Tensor
-    ) -> tuple[float, float]:
+            self, observation: torch.Tensor, actions: torch.Tensor, train_reward:bool
+    ) -> tuple[float, float, torch.Tensor]:
         """
         Estimate uncertainty.
         """
         normalized_state = normalize_observation(observation, self.statistics)
         mean, var = self.world_model.forward(normalized_state, actions)
         uncert = torch.mean(var.squeeze()).item()
-
-        # Reward Uncertainty
-        sample_times = 100
-        dist = torch.distributions.Normal(mean, var)
-        samples = (dist.sample([sample_times]))
-        samples = samples.squeeze()
-        samples = denormalize_observation_delta(samples, self.statistics)
-        samples += observation
-        observationss = torch.repeat_interleave(observation, repeats=sample_times, dim=0)
-        actionss = torch.repeat_interleave(actions, repeats=sample_times, dim=0)
-        if self.sas:
-            if self.prob_rwd:
-                rewards, rwd_var = self.reward_network(observationss, actionss, samples)
-                epis_uncert = torch.var(rewards, dim=0).item()
-                aleatoric = (rwd_var.squeeze().cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
-                uncert_rwd = (epis_uncert + aleatoric) ** 0.5
-            else:
-                rewards = self.reward_network(observationss, actionss, samples)
-                uncert_rwd = torch.var(rewards, dim=0).item()
+        next_state_samples = None
+        if not train_reward:
+            uncert_rwd = 0.0
+            dist = torch.distributions.Normal(mean, var)
+            next_state_samples = dist.sample([100])
+            next_state_samples = next_state_samples.squeeze()
+            next_state_samples = denormalize_observation_delta(next_state_samples, self.statistics)
         else:
-            if self.prob_rwd:
-                rewards, rwd_var = self.reward_network(samples, actionss)
-                epis_uncert = torch.var(rewards, dim=0).item()
-                aleatoric = (rwd_var.squeeze().cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
-                uncert_rwd = epis_uncert + aleatoric
+            # Reward Uncertainty
+            sample_times = 100
+            dist = torch.distributions.Normal(mean, var)
+            samples = (dist.sample([sample_times]))
+            samples = samples.squeeze()
+            samples = denormalize_observation_delta(samples, self.statistics)
+            samples += observation
+            observationss = torch.repeat_interleave(observation, repeats=sample_times, dim=0)
+            actionss = torch.repeat_interleave(actions, repeats=sample_times, dim=0)
+            if self.sas:
+                if self.prob_rwd:
+                    rewards, rwd_var = self.reward_network(observationss, actionss, samples)
+                    epis_uncert = torch.var(rewards, dim=0).item()
+                    aleatoric = (rwd_var.squeeze().cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
+                    uncert_rwd = (epis_uncert + aleatoric) ** 0.5
+                else:
+                    rewards = self.reward_network(observationss, actionss, samples)
+                    uncert_rwd = torch.var(rewards, dim=0).item()
             else:
-                rewards = self.reward_network(samples, actionss)
-                uncert_rwd = torch.var(rewards, dim=0).item()
-        return uncert, uncert_rwd
+                if self.prob_rwd:
+                    rewards, rwd_var = self.reward_network(samples, actionss)
+                    epis_uncert = torch.var(rewards, dim=0).item()
+                    aleatoric = (rwd_var.squeeze().cpu().detach().numpy() ** 2).mean(axis=0) ** 0.5
+                    uncert_rwd = epis_uncert + aleatoric
+                else:
+                    rewards = self.reward_network(samples, actionss)
+                    uncert_rwd = torch.var(rewards, dim=0).item()
+        return uncert, uncert_rwd, next_state_samples
 
     def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor, ):
         normalized_state = normalize_observation(states, self.statistics)

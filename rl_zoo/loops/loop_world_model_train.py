@@ -123,16 +123,6 @@ class World_Model_Trainer:
             # One step prediction
             pred_ns, _, _, _ = self.world_model.pred_next_states(observation=tensor_state,
                                                                  actions=tensor_action)
-            if self.train_reward:
-                pred_reward, _ = self.world_model.pred_rewards(observation=tensor_state,
-                                                               action=tensor_action,
-                                                               next_observation=pred_ns)
-                pred_reward = pred_reward.detach().squeeze().cpu().numpy()
-            else:
-                pred_reward = 0.0
-            # Ground Truth Reward function prediction
-            pred_gt_rewrad = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(), pred_ns.detach().cpu().numpy().squeeze())
-            # pred_gt_rewrad = 0.0
             # MSE. L1 of dynamics
             np_pred_ns = pred_ns.detach().squeeze().cpu().numpy()
             one_step_mse = (np.square(np_pred_ns - gt_ns)).mean()
@@ -141,17 +131,43 @@ class World_Model_Trainer:
             l2_one_step_errors.append(one_step_mse)
             episodic_pred_error += one_step_mse
 
-            l1_one_rwd_error = abs(pred_reward - gt_rwd)
-            l1_one_rwd_errors.append(l1_one_rwd_error)
-            episodic_rwd_pred_error += l1_one_rwd_error
+            if self.train_reward:
+                pred_reward, _ = self.world_model.pred_rewards(observation=tensor_state,
+                                                               action=tensor_action,
+                                                               next_observation=pred_ns)
+                pred_reward = pred_reward.detach().squeeze().cpu().numpy()
+            else:
+                # Ground Truth Reward function prediction
+                pred_reward = 0.0
+            if self.train_reward:
+                l1_one_rwd_error = abs(pred_reward - gt_rwd)
+                l1_one_rwd_errors.append(l1_one_rwd_error)
+                episodic_rwd_pred_error += l1_one_rwd_error
+            else:
+                l1_one_rwd_errors.append(0.0)
 
-            l1_one_gt_rwd_error = abs(pred_gt_rewrad - gt_rwd)
+            pred_gt_reward = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(), pred_ns.detach().cpu().numpy().squeeze())
+            l1_one_gt_rwd_error = abs(pred_gt_reward - gt_rwd)
             l1_one_gt_rwd_errors.append(l1_one_gt_rwd_error)
 
-            one_dyna_uncert, one_rwd_uncert = self.world_model.estimate_uncertainty(observation=tensor_state,
-                                                                                    actions=tensor_action)
+            # Errors are done: L1 WM, L2 WM, L1 PRED RW, L1 GT RW.
+            one_dyna_uncert, one_rwd_uncert, samples = self.world_model.estimate_uncertainty(observation=tensor_state,
+                                                                                             actions=tensor_action,
+                                                                                             train_reward=self.train_reward)
             one_dyna_uncerts.append(one_dyna_uncert)
-            one_rwd_uncerts.append(one_rwd_uncert)
+            # Reward uncertainty estimation
+            if samples is None:
+                one_rwd_uncerts.append(one_rwd_uncert)
+            else:
+                samples = samples.detach().cpu().numpy()
+                rds = []
+                for i in range(samples.shape[0]):
+                    sample = samples[i]
+                    pred_s_reward = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(),sample)
+                    rds.append(pred_s_reward)
+                rds = np.array(rds)
+                one_rwd_uncert = np.var(rds, axis=0)
+                one_rwd_uncerts.append(one_rwd_uncert)
             #################    Uncertainty Estimation and Quantification    ################
             gt_s = gt_ns
             if gt_done:
@@ -167,7 +183,7 @@ class World_Model_Trainer:
         c_1 = np.corrcoef(l2_one_step_errors, one_dyna_uncerts)
         c_2 = np.corrcoef(l1_one_step_errors, one_dyna_uncerts)
         c_3 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
-        c_4 = np.corrcoef(l1_one_gt_rwd_errors, one_dyna_uncerts)
+        c_4 = np.corrcoef(l1_one_gt_rwd_errors, one_rwd_uncerts)
 
         logging.info(f"Prediction Error dynamics: {episodic_pred_error}, reward:{episodic_rwd_pred_error}")
         all_data = np.zeros((7,))
@@ -201,11 +217,6 @@ class World_Model_Trainer:
         with logging_redirect_tqdm():
             need_evaluate = False
             need_reset = True
-            if flush:
-                store_states = []
-                store_actions = []
-                store_next_states = []
-
             for _ in trange(self.maximum_steps):
                 if need_reset:
                     epi_reward = 0.0
@@ -218,11 +229,6 @@ class World_Model_Trainer:
                     action = self.env.sample_action()
                 # Do action is for the environment.
                 next_state, reward, done, _ = self.env.step(action)
-                if flush:
-                    store_states.append(state)
-                    store_actions.append(action)
-                    store_next_states.append(next_state)
-
                 # Small action is for training.
                 self.memory.add(state, action, reward, next_state, done)
                 epi_reward += reward
@@ -242,35 +248,19 @@ class World_Model_Trainer:
                     # Train the world model every time.
                     if self.model_G > 1.0:
                         for _ in range(int(self.model_G)):
-                            if flush:
-                                tensor_store_states = torch.FloatTensor(np.array(store_states)).to(self.device)
-                                tensor_store_actions = torch.FloatTensor(np.array(store_actions)).to(self.device)
-                                tensor_store_next_states = torch.FloatTensor(np.array(store_next_states)).to(
-                                    self.device)
-                                self.world_model.train_world_all(tensor_store_states, tensor_store_actions,
-                                                                 tensor_store_next_states)
-                            else:
-                                self.agent.train_world_model(memory=self.memory,
-                                                             batch_size=self.batch_size,
-                                                             world_model=self.world_model,
-                                                             train_both=self.train_both,
-                                                             train_reward=self.train_reward)
+                            self.agent.train_world_model(memory=self.memory,
+                                                         batch_size=self.batch_size,
+                                                         world_model=self.world_model,
+                                                         train_both=self.train_both,
+                                                         train_reward=self.train_reward)
                     else:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
-                            if flush:
-                                tensor_store_states = torch.FloatTensor(np.array(store_states)).to(self.device)
-                                tensor_store_actions = torch.FloatTensor(np.array(store_actions)).to(self.device)
-                                tensor_store_next_states = torch.FloatTensor(np.array(store_next_states)).to(
-                                    self.device)
-                                self.world_model.train_world_all(tensor_store_states, tensor_store_actions,
-                                                                 tensor_store_next_states)
-                            else:
-                                self.agent.train_world_model(memory=self.memory,
-                                                             batch_size=self.batch_size,
-                                                             world_model=self.world_model,
-                                                             train_both=self.train_both,
-                                                             train_reward=self.train_reward)
+                            self.agent.train_world_model(memory=self.memory,
+                                                         batch_size=self.batch_size,
+                                                         world_model=self.world_model,
+                                                         train_both=self.train_both,
+                                                         train_reward=self.train_reward)
                 # Evaluating
                 if (self.counter % self.evaluate_interval == 0) and (self.counter > self.batch_size):
                     need_evaluate = True
