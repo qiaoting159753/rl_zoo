@@ -80,6 +80,7 @@ class Single_PNN(World_Model):
             next_state_samples = dist.sample([100])
             next_state_samples = next_state_samples.squeeze()
             next_state_samples = denormalize_observation_delta(next_state_samples, self.statistics)
+            next_state_samples += observation
         else:
             # Reward Uncertainty
             sample_times = 100

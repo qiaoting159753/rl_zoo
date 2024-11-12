@@ -119,14 +119,18 @@ class Ensemble_Dyna_One_Reward(World_Model):
         self.update_counter %= self.boost_inter * self.num_models
 
     def estimate_uncertainty(
-            self, observation: torch.Tensor, actions: torch.Tensor
-    ) -> tuple[float, float]:
+            self, observation: torch.Tensor, actions: torch.Tensor, train_reward:bool
+    ) -> tuple[float, float, torch.Tensor]:
         """
         Estimate uncertainty.
 
         :param observation:
         :param actions:
         """
+        next_state_samples = None
+        uncert_rwd = 0.0
+        uncert = 0.0
+
         means = []
         vars_s = []
         normalized_state = normalize_observation(observation, self.statistics)
@@ -134,52 +138,61 @@ class Ensemble_Dyna_One_Reward(World_Model):
             mean, var = model.forward(normalized_state, actions)
             means.append(mean)
             vars_s.append(var)
-        noises = torch.stack(vars_s).squeeze().detach().numpy()
+        vars_s = torch.stack(vars_s).squeeze()
+        noises = vars_s.detach().numpy()
         aleatoric = (noises ** 2).mean(axis=0) ** 0.5
-        all_means = torch.stack(means).squeeze().detach().numpy()
-        epistemic = all_means.var(axis=0) ** 0.5
+        all_means = torch.stack(means).squeeze()
+        epistemic = all_means.detach().numpy()
+        epistemic = epistemic.var(axis=0) ** 0.5
         aleatoric = np.minimum(aleatoric, 10e3)
         epistemic = np.minimum(epistemic, 10e3)
         total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
         uncert = np.mean(total_unc)
 
-        # Reward Uncertainty
-        sample_times = 20
-        means = torch.vstack(means)
-        vars_s = torch.vstack(vars_s)
-        dist = torch.distributions.Normal(means, vars_s)
-        samples = dist.sample([sample_times])
-        samples = torch.reshape(samples, (sample_times * self.num_models, self.observation_size))
-        samples = denormalize_observation_delta(samples, self.statistics)
-        observationss = torch.repeat_interleave(observation, repeats=sample_times * self.num_models, dim=0)
-        actionss = torch.repeat_interleave(actions, repeats=sample_times * self.num_models, dim=0)
-        samples += observationss
+        if train_reward:
+            # Reward Uncertainty
+            sample_times = 20
+            means = torch.vstack(means)
+            vars_s = torch.vstack(vars_s)
+            dist = torch.distributions.Normal(means, vars_s)
+            samples = dist.sample([sample_times])
+            samples = torch.reshape(samples, (sample_times * self.num_models, self.observation_size))
+            samples = denormalize_observation_delta(samples, self.statistics)
+            observationss = torch.repeat_interleave(observation, repeats=sample_times * self.num_models, dim=0)
+            actionss = torch.repeat_interleave(actions, repeats=sample_times * self.num_models, dim=0)
+            samples += observationss
 
-        if self.sas:
-            if self.prob_rwd:
-                rewards, rwd_var = self.reward_network(observationss, actionss, samples)
-                epis_uncert = torch.var(rewards, dim=0).item()
-                rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
-                alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
-                epis_uncert = np.minimum(epis_uncert, 10e3)
-                alea_uncert = np.minimum(alea_uncert, 10e3)
-                uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
+            if self.sas:
+                if self.prob_rwd:
+                    rewards, rwd_var = self.reward_network(observationss, actionss, samples)
+                    epis_uncert = torch.var(rewards, dim=0).item()
+                    rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
+                    alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
+                    epis_uncert = np.minimum(epis_uncert, 10e3)
+                    alea_uncert = np.minimum(alea_uncert, 10e3)
+                    uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
+                else:
+                    rewards = self.reward_network(observationss, actionss, samples)
+                    uncert_rwd = torch.var(rewards, dim=0).item()
             else:
-                rewards = self.reward_network(observationss, actionss, samples)
-                uncert_rwd = torch.var(rewards, dim=0).item()
+                if self.prob_rwd:
+                    rewards, rwd_var = self.reward_network(samples, actionss)
+                    epis_uncert = torch.var(rewards, dim=0).item()
+                    rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
+                    alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
+                    epis_uncert = np.minimum(epis_uncert, 10e3)
+                    alea_uncert = np.minimum(alea_uncert, 10e3)
+                    uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
+                else:
+                    rewards = self.reward_network(samples, actionss)
+                    uncert_rwd = torch.var(rewards, dim=0).item()
         else:
-            if self.prob_rwd:
-                rewards, rwd_var = self.reward_network(samples, actionss)
-                epis_uncert = torch.var(rewards, dim=0).item()
-                rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
-                alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
-                epis_uncert = np.minimum(epis_uncert, 10e3)
-                alea_uncert = np.minimum(alea_uncert, 10e3)
-                uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
-            else:
-                rewards = self.reward_network(samples, actionss)
-                uncert_rwd = torch.var(rewards, dim=0).item()
-        return uncert, uncert_rwd
+            dist = torch.distributions.Normal(all_means, vars_s)
+            next_state_samples = dist.sample([20])
+            next_state_samples = next_state_samples.reshape((self.num_models * 100, self.observation_size))
+            next_state_samples = denormalize_observation_delta(next_state_samples, self.statistics)
+            next_state_samples += observation
+        return uncert, uncert_rwd, next_state_samples
 
     def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor):
         sample_times = 20
