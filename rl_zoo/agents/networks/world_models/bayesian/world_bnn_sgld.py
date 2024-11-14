@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from rl_zoo.agents.networks.world_models import World_Model
 from rl_zoo.utils.helpers import denormalize_observation_delta, normalize_observation, normalize_observation_delta
-from rl_zoo.agents.networks.world_models.bayesian.bayesian_sgld_classes import SGLD_Sampler, HMC_Sampler, MALA_Sampler
+from rl_zoo.agents.networks.world_models.bayesian.bayesian_sgld_classes import SGLD_Sampler
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 
@@ -30,11 +30,8 @@ class CustomizedMLP(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_sizes[0], hidden_sizes[1]),
             nn.ReLU(),
-            nn.Linear(hidden_sizes[1], hidden_sizes[1]),
-            nn.ReLU(),
             nn.Linear(hidden_sizes[1], output_size)
         )
-
         self.log_std = nn.Parameter(torch.FloatTensor([-1]))
         self.data = None
         self.target = None
@@ -63,7 +60,7 @@ class CustomizedMLP(nn.Module):
         mu, var_s = self.forward(data)
         mse = F.mse_loss(mu, target)
         # log_prob = torch.distributions.Normal(mu, F.softplus(self.log_std)).log_prob(self.target).mean()
-        log_prob = -1 * F.gaussian_nll_loss(mu, target=target, var=var_s)
+        log_prob = -F.gaussian_nll_loss(mu, target=target, var=var_s)
         return {'log_prob': log_prob, 'MSE': mse.detach_()}
 
 
@@ -98,7 +95,7 @@ class Bayesian_World_Model_SGLD(World_Model):
         self.world_optimizers = torch.optim.Adam(self.world_model_0.parameters(), lr=l_r)
         self.trained_once = False
         self.counter = 0
-        self.stack_layers = 5
+        self.stack_layers = 1
         self.data = torch.ones((self.stack_layers * 256, observation_size + num_actions))
         self.target = torch.ones((self.stack_layers * 256, observation_size))
 
@@ -149,8 +146,7 @@ class Bayesian_World_Model_SGLD(World_Model):
             self.world_model_1.dataloader = DataLoader(TensorDataset(self.data, self.target), batch_size=50)
         self.counter += 1
 
-    def estimate_uncertainty(
-            self, observation: torch.Tensor, actions: torch.Tensor
+    def estimate_uncertainty(self, observation: torch.Tensor, actions: torch.Tensor, train_reward:bool
     ) -> tuple[float, float]:
         total_unc = 0.0
         if self.counter > self.stack_layers and (self.trained_once):
@@ -158,12 +154,7 @@ class Bayesian_World_Model_SGLD(World_Model):
             data = torch.cat((normalized_state, actions), dim=1)
             # Get model uncertainty by sampling 100 parameters.
             self.world_model_1.load_state_dict(copy.deepcopy(self.world_model_0.state_dict()))
-            sampler = SGLD_Sampler(self.world_model_1,
-                                  burn_in=0,
-                                  tune=False,
-                                  step_size=0.0001,
-                                  num_steps=10,
-                                  num_chains=10)
+            sampler = SGLD_Sampler(self.world_model_1, step_size=0.0001, burn_in=0, num_steps=3, num_chains=1, tune=False)
             chains = sampler.sample_chains()
             # # Estimation from chains.
             preds = []
@@ -176,10 +167,11 @@ class Bayesian_World_Model_SGLD(World_Model):
                     preds.append(pred)
             noises = torch.vstack(aleatorics).squeeze().detach().numpy()
             aleatoric = (noises ** 2).mean(axis=0) ** 0.5
-            aleatoric = aleatoric.mean()
             preds = torch.vstack(preds)
-            epistemic = torch.var(preds, dim=0).mean().item()
+            all_means = preds.detach().numpy()
+            epistemic = all_means.var(axis=0) ** 0.5
             aleatoric = np.minimum(aleatoric, 10e3)
             epistemic = np.minimum(epistemic, 10e3)
             total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
-        return total_unc, 0.0
+            total_unc = total_unc.mean()
+        return total_unc, 0.0, preds

@@ -129,8 +129,6 @@ class Ensemble_Dyna_One_Reward(World_Model):
         """
         next_state_samples = None
         uncert_rwd = 0.0
-        uncert = 0.0
-
         means = []
         vars_s = []
         normalized_state = normalize_observation(observation, self.statistics)
@@ -148,7 +146,6 @@ class Ensemble_Dyna_One_Reward(World_Model):
         epistemic = np.minimum(epistemic, 10e3)
         total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
         uncert = np.mean(total_unc)
-
         if train_reward:
             # Reward Uncertainty
             sample_times = 20
@@ -189,7 +186,7 @@ class Ensemble_Dyna_One_Reward(World_Model):
         else:
             dist = torch.distributions.Normal(all_means, vars_s)
             next_state_samples = dist.sample([20])
-            next_state_samples = next_state_samples.reshape((self.num_models * 100, self.observation_size))
+            next_state_samples = next_state_samples.reshape((self.num_models * 20, self.observation_size))
             next_state_samples = denormalize_observation_delta(next_state_samples, self.statistics)
             next_state_samples += observation
         return uncert, uncert_rwd, next_state_samples

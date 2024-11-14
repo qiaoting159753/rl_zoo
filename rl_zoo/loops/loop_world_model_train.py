@@ -172,7 +172,6 @@ class World_Model_Trainer:
             gt_s = gt_ns
             if gt_done:
                 break
-
         l1_one_step_errors = np.array(l1_one_step_errors)
         l2_one_step_errors = np.array(l2_one_step_errors)
         l1_one_rwd_errors = np.array(l1_one_rwd_errors)

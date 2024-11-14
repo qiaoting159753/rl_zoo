@@ -8,7 +8,7 @@
   "random_goal": false,
   "batch_size": 256,
   "episode_steps": 257,
-  "evaluate_interval": 257,
+  "evaluate_interval": 1028,
   "maximum_steps": 257000,
   "horizon": 5,
   "branch_factor": 10,
@@ -21,7 +21,7 @@
   "sas": true,
   "prob_rwd": true,
   "train_both": false,
-  "train_reward": true
+  "train_reward": false
 }
 
 
