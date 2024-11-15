@@ -13,6 +13,7 @@ logging.basicConfig(level=logging.INFO)
 from rl_zoo.networks.mfrl.common import Actor
 from rl_zoo.networks.mfrl.sac import SAC_Critic
 from rl_zoo.agents.mfrl import SAC
+from rl_zoo.agents.mbrl import Dyna_SAC_NS
 from rl_zoo.utils import PrioritizedReplayBuffer
 
 # World Models
@@ -146,7 +147,8 @@ class World_Model_Trainer:
             else:
                 l1_one_rwd_errors.append(0.0)
 
-            pred_gt_reward = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(), pred_ns.detach().cpu().numpy().squeeze())
+            pred_gt_reward = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(),
+                                                    pred_ns.detach().cpu().numpy().squeeze())
             l1_one_gt_rwd_error = abs(pred_gt_reward - gt_rwd)
             l1_one_gt_rwd_errors.append(l1_one_gt_rwd_error)
 
@@ -163,7 +165,7 @@ class World_Model_Trainer:
                 rds = []
                 for i in range(samples.shape[0]):
                     sample = samples[i]
-                    pred_s_reward = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(),sample)
+                    pred_s_reward = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(), sample)
                     rds.append(pred_s_reward)
                 rds = np.array(rds)
                 one_rwd_uncert = np.var(rds, axis=0)
@@ -248,18 +250,14 @@ class World_Model_Trainer:
                     if self.model_G > 1.0:
                         for _ in range(int(self.model_G)):
                             self.agent.train_world_model_world(memory=self.memory,
-                                                         batch_size=self.batch_size,
-                                                         world_model=self.world_model,
-                                                         train_both=self.train_both,
-                                                         train_reward=self.train_reward)
+                                                               batch_size=self.batch_size,
+                                                               )
                     else:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
                             self.agent.train_world_model_world(memory=self.memory,
-                                                         batch_size=self.batch_size,
-                                                         world_model=self.world_model,
-                                                         train_both=self.train_both,
-                                                         train_reward=self.train_reward)
+                                                               batch_size=self.batch_size,
+                                                               )
                 # Evaluating
                 if (self.counter % self.evaluate_interval == 0) and (self.counter > self.batch_size):
                     need_evaluate = True
@@ -283,16 +281,16 @@ class World_Model_Trainer:
         """
         actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
         critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-        self.agent = SAC(actor_network=actor,
-                         critic_network=critic,
-                         action_num=self.action_dim,
-                         alpha_lr=3e-4,
-                         gamma=0.99,
-                         tau=0.005,
-                         actor_lr=3e-4,
-                         critic_lr=3e-4,
-                         device=torch.device(self.device),
-                         reward_scale=1.0)
+        # self.agent = SAC(actor_network=actor,
+        #                  critic_network=critic,
+        #                  action_num=self.action_dim,
+        #                  alpha_lr=3e-4,
+        #                  gamma=0.99,
+        #                  tau=0.005,
+        #                  actor_lr=3e-4,
+        #                  critic_lr=3e-4,
+        #                  device=torch.device(self.device),
+        #                  reward_scale=1.0)
 
         if self.world_model_name == "Single_PNN":
             self.world_model = Single_PNN(observation_size=self.state_dim,
@@ -353,6 +351,19 @@ class World_Model_Trainer:
                                                          sas=self.sas,
                                                          prob_rwd=self.prob_rwd
                                                          )
+
+        self.agent = Dyna_SAC_NS(actor_network=actor,
+                                 critic_network=critic,
+                                 world_network=self.world_model,
+                                 num_samples=10,
+                                 action_num=self.action_dim,
+                                 alpha_lr=3e-4,
+                                 horizon=1,
+                                 gamma=0.99,
+                                 tau=0.005,
+                                 actor_lr=3e-4,
+                                 critic_lr=3e-4,
+                                 device=torch.device(self.device))
 
         # if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
         #     self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,
