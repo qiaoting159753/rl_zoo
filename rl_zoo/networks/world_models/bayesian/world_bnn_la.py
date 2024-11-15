@@ -104,32 +104,22 @@ class Bayesian_World_Model_LA(World_Model):
         if self.l_a.n_data > 0:
             normalized_state = normalize_observation(observation, self.statistics)
             s_n_a = torch.cat((normalized_state, actions), dim=1)
-
-            # pred_test = self.world_model(s_n_a)
-            # var_s = pred_test[:, self.observation_size:]
-            # var_s = var_s.squeeze()
-            # aleatoric = var_s.detach().cpu().numpy()
-            # aleatoric = (aleatoric ** 2) ** 0.5
-
-            a, f_var = self.l_a(s_n_a, pred_type="glm", link_approx="mc", n_samples=100)
-            a = a.detach().squeeze().cpu().numpy()
-            aleatoric = a[self.observation_size:]
+            f_mean, f_var = self.l_a(s_n_a, pred_type="glm", link_approx="mc", n_samples=100)
+            f_mean_detach = f_mean.detach().squeeze().cpu().numpy()
+            aleatoric = f_mean_detach[self.observation_size:]
             aleatoric = (aleatoric ** 2) ** 0.5
-
             f_var = f_var.squeeze()
             f_var = torch.diagonal(f_var)
-
-            # print("------------------------------------")
-            # print(torch.mean(f_var[self.observation_size:]))
-            # print(torch.mean(f_var[:self.observation_size]))
-
             # Definitely not self.l_a.sigma_noise.item(), coz it remain the same everytime.
             epistemic = f_var[:self.observation_size].squeeze().detach().cpu().numpy()
             epistemic = epistemic ** 0.5
-
             # # epistemic = all_means.var(axis=0) ** 0.5
             aleatoric = np.minimum(aleatoric, 10e3)
             epistemic = np.minimum(epistemic, 10e3)
             total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
             uncert = np.mean(total_unc).item()
+
+            if not train_reward:
+                dist1 = torch.distributions.Normal(a, f_var)
+
         return uncert, rwd_uncert, None
