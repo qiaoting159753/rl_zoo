@@ -1,8 +1,8 @@
 import logging
 import torch
 import numpy as np
-from rl_zoo.agents.networks.world_models.simple import Probabilistic_SAS_Reward, Probabilistic_NS_Reward
-from rl_zoo.agents.networks.world_models.simple import Simple_SAS_Reward, Simple_NS_Reward
+from rl_zoo.networks.world_models.simple import Probabilistic_SAS_Reward, Probabilistic_NS_Reward
+from rl_zoo.networks.world_models.simple import Simple_SAS_Reward, Simple_NS_Reward
 import torch.nn.functional as F
 import torch.utils
 from torch import optim
@@ -158,7 +158,7 @@ class World_Model:
             return pred_rewards, None
 
     def estimate_uncertainty(
-            self, observation: torch.Tensor, actions: torch.Tensor
+            self, observation: torch.Tensor, actions: torch.Tensor, train_reward:bool,
     ) -> tuple[float, float]:
         """
         Estimate next state uncertainty and reward uncertainty.

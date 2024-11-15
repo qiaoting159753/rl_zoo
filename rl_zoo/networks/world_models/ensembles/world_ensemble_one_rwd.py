@@ -4,8 +4,8 @@ import torch
 import torch.nn.functional as F
 import torch.utils
 from torch import optim
-from rl_zoo.agents.networks.world_models.simple import Probabilistic_Dynamics
-from rl_zoo.agents.networks.world_models import World_Model
+from rl_zoo.networks.world_models.simple import Probabilistic_Dynamics
+from rl_zoo.networks.world_models import World_Model
 from rl_zoo.utils.helpers import normalize_observation_delta
 from rl_zoo.utils import denormalize_observation_delta, normalize_observation
 

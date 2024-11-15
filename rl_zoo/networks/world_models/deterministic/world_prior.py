@@ -2,7 +2,7 @@ from __future__ import division
 import torch
 import torch.nn.functional as F
 from torch import nn
-from rl_zoo.agents.networks.world_models import World_Model
+from rl_zoo.networks.world_models import World_Model
 from rl_zoo.utils import normalize_observation_delta, denormalize_observation_delta, normalize_observation
 
 

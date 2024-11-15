@@ -6,13 +6,13 @@ import torch.nn.functional as F
 import torch.utils
 from torch import optim
 from rl_zoo.utils import normalize_observation
-from rl_zoo.agents.networks.world_models.deterministic import (
+from rl_zoo.networks.world_models.deterministic import (
     NVP_Flows,
 )
-from rl_zoo.agents.networks.world_models.simple import (
+from rl_zoo.networks.world_models.simple import (
     Simple_SAS_Reward,
 )
-from rl_zoo.agents.networks.world_models import World_Model
+from rl_zoo.networks.world_models import World_Model
 from rl_zoo.utils.helpers import normalize_observation_delta
 
 

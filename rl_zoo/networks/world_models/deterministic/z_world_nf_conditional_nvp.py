@@ -1,14 +1,14 @@
-import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
 import torch.optim as optim
-from rl_zoo.agents.networks.world_models import World_Model
+from rl_zoo.networks.world_models import World_Model
+from rl_zoo.utils import ConditionalDiagGaussian
 from rl_zoo.utils import MaskedAffineAutoregressive, normalize_observation, normalize_observation_delta, \
     denormalize_observation_delta, Permute
 
 
-class NVP_World_Model(World_Model):
+class Conditional_NVP_World_Model(World_Model):
     def __init__(
             self,
             observation_size: int,
@@ -22,11 +22,8 @@ class NVP_World_Model(World_Model):
         self.l_r = l_r
         self.device = device
         self.hidden_size = hidden_size
-        self.statistics = dict()
-
-        self.world_model = NVP_Flows(self.observation_size, self.num_actions)
-        self.optimizer = optim.Adam(self.world_model.parameters(), lr=0.00005)
-
+        self.statistic = {}
+        self.world_model = Conditional_NVP_Flows(self.observation_size, self.num_actions)
         self.reward_model = Probabilistic_SAS_Reward(observation_size=observation_size, num_actions=num_actions,
                                                      hidden_size=hidden_size)
         self.reward_optimizers = optim.Adam(self.reward_model.parameters(), lr=l_r)
@@ -40,7 +37,7 @@ class NVP_World_Model(World_Model):
         """
         for i in statistics:
             statistics[i] = torch.FloatTensor(statistics[i])
-        self.statistics = statistics
+        self.statistic = statistics
         self.world_model.statistics = statistics
 
     def train_world(
@@ -51,26 +48,11 @@ class NVP_World_Model(World_Model):
     ) -> None:
         """
         Train the dynamic of world model.
-
         :param states:
         :param actions:
         :param next_states:
         """
-        target = (next_states - states)
-        delta_targets_normalized = normalize_observation_delta(target, self.statistics)
-        s_n_a = torch.cat((delta_targets_normalized, actions), dim=1)
-        normalized_obs = normalize_observation(states, self.statistics)
-        # s_a = torch.cat((normalized_obs, actions), dim=1)
-        _, z_, log_dets = self.world_model.forward(states, actions)
-        # Reverse KLD: Log_q - Log_p = (Log_q0 - forward_log_det) - (-MSE)
-        mse_loss = F.mse_loss(z_, s_n_a, reduction="sum")
-        # _, forward_kld = self.world_model.reverse(z_)
-        loss = torch.mean(log_dets + mse_loss)
-        # loss = forward_kld + mse_loss
-        # loss = self.world_model.forward_kld(s_a, s_n_a)
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+        self.world_model.train_net(states, actions, next_states)
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
@@ -89,11 +71,12 @@ class NVP_World_Model(World_Model):
         :return:
         """
         # logging.info("Not Implemented")
-        _, pred_z, _ = self.world_model.forward(observation, actions)
-        z_start, _ = self.world_model.reverse(pred_z)
-        normalized_obs = normalize_observation(observation, self.statistics)
+        pred_next, pred_z, _ = self.world_model.forward(observation, actions)
+        normalized_obs = normalize_observation(observation, self.statistic)
         target_z_ = torch.cat((normalized_obs, actions), dim=1)
-        mse_loss = np.sum(abs(z_start.detach().numpy() - target_z_.detach().numpy()))
+        z_,_ = self.world_model.reverse(pred_z)
+        mse_loss = F.mse_loss(z_, target_z_).item()
+        # mse_loss = np.sum(abs(z_.detach().numpy() - target_z_.detach().numpy()))
         return mse_loss, 0.0
 
     def train_reward(
@@ -131,43 +114,31 @@ class NVP_World_Model(World_Model):
         return pred_reward, None, reward_var
 
 
-class NVP_Flows(nn.Module):
+class Conditional_NVP_Flows:
     """
-
+    Conditional NVP.
     """
     # Forward KLD: inverse back, -log_q - init_log.
     # Reverse KLD: forward, + init_log - log_det, loss = (mean - beta * mean).
     # total_params = sum(p.numel() for p in self.flows.parameters())
     # print("Normalizing Flows Model One model No. Parameters: ")
     # print(total_params)
-    def __init__(self, state_dim, act_dim, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, state_dim, act_dim):
         self.state_dim = state_dim
         self.act_dim = act_dim
         self.shape = (state_dim + act_dim,)
         # Define a nf
         num_layers = 32
         flows = []
-        for _ in range(num_layers):
+        self.q_0 = ConditionalDiagGaussian(self.shape)
+        for i in range(num_layers):
             mask = MaskedAffineAutoregressive(state_dim + act_dim, hidden_features=128, num_blocks=1)
             # Swap dimensions
             flows.append(mask)
             flows.append(Permute(state_dim + act_dim, mode='swap'))
         self.flows = nn.ModuleList(flows)
+        self.optimizer = optim.Adam(self.flows.parameters(), lr=0.00001)
         self.statistics = dict()
-
-    # def forward_kld(self, x, y):
-    #     """
-    #     Maximum Likelihood Loss.
-    #     forward_kld = mse - mean(log_dets)
-    #     :param x:
-    #     :param y:
-    #     :return:
-    #     """
-    #     z_, log_dets = self.reverse(y)
-    #     # neg_mse = torch.sum(-1 * torch.pow((z_ - x), 2))
-    #     # log_dets += neg_mse
-    #     return -torch.mean(log_dets)
 
     def forward(self, states, actions):
         """
@@ -178,8 +149,9 @@ class NVP_Flows(nn.Module):
         """
         normalized_obs = normalize_observation(states, self.statistics)
         s_a = torch.cat((normalized_obs, actions), dim=1)
-        z_ = s_a
         log_dets = 0
+        z_, log_det = self.q_0.forward(s_a, log_scale=torch.ones(s_a.shape) * 0.1)
+        log_dets += log_det
         for flow in self.flows:
             z_, log_det = flow.forward(z_)
             log_dets += log_det
@@ -187,6 +159,24 @@ class NVP_Flows(nn.Module):
         pred_delta = denormalize_observation_delta(pred, self.statistics)
         pred_next = pred_delta + states
         return pred_next, z_, log_dets
+
+    def train_net(self, states, actions, next_states):
+        """
+        :param states:
+        :param actions:
+        :param next_states:
+        """
+        # Target is the normalized diff
+        target = (next_states - states)
+        delta_targets_normalized = normalize_observation_delta(target, self.statistics)
+        s_n_a = torch.cat((delta_targets_normalized, actions), dim=1)
+        _, z_end, log_dets = self.forward(states, actions)
+        # Reverse KLD: Log_q - Log_p = (Log_q0 - forward_log_det) - (-MSE)
+        mse_loss = F.mse_loss(z_end, s_n_a, reduction="sum")
+        loss = torch.mean(-1 * log_dets + mse_loss)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
     def reverse(self, z_):
         """

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from laplace import Laplace
 from torch.utils.data import DataLoader, TensorDataset
-from rl_zoo.agents.networks.world_models import World_Model
+from rl_zoo.networks.world_models import World_Model
 from rl_zoo.utils.helpers import normalize_observation_delta, normalize_observation, denormalize_observation_delta
 
 class PNN_MLP(nn.Module):

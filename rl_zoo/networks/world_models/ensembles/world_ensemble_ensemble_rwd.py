@@ -1,7 +1,7 @@
 import math
 import torch
 import torch.utils
-from rl_zoo.agents.networks.world_models.deterministic import Single_PNN
+from rl_zoo.networks.world_models.deterministic import Single_PNN
 from rl_zoo.utils.helpers import normalize_observation, denormalize_observation_delta
 import numpy as np
 

@@ -8,16 +8,16 @@ import torch.nn.functional as F
 import torch.utils
 from torch import optim
 
-from rl_zoo.agents.networks.world_models.simple.probabilistic_dynamic import (
+from rl_zoo.networks.world_models.simple.probabilistic_dynamic import (
     Probabilistic_Dynamics,
 )
-from rl_zoo.agents.networks.world_models.simple.probabilistic_sas_reward import (
+from rl_zoo.networks.world_models.simple.probabilistic_sas_reward import (
     Probabilistic_SAS_Reward,
 )
-from rl_zoo.agents.networks.world_models.simple import (
+from rl_zoo.networks.world_models.simple import (
     Simple_SAS_Done,
 )
-from rl_zoo.agents.networks.world_models import World_Model
+from rl_zoo.networks.world_models import World_Model
 from rl_zoo.utils.helpers import normalize_observation_delta
 
 
