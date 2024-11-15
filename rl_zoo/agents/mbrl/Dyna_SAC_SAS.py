@@ -15,7 +15,7 @@ import torch
 
 from rl_zoo.utils import PrioritizedReplayBuffer
 
-from rl_zoo.agents.networks.world_models import (
+from rl_zoo.networks.world_models import (
     World_Model,
 )
 

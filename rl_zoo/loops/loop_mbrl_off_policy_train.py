@@ -11,11 +11,11 @@ from rl_zoo.agents.mbrl import Immersive_Reweight_Dyna_SAC
 from rl_zoo.agents.mbrl import STEVE_SAC_Critic_mean
 
 # World Models
-from rl_zoo.agents.networks.world_models.ensembles import Ensemble_Dyna_One_Reward
+from rl_zoo.networks.world_models.ensembles import Ensemble_Dyna_One_Reward
 
 # Actors and Critics
-from rl_zoo.agents.networks.mfrl.common import Actor
-from rl_zoo.agents.networks.mfrl.sac import SAC_Critic
+from rl_zoo.networks.mfrl.common import Actor
+from rl_zoo.networks.mfrl.sac import SAC_Critic
 
 from rl_zoo.utils import PrioritizedReplayBuffer
 from datetime import datetime

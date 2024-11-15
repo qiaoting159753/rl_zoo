@@ -10,21 +10,21 @@ from rl_zoo.utils import normalize
 logging.basicConfig(level=logging.INFO)
 
 # Agents
-from rl_zoo.agents.networks.mfrl.common import Actor
-from rl_zoo.agents.networks.mfrl.sac import SAC_Critic
+from rl_zoo.networks.mfrl.common import Actor
+from rl_zoo.networks.mfrl.sac import SAC_Critic
 from rl_zoo.agents.mfrl import SAC
 from rl_zoo.utils import PrioritizedReplayBuffer
 
 # World Models
-from rl_zoo.agents.networks.world_models.deterministic import (Single_PNN,
-                                                               Prior_World_Model)
+from rl_zoo.networks.world_models.deterministic import (Single_PNN,
+                                                        Prior_World_Model)
 
-from rl_zoo.agents.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_Reward,
-                                                           Ensemble_Dyna_One_Reward)
+from rl_zoo.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_Reward,
+                                                    Ensemble_Dyna_One_Reward)
 
-from rl_zoo.agents.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
-                                                          Bayesian_World_Model_LA,
-                                                          Bayesian_World_Model_SGLD)
+from rl_zoo.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
+                                                   Bayesian_World_Model_LA,
+                                                   Bayesian_World_Model_SGLD)
 
 
 class World_Model_Trainer:

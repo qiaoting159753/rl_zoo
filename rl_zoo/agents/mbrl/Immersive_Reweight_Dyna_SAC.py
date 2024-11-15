@@ -7,7 +7,7 @@ import math
 import copy
 import numpy as np
 import torch
-from rl_zoo.agents.networks.world_models import World_Model
+from rl_zoo.networks.world_models import World_Model
 from rl_zoo.envs.openai.openai_pendulum import PendulumEnv
 import torch.nn.functional as F
 

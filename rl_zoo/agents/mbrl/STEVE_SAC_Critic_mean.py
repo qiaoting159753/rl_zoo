@@ -14,7 +14,7 @@ import torch
 
 from rl_zoo.utils import PrioritizedReplayBuffer
 
-from rl_zoo.agents.networks.world_models import (
+from rl_zoo.networks.world_models import (
     World_Model,
 )
 
@@ -22,7 +22,6 @@ from rl_zoo.agents.networks.world_models import (
 class STEVE_SAC_Critic_mean:
     """
     STEVE
-
     """
     def __init__(
             self,
@@ -188,43 +187,34 @@ class STEVE_SAC_Critic_mean:
                     param.data * self.tau + target_param.data * (1.0 - self.tau)
                 )
 
-    def train_world_model(
-            self, memory: PrioritizedReplayBuffer, batch_size: int
-    ) -> None:
-
+    def train_world_model(self, memory: PrioritizedReplayBuffer, batch_size: int, world_model, train_both: bool, train_reward: bool):
         experiences = memory.sample_uniform(batch_size)
         states, actions, rewards, next_states, _, _ = experiences
-
+        batch_size = len(states)
+        # Convert into tensor
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
-        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device).unsqueeze(1)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-
-        self.world_model.train_world(
-            states=states,
-            actions=actions,
-            next_states=next_states,
-        )
-        self.world_model.train_reward(
-            states=states,
-            actions=actions,
-            rewards=rewards,
-            next_states=next_states
-        )
+        # Reshape to batch_size x whatever
+        world_model.train_world(states, actions, next_states)
+        if train_reward:
+            rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+            rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+            if train_both:
+                world_model.train_together(states, actions, rewards)
+            else:
+                world_model.train_reward(states, actions, next_states, rewards)
 
     def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:
         self.learn_counter += 1
-
         experiences = memory.sample_uniform(batch_size)
         states, actions, rewards, next_states, dones, _ = experiences
-
         # Convert into tensor
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
         rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device).unsqueeze(1)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
         dones = torch.LongTensor(np.asarray(dones)).to(self.device).unsqueeze(1)
-
         # Step 2 train as usual
         self._train_policy(
             states=states,

@@ -15,10 +15,10 @@ import torch
 
 from rl_zoo.utils import PrioritizedReplayBuffer
 
-from rl_zoo.agents.networks.world_models import (
+from rl_zoo.networks.world_models import (
     World_Model,
 )
-
+import math
 
 class Dyna_SAC_NS:
     """
@@ -157,28 +157,30 @@ class Dyna_SAC_NS:
                 )
 
     def train_world_model(
-        self, memory: PrioritizedReplayBuffer, batch_size: int
+            self, memory: PrioritizedReplayBuffer, batch_size: int
     ) -> None:
-
+        train_reward = False
+        train_both = False
         experiences = memory.sample_uniform(batch_size)
         states, actions, rewards, next_states, _, _ = experiences
-
+        batch_size = len(states)
+        # Convert into tensor
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
-        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device).unsqueeze(1)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
 
-        self.world_model.train_world(
-            states=states,
-            actions=actions,
-            next_states=next_states,
-        )
+        # states = states[:, :-2]
+        # next_states = next_states[:, :-2]
+        # Reshape to batch_size x whatever
+        self.world_model.train_world(states, actions, next_states)
 
-        self.world_model.train_reward(
-            next_states=next_states,
-            rewards=rewards,
-            actions=actions,
-        )
+        if train_reward:
+            rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+            rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+            if train_both:
+                self.world_model.train_together(states, actions, rewards)
+            else:
+                self.world_model.train_reward(states, actions, next_states, rewards)
 
     def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:
         self.learn_counter += 1
@@ -202,6 +204,8 @@ class Dyna_SAC_NS:
             dones=dones,
         )
 
+        self._dyna_generate_and_train(next_states)
+
     def _dyna_generate_and_train(self, next_states: torch.Tensor) -> None:
         pred_states = []
         pred_actions = []
@@ -218,10 +222,23 @@ class Dyna_SAC_NS:
                 pred_next_state, _, _, _ = self.world_model.pred_next_states(
                     pred_state, pred_acts
                 )
-                pred_reward = self.world_model.pred_rewards(pred_next_state)
+                # pred_reward = self.world_model.pred_rewards(pred_next_state)
+                target_goal_tensor = pred_state[:, -2:]
+                target_goal = target_goal_tensor.cpu().numpy()
+                object_current = pred_next_state[:, -4:-2]
+                object_current = object_current.cpu().numpy()
+                sq_diff = (target_goal - object_current) ** 2
+                goal_distance_after = np.expand_dims(np.sqrt(np.sum(sq_diff, axis=1)), axis=1)
+                pred_reward = np.round((-goal_distance_after+70), 2)
+                mask1 = goal_distance_after <= 10
+                mask2 = goal_distance_after > 70
+                pred_reward[mask1] = 800
+                pred_reward[mask2] = 0
+                pred_reward = torch.FloatTensor(pred_reward).to(self.device)
+                pred_next_state[:, -2:] = pred_state[:, -2:]
                 pred_states.append(pred_state)
                 pred_actions.append(pred_acts.detach())
-                pred_rs.append(pred_reward.detach())
+                pred_rs.append(pred_reward)
                 pred_n_states.append(pred_next_state.detach())
                 pred_state = pred_next_state.detach()
             pred_states = torch.vstack(pred_states)

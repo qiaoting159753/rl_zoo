@@ -10,14 +10,14 @@ from rl_zoo.agents.mfrl import TQC
 from rl_zoo.agents.mfrl import Fully_Expand
 
 # Actors
-from rl_zoo.agents.networks.mfrl.common import Actor
-from rl_zoo.agents.networks.mfrl.common import HyperActor
+from rl_zoo.networks.mfrl.common import Actor
+from rl_zoo.networks.mfrl.common import HyperActor
 
 # Critic
-from rl_zoo.agents.networks.mfrl.sac import SAC_Critic
-from rl_zoo.agents.networks.mfrl.sac import Hyper_Double_SAC_Critic
-from rl_zoo.agents.networks.mfrl.tqc import TQC_Critic
-from rl_zoo.agents.networks.mfrl.tqc import Hyper_TQC_Critic
+from rl_zoo.networks.mfrl.sac import SAC_Critic
+from rl_zoo.networks.mfrl.sac import Hyper_Double_SAC_Critic
+from rl_zoo.networks.mfrl.tqc import TQC_Critic
+from rl_zoo.networks.mfrl.tqc import Hyper_TQC_Critic
 
 from rl_zoo.utils import PrioritizedReplayBuffer
 from datetime import datetime
