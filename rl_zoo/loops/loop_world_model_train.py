@@ -247,7 +247,7 @@ class World_Model_Trainer:
                     # Train the world model every time.
                     if self.model_G > 1.0:
                         for _ in range(int(self.model_G)):
-                            self.agent.train_world_model(memory=self.memory,
+                            self.agent.train_world_model_world(memory=self.memory,
                                                          batch_size=self.batch_size,
                                                          world_model=self.world_model,
                                                          train_both=self.train_both,
@@ -255,7 +255,7 @@ class World_Model_Trainer:
                     else:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
-                            self.agent.train_world_model(memory=self.memory,
+                            self.agent.train_world_model_world(memory=self.memory,
                                                          batch_size=self.batch_size,
                                                          world_model=self.world_model,
                                                          train_both=self.train_both,

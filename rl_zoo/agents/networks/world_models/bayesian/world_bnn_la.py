@@ -6,7 +6,7 @@ import torch.nn as nn
 from laplace import Laplace
 from torch.utils.data import DataLoader, TensorDataset
 from rl_zoo.agents.networks.world_models import World_Model
-
+from rl_zoo.utils.helpers import normalize_observation_delta, normalize_observation, denormalize_observation_delta
 
 class PNN_MLP(nn.Module):
     def __init__(self, input_size: int, hidden_sizes: list[int], output_size: int):
@@ -56,16 +56,19 @@ class Bayesian_World_Model_LA(World_Model):
                            "regression",
                            subset_of_weights="all",
                            hessian_structure="kron",
-                           temperature=temperature,
+                           temperature=0.1,
                            prior_precision=prior_precision)
 
     def pred_next_states(
             self, observation: torch.Tensor, actions: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        s_n_a = torch.cat((observation, actions), dim=1)
+        normalized_observation = normalize_observation(observation, self.statistics)
+        s_n_a = torch.cat((normalized_observation, actions), dim=1)
         pred_s = self.world_model(s_n_a)
-        pred_s = pred_s[:, :self.observation_size]
-        return pred_s, None, None, None
+        n_mean = pred_s[:, :self.observation_size]
+        prediction = denormalize_observation_delta(n_mean, self.statistics)
+        prediction += observation
+        return prediction, None, None, None
 
     def train_world(
             self,
@@ -73,37 +76,46 @@ class Bayesian_World_Model_LA(World_Model):
             actions: torch.Tensor,
             next_states: torch.Tensor,
     ) -> None:
-        s_n_a = torch.cat((states, actions), dim=1)
+        normalized_state = normalize_observation(states, self.statistics)
+        s_n_a = torch.cat((normalized_state, actions), dim=1)
+        target = next_states - states
+        delta_targets_normalized = normalize_observation_delta(target, self.statistics)
         pred_s = self.world_model(s_n_a)
         mean_s = pred_s[:, :self.observation_size]
         var_s = pred_s[:, self.observation_size:]
-        model_loss = F.gaussian_nll_loss(input=mean_s, target=next_states, var=var_s).mean()
+        model_loss = F.gaussian_nll_loss(input=mean_s, target=delta_targets_normalized, var=var_s).mean()
         self.dyna_optimizer.zero_grad()
         model_loss.backward()
         self.dyna_optimizer.step()
 
         pred_s_2 = self.world_model(s_n_a)
         mean_s_2 = pred_s_2[:, :self.observation_size]
-        y_x = (next_states - mean_s_2) ** 2
-        target = torch.cat((next_states, y_x), dim=1).detach()
+        y_x = (delta_targets_normalized - mean_s_2) ** 2
+        target = torch.cat((delta_targets_normalized, y_x), dim=1).detach()
 
         train_loader = DataLoader(TensorDataset(s_n_a, target), batch_size=s_n_a.shape[0])
         self.l_a.fit(train_loader, override=False)
 
     def estimate_uncertainty(
-            self, observation: torch.Tensor, actions: torch.Tensor
+            self, observation: torch.Tensor, actions: torch.Tensor, train_reward:bool
     ) -> tuple[float, float]:
         uncert = 0.0
         rwd_uncert = 0.0
         if self.l_a.n_data > 0:
-            s_n_a = torch.cat((observation, actions), dim=1)
-            pred_test = self.world_model(s_n_a)
-            var_s = pred_test[:, self.observation_size:]
-            var_s = var_s.squeeze()
-            aleatoric = var_s.detach().cpu().numpy()
-            aleatoric = (aleatoric ** 2).mean(axis=0) ** 0.5
+            normalized_state = normalize_observation(observation, self.statistics)
+            s_n_a = torch.cat((normalized_state, actions), dim=1)
 
-            _, f_var = self.l_a(s_n_a, pred_type="glm", link_approx="mc", n_samples=100)
+            # pred_test = self.world_model(s_n_a)
+            # var_s = pred_test[:, self.observation_size:]
+            # var_s = var_s.squeeze()
+            # aleatoric = var_s.detach().cpu().numpy()
+            # aleatoric = (aleatoric ** 2) ** 0.5
+
+            a, f_var = self.l_a(s_n_a, pred_type="glm", link_approx="mc", n_samples=100)
+            a = a.detach().squeeze().cpu().numpy()
+            aleatoric = a[self.observation_size:]
+            aleatoric = (aleatoric ** 2) ** 0.5
+
             f_var = f_var.squeeze()
             f_var = torch.diagonal(f_var)
 
@@ -113,11 +125,11 @@ class Bayesian_World_Model_LA(World_Model):
 
             # Definitely not self.l_a.sigma_noise.item(), coz it remain the same everytime.
             epistemic = f_var[:self.observation_size].squeeze().detach().cpu().numpy()
-            epistemic = (epistemic ** 2).mean(axis=0) ** 0.5
+            epistemic = epistemic ** 0.5
 
             # # epistemic = all_means.var(axis=0) ** 0.5
             aleatoric = np.minimum(aleatoric, 10e3)
             epistemic = np.minimum(epistemic, 10e3)
             total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
             uncert = np.mean(total_unc).item()
-        return uncert, rwd_uncert
+        return uncert, rwd_uncert, None

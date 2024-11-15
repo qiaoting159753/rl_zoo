@@ -2,7 +2,7 @@
   "loop_name": "World_Model",
   "agent_name":"Bayesian_Laplace",
   "device": "cpu",
-  "seeds":[15],
+  "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 0.2,
   "random_goal": false,
