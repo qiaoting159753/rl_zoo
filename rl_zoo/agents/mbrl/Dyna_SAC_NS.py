@@ -156,31 +156,29 @@ class Dyna_SAC_NS:
                     param.data * self.tau + target_param.data * (1.0 - self.tau)
                 )
 
-    def train_world_model(
-            self, memory: PrioritizedReplayBuffer, batch_size: int
-    ) -> None:
-        train_reward = False
-        train_both = False
+    def train_world_model(self, memory: PrioritizedReplayBuffer,
+                          batch_size: int):
         experiences = memory.sample_uniform(batch_size)
         states, actions, rewards, next_states, _, _ = experiences
-        batch_size = len(states)
-        # Convert into tensor
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+        self.world_model.train_world(states, actions, next_states)
 
+        # train_reward = False
+        # train_both = False
+        # batch_size = len(states)
+        # Convert into tensor
         # states = states[:, :-2]
         # next_states = next_states[:, :-2]
         # Reshape to batch_size x whatever
-        self.world_model.train_world(states, actions, next_states)
-
-        if train_reward:
-            rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
-            rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
-            if train_both:
-                self.world_model.train_together(states, actions, rewards)
-            else:
-                self.world_model.train_reward(states, actions, next_states, rewards)
+        # if train_reward:
+        #     rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+        #     rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+        #     if train_both:
+        #         self.world_model.train_together(states, actions, rewards)
+        #     else:
+        #         self.world_model.train_reward(states, actions, next_states, rewards)
 
     def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:
         self.learn_counter += 1

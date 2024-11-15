@@ -352,6 +352,18 @@ class World_Model_Trainer:
                                                          prob_rwd=self.prob_rwd
                                                          )
 
+        # self.agent = SAC(actor_network=actor,
+        #                  critic_network=critic,
+        #                  world_model= self.world_model,
+        #                  action_num=self.action_dim,
+        #                  alpha_lr=3e-4,
+        #                  gamma=0.99,
+        #                  tau=0.005,
+        #                  actor_lr=3e-4,
+        #                  critic_lr=3e-4,
+        #                  device=torch.device(self.device),
+        #                  reward_scale=1.0)
+
         self.agent = Dyna_SAC_NS(actor_network=actor,
                                  critic_network=critic,
                                  world_network=self.world_model,

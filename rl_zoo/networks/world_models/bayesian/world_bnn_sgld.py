@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from rl_zoo.networks.world_models import World_Model
 from rl_zoo.utils.helpers import denormalize_observation_delta, normalize_observation, normalize_observation_delta
-from rl_zoo.agents.networks.world_models.bayesian.bayesian_sgld_classes import SGLD_Sampler
+from rl_zoo.networks.world_models.bayesian.bayesian_sgld_classes import SGLD_Sampler
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 

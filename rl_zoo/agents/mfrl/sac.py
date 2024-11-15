@@ -25,6 +25,7 @@ class SAC:
             self,
             actor_network: torch.nn.Module,
             critic_network: torch.nn.Module,
+            world_model,
             gamma: float,
             tau: float,
             reward_scale: float,
@@ -36,7 +37,7 @@ class SAC:
     ):
         self.type = "policy"
         self.device = device
-
+        self.world_model = world_model
         # this may be called policy_net in other implementations
         self.actor_net = actor_network.to(device)
         # this may be called soft_q_net in other implementations
@@ -137,12 +138,10 @@ class SAC:
                 target_param.data.copy_(
                     param.data * self.tau + target_param.data * (1.0 - self.tau)
                 )
-
-    def train_world_model(self, memory, batch_size):
-        pass
-
-    def set_statistics(self, stats):
-        pass
+    def set_statistics(self, stats: dict) -> None:
+        if self.world_model is None:
+            return
+        self.world_model.set_statistics(stats)
 
     def save_models(self, filename: str, filepath: str = "models") -> None:
         path = f"{filepath}/models" if filepath != "models" else filepath
@@ -162,20 +161,24 @@ class SAC:
         self.critic_net.load_state_dict(torch.load(f"{path}/{filename}_critic.pht"))
         logging.info("models has been loaded...")
 
-    def train_world_model_world(self, memory: PrioritizedReplayBuffer, batch_size: int, world_model, train_both: bool, train_reward: bool):
+    def train_world_model(self, memory: PrioritizedReplayBuffer,
+                          batch_size: int):
+        if self.world_model is None:
+            return
         experiences = memory.sample_uniform(batch_size)
         states, actions, rewards, next_states, _, _ = experiences
-        batch_size = len(states)
-        # Convert into tensor
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+        self.world_model.train_world(states, actions, next_states)
+
         # Reshape to batch_size x whatever
-        world_model.train_world(states, actions, next_states)
-        if train_reward:
-            rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
-            rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
-            if train_both:
-                world_model.train_together(states, actions, rewards)
-            else:
-                world_model.train_reward(states, actions, next_states, rewards)
+        # batch_size = len(states)
+        # Convert into tensor
+        # if train_reward:
+        #     rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+        #     rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+        #     if train_both:
+        #         world_model.train_together(states, actions, rewards)
+        #     else:
+        #         world_model.train_reward(states, actions, next_states, rewards)
