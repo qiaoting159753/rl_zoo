@@ -25,7 +25,6 @@ class SAC:
             self,
             actor_network: torch.nn.Module,
             critic_network: torch.nn.Module,
-            world_model,
             gamma: float,
             tau: float,
             reward_scale: float,
@@ -34,6 +33,7 @@ class SAC:
             critic_lr: float,
             alpha_lr: float,
             device: torch.device,
+            world_model=None,
     ):
         self.type = "policy"
         self.device = device
