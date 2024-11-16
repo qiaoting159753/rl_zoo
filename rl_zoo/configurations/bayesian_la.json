@@ -14,7 +14,7 @@
   "branch_factor": 10,
   "on_policy": true,
   "Parameter_A": [0.1],
-  "Parameter_B" : [0.1],
+  "Parameter_B" : [0.8, 1.0],
   "Parameter_C" : [0.1],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",

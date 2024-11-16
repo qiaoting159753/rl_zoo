@@ -279,18 +279,6 @@ class World_Model_Trainer:
         """
         Create an agent
         """
-        actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
-        critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
-        # self.agent = SAC(actor_network=actor,
-        #                  critic_network=critic,
-        #                  action_num=self.action_dim,
-        #                  alpha_lr=3e-4,
-        #                  gamma=0.99,
-        #                  tau=0.005,
-        #                  actor_lr=3e-4,
-        #                  critic_lr=3e-4,
-        #                  device=torch.device(self.device),
-        #                  reward_scale=1.0)
 
         if self.world_model_name == "Single_PNN":
             self.world_model = Single_PNN(observation_size=self.state_dim,
@@ -351,6 +339,9 @@ class World_Model_Trainer:
                                                          sas=self.sas,
                                                          prob_rwd=self.prob_rwd
                                                          )
+
+        actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
+        critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
 
         self.agent = SAC(actor_network=actor,
                          critic_network=critic,

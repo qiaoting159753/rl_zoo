@@ -56,7 +56,7 @@ class Bayesian_World_Model_LA(World_Model):
                            "regression",
                            subset_of_weights="all",
                            hessian_structure="kron",
-                           temperature=0.1,
+                           temperature=temperature,
                            prior_precision=prior_precision)
 
     def pred_next_states(
@@ -120,6 +120,22 @@ class Bayesian_World_Model_LA(World_Model):
             uncert = np.mean(total_unc).item()
 
             if not train_reward:
-                dist1 = torch.distributions.Normal(a, f_var)
+                # f_mean = f_mean.squeeze()
+                # f_var = f_var.squeeze()
+                # dist1 = torch.distributions.Normal(f_mean[:self.observation_size], f_var[:self.observation_size])
+                # samples = dist1.sample([100])
 
-        return uncert, rwd_uncert, None
+                f_var[f_var < 0.00001] = 0.00001
+                dist1 = torch.distributions.Normal(f_mean.squeeze(), f_var)
+                sample1 = dist1.sample([10])
+                sub_means = sample1[:, :self.observation_size]
+                sub_vars = sample1[:, self.observation_size:]
+                dist2 = torch.distributions.Normal(sub_means, sub_vars)
+                samples = dist2.sample([10])
+                samples = samples.reshape((100, self.observation_size))
+
+                samples = denormalize_observation_delta(samples, self.statistics)
+                samples += observation
+            else:
+                samples = None
+        return uncert, rwd_uncert, samples
