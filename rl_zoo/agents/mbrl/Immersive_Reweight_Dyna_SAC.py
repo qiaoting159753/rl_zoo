@@ -1,62 +1,60 @@
 """
 Sutton, Richard S. "Dyna, an integrated architecture for learning, planning, and reacting."
 
+
+
 This code runs automatic entropy tuning
 """
-import math
 import copy
+import logging
+import os
 import numpy as np
 import torch
-from rl_zoo.networks.world_models import World_Model
-from rl_zoo.envs.openai.openai_pendulum import PendulumEnv
-import torch.nn.functional as F
+import math
 
+from rl_zoo.utils import PrioritizedReplayBuffer
+
+from rl_zoo.networks.world_models import World_Model
+import torch.nn.functional as F
 
 class Immersive_Reweight_Dyna_SAC:
     """
     Use the Soft Actor Critic as the Actor Critic framework.
-
     """
 
     def __init__(
-            self,
-            actor_network,
-            critic_network,
-            world_network: World_Model,
-            gamma,
-            tau,
-            action_num,
-            actor_lr,
-            critic_lr,
-            alpha_lr,
-            num_samples,
-            horizon,
-            device,
+        self,
+        actor_network: torch.nn.Module,
+        critic_network: torch.nn.Module,
+        world_network: World_Model,
+        gamma: float,
+        tau: float,
+        action_num: int,
+        actor_lr: float,
+        critic_lr: float,
+        alpha_lr: float,
+        num_samples: int,
+        horizon: int,
+        device: torch.device,
     ):
-        self.env = PendulumEnv()
-
         self.type = "mbrl"
+        self.device = device
+
+        # this may be called policy_net in other implementations
+        self.actor_net = actor_network.to(self.device)
+        # this may be called soft_q_net in other implementations
+        self.critic_net = critic_network.to(self.device)
+        self.target_critic_net = copy.deepcopy(self.critic_net)
+        # Other Variables
+        self.gamma = gamma
+        self.tau = tau
         # Switches
         self.num_samples = num_samples
         self.horizon = horizon
         self.action_num = action_num
-        # Other Variables
-        self.gamma = gamma
-        self.tau = tau
-        self.device = device
-        self.batch_size = None
 
-        # this may be called policy_net in other implementations
-        self.actor_net = actor_network.to(device)
-        # this may be called soft_q_net in other implementations
-        self.critic_net = critic_network.to(device)
-        self.target_critic_net = copy.deepcopy(self.critic_net).to(device)
-
-        # Set to initial alpha to 1.0 according to other baselines.
-        self.log_alpha = torch.tensor(np.log(1.0)).to(device)
-        self.log_alpha.requires_grad = True
-        self.target_entropy = -action_num
-
+        self.learn_counter = 0
+        self.policy_update_freq = 1
         # optimizer
         self.actor_net_optimiser = torch.optim.Adam(
             self.actor_net.parameters(), lr=actor_lr
@@ -64,12 +62,17 @@ class Immersive_Reweight_Dyna_SAC:
         self.critic_net_optimiser = torch.optim.Adam(
             self.critic_net.parameters(), lr=critic_lr
         )
+
+        # Set to initial alpha to 1.0 according to other baselines.
+        self.log_alpha = torch.tensor(np.log(1.0)).to(device)
+        self.log_alpha.requires_grad = True
+        self.target_entropy = -action_num
         self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=alpha_lr)
 
         # World model
         self.world_model = world_network
-        self.learn_counter = 0
-        self.policy_update_freq = 1
+        self.batch_size = None
+
 
     @property
     def _alpha(self):
@@ -79,11 +82,12 @@ class Immersive_Reweight_Dyna_SAC:
         return self.log_alpha.exp()
 
     # pylint: disable-next=unused-argument to keep the same interface
-    def select_action_from_policy(self, state, evaluation=False, noise_scale=0):
+    def select_action_from_policy(
+        self, state: np.ndarray, evaluation: bool = False, noise_scale: float = 0
+    ) -> np.ndarray:
         """
         Select a action for executing. It is the only channel that an agent
         will communicate the the actual environment.
-
         """
         # note that when evaluating this algorithm we need to select mu as
         # action so _, _, action = self.actor_net.sample(state_tensor)
@@ -91,25 +95,26 @@ class Immersive_Reweight_Dyna_SAC:
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             if evaluation is False:
-                (action, _, _) = self.actor_net.sample(state_tensor)
+                (action, _, _) = self.actor_net(state_tensor)
             else:
-                (_, _, action) = self.actor_net.sample(state_tensor)
+                (_, _, action) = self.actor_net(state_tensor)
             action = action.cpu().data.numpy().flatten()
-            action = action * 2.0
         self.actor_net.train()
         return action
 
-    def _train_policy(self, states, actions, rewards, next_states, dones, weights=None):
-        """
-        Train the policy with Model-Based Value Expansion. A family of MBRL.
-
-        """
+    def _train_policy(
+        self,
+        states: torch.Tensor,
+        actions: torch.Tensor,
+        rewards: torch.Tensor,
+        next_states: torch.Tensor,
+        dones: torch.Tensor,
+    ) -> None:
         if weights is None:
             weights = torch.ones(rewards.shape).to(self.device)
-
         info = {}
         with torch.no_grad():
-            next_actions, next_log_pi, _ = self.actor_net.sample(next_states)
+            next_actions, next_log_pi, _ = self.actor_net(next_states)
             target_q_one, target_q_two = self.target_critic_net(
                 next_states, next_actions
             )
@@ -117,10 +122,10 @@ class Immersive_Reweight_Dyna_SAC:
                     torch.minimum(target_q_one, target_q_two) - self._alpha * next_log_pi
             )
             q_target = rewards + self.gamma * (1 - dones) * target_q_values
-        q_target = q_target.detach()
         assert (len(q_target.shape) == 2) and (q_target.shape[1] == 1)
-
+        q_target = q_target.detach()
         q_values_one, q_values_two = self.critic_net(states, actions)
+
         # critic_loss_one = F.mse_loss(q_values_one, q_target)
         td_error1 = (q_target - q_values_one)  # * weights
         td_error2 = (q_target - q_values_two)  # * weights
@@ -131,9 +136,8 @@ class Immersive_Reweight_Dyna_SAC:
         self.critic_net_optimiser.zero_grad()
         critic_loss_total.backward()
         self.critic_net_optimiser.step()
-
         ##################     Update the Actor Second     ####################
-        pi, first_log_p, _ = self.actor_net.sample(states)
+        pi, first_log_p, _ = self.actor_net(states)
         qf1_pi, qf2_pi = self.critic_net(states, pi)
         min_qf_pi = torch.minimum(qf1_pi, qf2_pi)
         actor_loss = ((self._alpha * first_log_p) - min_qf_pi).mean()
@@ -145,7 +149,7 @@ class Immersive_Reweight_Dyna_SAC:
 
         # update the temperature
         alpha_loss = -(
-                self.log_alpha * (first_log_p + self.target_entropy).detach()
+            self.log_alpha * (first_log_p + self.target_entropy).detach()
         ).mean()
         self.log_alpha_optimizer.zero_grad()
         alpha_loss.backward()
@@ -153,161 +157,143 @@ class Immersive_Reweight_Dyna_SAC:
 
         if self.learn_counter % self.policy_update_freq == 0:
             for target_param, param in zip(
-                    self.target_critic_net.parameters(), self.critic_net.parameters()
+                self.target_critic_net.parameters(), self.critic_net.parameters()
             ):
                 target_param.data.copy_(
                     param.data * self.tau + target_param.data * (1.0 - self.tau)
                 )
 
-    def train_world_model(self, experiences):
+    def train_world_model(self, memory: PrioritizedReplayBuffer,
+                          batch_size: int):
         """
         Sample the buffer again for training the world model can reach higher rewards.
 
         :param experiences:
         """
-        (
-            states,
-            actions,
-            rewards,
-            next_states,
-            _,
-        ) = experiences
-
+        experiences = memory.sample_uniform(batch_size)
+        states, actions, rewards, next_states, _, _ = experiences
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
-        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device).unsqueeze(1)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        assert len(states.shape) >= 2
-        assert len(actions.shape) == 2
-        assert len(rewards.shape) == 2 and rewards.shape[1] == 1
-        assert len(next_states.shape) >= 2
-        # # Step 1 train the world model.
-        self.world_model.train_world(
-            states=states,
-            actions=actions,
-            next_states=next_states
-        )
-        self.world_model.train_reward(next_states=next_states, actions=actions, rewards=rewards)
+        self.world_model.train_world(states, actions, next_states)
 
-    def train_policy(self, experiences):
-        """
-        Interface to training loop.
 
-        """
+        # (
+        #     states,
+        #     actions,
+        #     rewards,
+        #     next_states,
+        #     _,
+        # ) = experiences
+        #
+        # states = torch.FloatTensor(np.asarray(states)).to(self.device)
+        # actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
+        # rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device).unsqueeze(1)
+        # next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+        # assert len(states.shape) >= 2
+        # assert len(actions.shape) == 2
+        # assert len(rewards.shape) == 2 and rewards.shape[1] == 1
+        # assert len(next_states.shape) >= 2
+        # # # Step 1 train the world model.
+        # self.world_model.train_world(
+        #     states=states,
+        #     actions=actions,
+        #     next_states=next_states
+        # )
+        # self.world_model.train_reward(next_states=next_states, actions=actions, rewards=rewards)
+
+
+
+
+    def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:
         self.learn_counter += 1
-        (
-            states,
-            actions,
-            rewards,
-            next_states,
-            dones,
-        ) = experiences
-        self.batch_size = len(states)
+
+        experiences = memory.sample_uniform(batch_size)
+        states, actions, rewards, next_states, dones, _ = experiences
+
         # Convert into tensor
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
         rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device).unsqueeze(1)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
         dones = torch.LongTensor(np.asarray(dones)).to(self.device).unsqueeze(1)
-        assert len(states.shape) >= 2
-        assert len(actions.shape) == 2
-        assert len(rewards.shape) == 2 and rewards.shape[1] == 1
-        assert len(next_states.shape) >= 2
+
         # Step 2 train as usual
-        # self._train_policy(
-        #     states=states,
-        #     actions=actions,
-        #     rewards=rewards,
-        #     next_states=next_states,
-        #     dones=dones,
-        #     weights=torch.ones(rewards.shape).to(self.device),
-        # )
+        self._train_policy(
+            states=states,
+            actions=actions,
+            rewards=rewards,
+            next_states=next_states,
+            dones=dones,
+            weights=torch.ones(rewards.shape).to(self.device),
+        )
         # Step 3 Dyna add more statistics
         self._dyna_generate_and_train(next_states=next_states)
 
-    def _dyna_generate_and_train(self, next_states):
+    def _dyna_generate_and_train(self, next_states: torch.Tensor) -> None:
         """
         Only off-policy Dyna will work.
         :param next_states:
         """
+
+
         pred_states = []
         pred_actions = []
         pred_rs = []
         pred_n_states = []
         weights = []
-        pred_state = next_states
-        for _ in range(self.horizon):
-            pred_state = torch.repeat_interleave(pred_state, self.num_samples, dim=0)
-            # This part is controversial. But random actions is empirically better.
-            rand_acts = np.random.uniform(-1, 1, (pred_state.shape[0], self.action_num))
-            pred_acts = torch.FloatTensor(rand_acts).to(self.device)
-            # pred_acts,_,_ = self.actor_net.sample(pred_state)
 
-            p_states, p_rewards = self.query(pred_state.cpu().detach().numpy(), pred_acts.cpu().detach().numpy())
-            pred_next_state = torch.FloatTensor(np.array(p_states)).to(self.device)
-            pred_reward = torch.FloatTensor(np.array(p_rewards)).to(self.device).unsqueeze(dim=1)
+        with torch.no_grad():
+            pred_state = next_states
+            for _ in range(self.horizon):
+                pred_state = torch.repeat_interleave(pred_state, self.num_samples, dim=0)
+                # This part is controversial. But random actions is empirically better.
+                rand_acts = np.random.uniform(-1, 1, (pred_state.shape[0], self.action_num))
+                pred_acts = torch.FloatTensor(rand_acts).to(self.device)
 
-            # pred_next_state, _, means, variances = self.world_model.pred_next_states(
-            #     pred_state, pred_acts
-            # )
-            # pred_reward = self.world_model.pred_rewards(pred_next_state)
-            #
-            # # # # Quantification of certainty.
-            # uncert = self.sampling(means, variances)
-            # uncert = uncert.unsqueeze(dim=1).to(self.device)
-            # weights.append(uncert)
 
-            pred_states.append(pred_state)
-            pred_actions.append(pred_acts.detach())
-            pred_rs.append(pred_reward.detach())
-            pred_n_states.append(pred_next_state.detach())
+                pred_next_state, all_pred_next, norm_means_, norm_vars_ = self.world_model.pred_next_states(
+                    pred_state, pred_acts
+                )
 
-            pred_state = pred_next_state.detach()
+                # Q, A, R
+                uncert = self.sampling(pred_state, norm_means_, norm_vars_)
 
-        pred_states = torch.vstack(pred_states)
-        pred_actions = torch.vstack(pred_actions)
-        pred_rs = torch.vstack(pred_rs)
-        pred_n_states = torch.vstack(pred_n_states)
-        # pred_weights = torch.vstack(weights)
-        # Pay attention to here! It is dones in the Cares RL Code!
-        pred_dones = torch.FloatTensor(np.zeros(pred_rs.shape)).to(self.device)
-        # states, actions, rewards, next_states, not_dones
+
+                p_states, p_rewards = self.query(pred_state.cpu().detach().numpy(), pred_acts.cpu().detach().numpy())
+                pred_next_state = torch.FloatTensor(np.array(p_states)).to(self.device)
+                pred_reward = torch.FloatTensor(np.array(p_rewards)).to(self.device).unsqueeze(dim=1)
+
+                # pred_next_state, _, means, variances = self.world_model.pred_next_states(
+                #     pred_state, pred_acts
+                # )
+                # pred_reward = self.world_model.pred_rewards(pred_next_state)
+                #
+                # # # # Quantification of certainty.
+                # uncert = self.sampling(means, variances)
+                # uncert = uncert.unsqueeze(dim=1).to(self.device)
+                # weights.append(uncert)
+
+                pred_states.append(pred_state)
+                pred_actions.append(pred_acts.detach())
+                pred_rs.append(pred_reward.detach())
+                pred_n_states.append(pred_next_state.detach())
+
+                pred_state = pred_next_state.detach()
+
+            pred_states = torch.vstack(pred_states)
+            pred_actions = torch.vstack(pred_actions)
+            pred_rs = torch.vstack(pred_rs)
+            pred_n_states = torch.vstack(pred_n_states)
+            pred_weights = torch.vstack(weights)
+            # Pay attention to here! It is dones in the Cares RL Code!
+            pred_dones = torch.FloatTensor(np.zeros(pred_rs.shape)).to(self.device)
+            # states, actions, rewards, next_states, not_dones
         self._train_policy(
-            pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, None
+            pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, pred_weights
         )
 
-    def query(self, states, us):
-        def angle_normalize(h):
-            return ((h + np.pi) % (2 * np.pi)) - np.pi
-
-        pred_states = []
-        pred_rewards = []
-
-        for i in range(states.shape[0]):
-            # Convert cos/sin to theta.
-            u = us[i]
-            state = states[i]
-            th = math.atan2(state[1], state[0])
-            thdot = state[2]
-
-            g = 10.0
-            m = 1.0
-            l = 1.0
-            dt = 0.05
-            u = np.clip(u, -2.0, 2.0)[0]
-            costs = angle_normalize(th) ** 2 + 0.1 * thdot ** 2 + 0.001 * (u ** 2)
-            newthdot = thdot + (3 * g / (2 * l) * np.sin(th) + 3.0 / (m * l ** 2) * u) * dt
-            newthdot = np.clip(newthdot, -8, 8)
-            newth = th + newthdot * dt
-
-            obs = np.array([np.cos(newth), np.sin(newth), newthdot], dtype=np.float32)
-
-            pred_states.append(obs)
-            pred_rewards.append(-costs)
-
-        return pred_states, pred_rewards
-
-    def sampling(self, pred_means, pred_vars):
+    def sampling(self, curr_states, pred_means, pred_vars):
         """
         High std means low uncertainty. Therefore, divided by 1
 
@@ -315,45 +301,122 @@ class Immersive_Reweight_Dyna_SAC:
         :param pred_vars:
         :return:
         """
-        # 5 models, each sampled 10 times = 50,
-        sample1 = torch.distributions.Normal(pred_means[0], pred_vars[0]).sample(
-            [10])
-        rwd_sample1 = self.world_model.pred_rewards(sample1)
+        with torch.no_grad():
+            # 5 models. Each predict 10 next_states.
+            sample1 = torch.distributions.Normal(pred_means[0], pred_vars[0]).sample(
+                [self.sample_times])
+            sample2 = torch.distributions.Normal(pred_means[1], pred_vars[1]).sample(
+                [self.sample_times])
+            sample3 = torch.distributions.Normal(pred_means[2], pred_vars[2]).sample(
+                [self.sample_times])
+            sample4 = torch.distributions.Normal(pred_means[3], pred_vars[3]).sample(
+                [self.sample_times])
+            sample5 = torch.distributions.Normal(pred_means[4], pred_vars[4]).sample(
+                [self.sample_times])
 
-        sample2 = torch.distributions.Normal(pred_means[1], pred_vars[1]).sample(
-            [10])
-        rwd_sample2 = self.world_model.pred_rewards(sample2)
+            rs = []
+            acts = []
+            qs = []
+            # Varying the next_state's distribution.
+            for i in range(self.sample_times):
+                sample1i = denormalize_observation_delta(sample1[i], self.world_model.statistics)
+                sample1i += curr_states
+                sample2i = denormalize_observation_delta(sample2[i], self.world_model.statistics)
+                sample2i += curr_states
+                sample3i = denormalize_observation_delta(sample3[i], self.world_model.statistics)
+                sample3i += curr_states
+                sample4i = denormalize_observation_delta(sample4[i], self.world_model.statistics)
+                sample4i += curr_states
+                sample5i = denormalize_observation_delta(sample5[i], self.world_model.statistics)
+                sample5i += curr_states
 
-        sample3 = torch.distributions.Normal(pred_means[2], pred_vars[2]).sample(
-            [10])
-        rwd_sample3 = self.world_model.pred_rewards(sample3)
+                if self.reweight_critic == 1:
+                    # 5 models, each sampled 10 times = 50,
+                    pred_rwd1 = self.world_model.pred_rewards(sample1i)
+                    pred_rwd2 = self.world_model.pred_rewards(sample2i)
+                    pred_rwd3 = self.world_model.pred_rewards(sample3i)
+                    pred_rwd4 = self.world_model.pred_rewards(sample4i)
+                    pred_rwd5 = self.world_model.pred_rewards(sample5i)
+                    rs.append(pred_rwd1)
+                    rs.append(pred_rwd2)
+                    rs.append(pred_rwd3)
+                    rs.append(pred_rwd4)
+                    rs.append(pred_rwd5)
+                # Each times, 5 models predict different actions.
+                # [2560, 17]
+                pred_act1, log_pi1, _ = self.actor_net(sample1i)
+                pred_act2, log_pi2, _ = self.actor_net(sample2i)
+                pred_act3, log_pi3, _ = self.actor_net(sample3i)
+                pred_act4, log_pi4, _ = self.actor_net(sample4i)
+                pred_act5, log_pi5, _ = self.actor_net(sample5i)
+                acts.append(log_pi1)
+                acts.append(log_pi2)
+                acts.append(log_pi3)
+                acts.append(log_pi4)
+                acts.append(log_pi5)
+                # How to become the same next state, different action.
+                # Now: sample1 sample2... same next state, different model.
+                # Pred_act1 pred_act2 same next_state, different actions.
+                # 5[] * 10[var of state]
+                qa1, qa2 = self.target_critic_net(sample1i, pred_act1)
+                qa = torch.minimum(qa1, qa2)
+                qb1, qb2 = self.target_critic_net(sample2i, pred_act2)
+                qb = torch.minimum(qb1, qb2)
+                qc1, qc2 = self.target_critic_net(sample3i, pred_act3)
+                qc = torch.minimum(qc1, qc2)
+                qd1, qd2 = self.target_critic_net(sample4i, pred_act4)
+                qd = torch.minimum(qd1, qd2)
+                qe1, qe2 = self.target_critic_net(sample5i, pred_act5)
+                qe = torch.minimum(qe1, qe2)
+                qs.append(qa)
+                qs.append(qb)
+                qs.append(qc)
+                qs.append(qd)
+                qs.append(qe)
+            if self.reweight_critic == 1:
+                rs = torch.stack(rs)
+            acts = torch.stack(acts)
+            qs = torch.stack(qs)
 
-        sample4 = torch.distributions.Normal(pred_means[3], pred_vars[3]).sample(
-            [10])
-        rwd_sample4 = self.world_model.pred_rewards(sample4)
+            if self.reweight_critic:
+                var_r = torch.var(rs, dim=0)
+                var_a = torch.var(acts, dim=0)
+                var_q = torch.var(qs, dim=0)
 
-        sample5 = torch.distributions.Normal(pred_means[4], pred_vars[4]).sample(
-            [10])
-        rwd_sample5 = self.world_model.pred_rewards(sample5)
+                mean_a = torch.mean(acts, dim=0, keepdim=True)
+                mean_q = torch.mean(qs, dim=0, keepdim=True)
+                diff_a = acts - mean_a
+                diff_q = qs - mean_q
+                cov_aq = torch.mean(diff_a * diff_q, dim=0)
 
-        samples = torch.cat((rwd_sample1, rwd_sample2, rwd_sample3, rwd_sample4, rwd_sample5))
-        # samples = torch.cat((sample1, sample2, sample3, sample4, sample5))
-        # Samples = [5 * 10, 10 predictions, 11 state dims]
-        # print(samples.shape)
-        stds = torch.var(samples, dim=0)
-        # print(stds.shape)
-        # [10 predictions, 11 state dims]
-        total_stds = torch.mean(stds, dim=1)
+                mean_r = torch.mean(rs, dim=0, keepdim=True)
+                diff_r = rs - mean_r
+                cov_rq = torch.mean(diff_r * diff_q, dim=0)
+                cov_ra = torch.mean(diff_r * diff_a, dim=0)
 
-        # Clip for sigmoid
-        # total_stds[total_stds < 0.1] = 0.0
-        # total_stds[total_stds > 4.0] = 4.0
+                gamma_sq = self.gamma * self.gamma
+                total_var = var_r + gamma_sq * var_a + gamma_sq * var_q + gamma_sq * 2 * cov_aq + \
+                            gamma_sq * 2 * cov_rq + gamma_sq * 2 * cov_ra
 
-        total_stds = F.sigmoid(total_stds)  # / 2 + 0.5  # 0.5 - 1.0
-        # total_stds = 1 / total_stds
-        # total_stds = total_stds / torch.mean(total_stds)  # if very uncertain,
-        # high std, encouraged.
-        # total_stds = total_stds - torch.min(total_stds)
-        # uncert = total_stds
-        uncert = 1.5 - total_stds
-        return uncert.detach()
+            if self.reweight_actor:
+                mean_a = torch.mean(acts, dim=0, keepdim=True)
+                mean_q = torch.mean(qs, dim=0, keepdim=True)
+                diff_a = acts - mean_a
+                diff_q = qs - mean_q
+                cov_aq = torch.mean(diff_a * diff_q, dim=0)
+
+                var_a = torch.var(acts, dim=0)
+                var_q = torch.var(qs, dim=0)
+                # For actor: alpha^2 * var_a + var_q
+                total_var = (self._alpha ** 2) * var_a + var_q + (self._alpha ** 2) * cov_aq
+
+            min_var = torch.min(total_var)
+            max_var = torch.max(total_var)
+            # As (max-min) decrease, threshold should go down.
+            threshold = self.threshold_scale * (max_var - min_var) + min_var
+            total_var[total_var <= threshold] = threshold
+
+            total_var += 0.00000001
+            total_stds = 1 / total_var
+
+        return total_stds.detach()
