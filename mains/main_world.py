@@ -9,7 +9,7 @@ import json
 
 def main():
     curr_path = os.getcwd()
-    alg_name = "bayesian_la.json"
+    alg_name = "prior_network.json"
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
     openai_or_dmcs = True
 
