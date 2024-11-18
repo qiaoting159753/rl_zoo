@@ -293,7 +293,8 @@ class World_Model_Trainer:
                                                  num_actions=self.action_dim,
                                                  device=self.device,
                                                  sas=self.sas,
-                                                 prob_rwd=self.prob_rwd
+                                                 prob_rwd=self.prob_rwd,
+                                                 lamb=self.parameter_a
                                                  )
 
         if self.world_model_name == "Ensemble_Dyna_One_Reward":

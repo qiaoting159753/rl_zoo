@@ -56,7 +56,7 @@ class Prior_World_Model(World_Model):
                  device: str,
                  l_r: float = 0.001,
                  hidden_size=None,
-                 lamb:float = 0.1,
+                 lamb: float = 0.1,
                  sas: bool = True,
                  prob_rwd: bool = True):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
