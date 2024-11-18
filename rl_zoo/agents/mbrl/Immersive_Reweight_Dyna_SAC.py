@@ -332,7 +332,6 @@ class Immersive_Reweight_Dyna_SAC:
                     qa1, qa2 = self.target_critic_net(samples[i], pred_act)
                     q_a = torch.minimum(qa1, qa2)
                     q_s.append(q_a)
-
             r_s = torch.stack(r_s)
             act_logs = torch.stack(act_logs)
             q_s = torch.stack(q_s)
@@ -356,7 +355,6 @@ class Immersive_Reweight_Dyna_SAC:
             total_var = var_r + gamma_sq * var_a + gamma_sq * var_q + gamma_sq * 2 * cov_aq + \
                         gamma_sq * 2 * cov_rq + gamma_sq * 2 * cov_ra
             # # For actor: alpha^2 * var_a + var_q
-            # total_var = (self._alpha ** 2) * var_a + var_q + (self._alpha ** 2) * cov_aq
             min_var = torch.min(total_var)
             max_var = torch.max(total_var)
             # As (max-min) decrease, threshold should go down.
@@ -364,5 +362,4 @@ class Immersive_Reweight_Dyna_SAC:
             total_var[total_var <= threshold] = threshold
             total_var += 0.00000001
             total_stds = 1 / total_var
-            print(total_stds.shape)
         return total_stds.detach()
