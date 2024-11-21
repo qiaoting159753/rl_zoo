@@ -272,11 +272,6 @@ class Immersive_Reweight_Dyna_SAC:
             # Pay attention to here! It is dones in the Cares RL Code!
             pred_dones = torch.FloatTensor(np.zeros(pred_rs.shape)).to(self.device)
             # states, actions, rewards, next_states, not_dones
-        print(pred_states.shape)
-        print(pred_rs.shape)
-        print(pred_n_states.shape)
-        print(pred_weights.shape)
-
         self._train_policy(
             pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, pred_weights
         )
@@ -355,3 +350,18 @@ class Immersive_Reweight_Dyna_SAC:
             total_var += 0.00000001
             total_stds = 1 / total_var
         return total_stds.detach()
+
+    def save_models(self, filename: str, filepath: str = "models") -> None:
+        path = f"{filepath}/models" if filepath != "models" else filepath
+        dir_exists = os.path.exists(path)
+        if not dir_exists:
+            os.makedirs(path)
+        torch.save(self.actor_net.state_dict(), f"{path}/{filename}_actor.pth")
+        torch.save(self.critic_net.state_dict(), f"{path}/{filename}_critic.pth")
+        logging.info("models has been saved...")
+
+    def load_models(self, filepath: str, filename: str) -> None:
+        path = f"{filepath}/models" if filepath != "models" else filepath
+        self.actor_net.load_state_dict(torch.load(f"{path}/{filename}_actor.pth"))
+        self.critic_net.load_state_dict(torch.load(f"{path}/{filename}_critic.pth"))
+        logging.info("models has been loaded...")
