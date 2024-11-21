@@ -318,9 +318,11 @@ class Immersive_Reweight_Dyna_SAC:
             r_s = []
             act_logs = []
             q_s = []
+            # For each model
             for i in range(pred_means.shape[0]):
                 sample_times = 10
                 samples = torch.distributions.Normal(pred_means[i], pred_vars[i]).sample([sample_times])
+                # For each sampling
                 for i in range(sample_times):
                     samples[i] = denormalize_observation_delta(samples[i], self.world_model.statistics)
                     samples[i] += curr_states
