@@ -229,6 +229,9 @@ class Immersive_Reweight_Dyna_SAC:
         # Step 3 Dyna add more statistics
         self._dyna_generate_and_train(next_states=next_states)
 
+    def set_statistics(self, stats: dict) -> None:
+        self.world_model.set_statistics(stats)
+
     def _dyna_generate_and_train(self, next_states: torch.Tensor) -> None:
         """
         Only off-policy Dyna will work.
@@ -247,38 +250,20 @@ class Immersive_Reweight_Dyna_SAC:
                 # This part is controversial. But random actions is empirically better.
                 rand_acts = np.random.uniform(-1, 1, (pred_state.shape[0], self.action_num))
                 pred_acts = torch.FloatTensor(rand_acts).to(self.device)
-
                 # [2560, 18]
-                pred_next_state, all_pred_next, norm_means_, norm_vars_ = self.world_model.pred_next_states(
+                pred_next_state, _, norm_means_, norm_vars_ = self.world_model.pred_next_states(
                     pred_state, pred_acts
                 )
                 pred_reward = self.reward_function(pred_state, pred_acts, pred_next_state)
                 uncert = self.sampling(pred_state, norm_means_, norm_vars_)
                 # Q, A, R
                 weights.append(uncert)
-                # p_states, p_rewards = self.query(pred_state.cpu().detach().numpy(), pred_acts.cpu().detach().numpy())
-                # pred_next_state = torch.FloatTensor(np.array(p_states)).to(self.device)
-                # pred_reward = torch.FloatTensor(np.array(p_rewards)).to(self.device).unsqueeze(dim=1)
-
-                # pred_next_state, _, means, variances = self.world_model.pred_next_states(
-                #     pred_state, pred_acts
-                # )
-                # pred_reward = self.world_model.pred_rewards(pred_next_state)
-                #
-                # # # # Quantification of certainty.
-                # uncert = self.sampling(means, variances)
-                # uncert = uncert.unsqueeze(dim=1).to(self.device)
-                # weights.append(uncert)
-
                 pred_next_state[:, -2:] = pred_state[:, -2:]
-
                 pred_states.append(pred_state)
                 pred_actions.append(pred_acts.detach())
                 pred_rs.append(pred_reward.detach())
                 pred_n_states.append(pred_next_state.detach())
-
                 pred_state = pred_next_state.detach()
-
             pred_states = torch.vstack(pred_states)
             pred_actions = torch.vstack(pred_actions)
             pred_rs = torch.vstack(pred_rs)
@@ -287,6 +272,11 @@ class Immersive_Reweight_Dyna_SAC:
             # Pay attention to here! It is dones in the Cares RL Code!
             pred_dones = torch.FloatTensor(np.zeros(pred_rs.shape)).to(self.device)
             # states, actions, rewards, next_states, not_dones
+        print(pred_states.shape)
+        print(pred_rs.shape)
+        print(pred_n_states.shape)
+        print(pred_weights.shape)
+
         self._train_policy(
             pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, pred_weights
         )
