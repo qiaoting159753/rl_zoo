@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 from rl_zoo.networks.mfrl.common import Actor
 from rl_zoo.networks.mfrl.sac import SAC_Critic
 from rl_zoo.agents.mfrl import SAC
-from rl_zoo.agents.mbrl import Dyna_SAC_NS
+from rl_zoo.agents.mbrl import Dyna_SAC_NS, Dyna_SAC_NS_V2
 from rl_zoo.agents.mbrl import Immersive_Reweight_Dyna_SAC
 from rl_zoo.utils import PrioritizedReplayBuffer
 
@@ -272,19 +272,19 @@ class MBRL_Trainer:
         #                  device=torch.device(self.device),
         #                  reward_scale=1.0)
 
-        self.agent = Immersive_Reweight_Dyna_SAC(actor_network=actor,
-                                                 critic_network=critic,
-                                                 world_network=self.world_model,
-                                                 num_samples=10,
-                                                 action_num=self.action_dim,
-                                                 alpha_lr=3e-4,
-                                                 horizon=1,
-                                                 gamma=0.99,
-                                                 tau=0.005,
-                                                 actor_lr=3e-4,
-                                                 critic_lr=3e-4,
-                                                 device=torch.device(self.device),
-                                                 threshold=0.5)
+        self.agent = Dyna_SAC_NS_V2(actor_network=actor,
+                                    critic_network=critic,
+                                    world_network=self.world_model,
+                                    num_samples=10,
+                                    action_num=self.action_dim,
+                                    alpha_lr=3e-4,
+                                    horizon=2,
+                                    gamma=0.99,
+                                    tau=0.005,
+                                    actor_lr=3e-4,
+                                    critic_lr=3e-4,
+                                    device=torch.device(self.device),
+                                    )
 
         # if self.world_model_name == "Ensemble_Dyna_One_SAS_Reward":
         #     self.world_model = Ensemble_Dyna_One_SAS_Reward(observation_size=self.state_dim,

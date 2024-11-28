@@ -137,10 +137,10 @@ class Ensemble_Dyna_One_Reward(World_Model):
             means.append(mean)
             vars_s.append(var)
         vars_s = torch.stack(vars_s).squeeze()
-        noises = vars_s.detach().numpy()
+        noises = vars_s.cpu().detach().numpy()
         aleatoric = (noises ** 2).mean(axis=0) ** 0.5
         all_means = torch.stack(means).squeeze()
-        epistemic = all_means.detach().numpy()
+        epistemic = all_means.cpu().detach().numpy()
         epistemic = epistemic.var(axis=0) ** 0.5
         aleatoric = np.minimum(aleatoric, 10e3)
         epistemic = np.minimum(epistemic, 10e3)
