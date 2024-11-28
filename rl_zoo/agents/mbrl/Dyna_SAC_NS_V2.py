@@ -40,6 +40,9 @@ class Dyna_SAC_NS_V2:
         horizon: int,
         device: torch.device,
     ):
+        logging.info("-------------------------------------------------------------------------------------------")
+        logging.info("-----------------------I am runing the Dyna_SAC_NS_V2 Agent! ------------------------------")
+        logging.info("-------------------------------------------------------------------------------------------")
         self.type = "mbrl"
         self.device = device
 

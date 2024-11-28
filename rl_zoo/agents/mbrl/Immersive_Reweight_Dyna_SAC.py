@@ -39,6 +39,10 @@ class Immersive_Reweight_Dyna_SAC:
             device: torch.device,
             threshold: float,
     ):
+        logging.info("-----------------------------------------------------------------------------------------------")
+        logging.info("-----------------------I am runing the Imerseive Reweight Agent! ------------------------------")
+        logging.info("-----------------------------------------------------------------------------------------------")
+
         self.threshold_scale = threshold
         self.type = "mbrl"
         self.device = device
