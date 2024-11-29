@@ -1,11 +1,11 @@
 import torch
 import numpy as np
 from torch import optim
-from rl_zoo.networks.world_models.bayesian.bnn_bbb_torchbnn import CustomizedMLP
+from rl_zoo.networks.world_models.bayesian.bnn_bbb_torchbnn import CustomizedMLP, BayesLinear
 from rl_zoo.networks.world_models import World_Model
 from rl_zoo.utils import normalize_observation, denormalize_observation_delta, normalize_observation_delta
 import torchbnn as bnn
-
+import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -33,12 +33,15 @@ class Bayesian_World_Model_BBB(World_Model):
         self.sas = sas
         self.prob_rwd = prob_rwd
 
-        self.world_model = CustomizedMLP(input_size=(observation_size+num_actions),
-                                         hidden_sizes=hidden_size,
-                                         output_size=2 * observation_size,
-                                         sigma=sigma)
+        self.world_model = nn.Sequential(
+            bnn.BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=(observation_size+num_actions), out_features=hidden_size[0]),
+            nn.ReLU(),
+            bnn.BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=hidden_size[0], out_features=hidden_size[1]),
+            nn.ReLU(),
+            bnn.BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=hidden_size[1], out_features=2 * observation_size),
+        )
 
-        self.kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False)
+        self.kl_loss = bnn.BKLLoss()
         self.world_optimizers = optim.Adam(self.world_model.parameters(), lr=self.l_r)
         self.world_model.to(self.device)
 
@@ -147,7 +150,7 @@ class Bayesian_World_Model_BBB(World_Model):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         normlized_state = normalize_observation(observation, self.statistics)
         normalized_obs_a = torch.cat((normlized_state, actions), dim=1)
-        pred = self.world_model(normalized_obs_a, sample=False)
+        pred = self.world_model(normalized_obs_a)
         preds = pred[:, :self.observation_size]
         mean_deltas = denormalize_observation_delta(preds, self.statistics)
         preds = mean_deltas + observation

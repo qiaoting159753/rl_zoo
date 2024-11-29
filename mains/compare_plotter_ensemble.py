@@ -35,7 +35,7 @@ def load_pnn():
     return data_list_pnn
 
 
-def load_prior():
+def load_1():
     algorithm = "prior_network"
     finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/0.3_16_16_15_24_11_18_04_47_57.csv.csv")
     finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/0.3_16_16_25_24_11_18_05_09_44.csv.csv")
@@ -64,58 +64,58 @@ def load_prior():
     return data_list_pnn
 
 
-def load_ensemble():
-    algorithm = "ensemble"
-    finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/15_0_0_15_24_11_13_22_52_20.csv.csv")
-    finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/15_0_0_25_24_11_13_23_50_40.csv.csv")
-    finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/15_0_0_35_24_11_14_00_53_36.csv.csv")
-    reacher_1 = pd.read_csv(location + algorithm + "/reacher_hard/15_0_0_15_24_11_14_05_23_31.csv.csv")
-    reacher_2 = pd.read_csv(location + algorithm + "/reacher_hard/15_0_0_25_24_11_14_06_29_56.csv.csv")
-    reacher_3 = pd.read_csv(location + algorithm + "/reacher_hard/15_0_0_35_24_11_14_07_38_41.csv.csv")
-    fish_1 = pd.read_csv(location + algorithm + "/fish_swim/15_0_0_15_24_11_14_01_55_07.csv.csv")
-    fish_2 = pd.read_csv(location + algorithm + "/fish_swim/15_0_0_25_24_11_14_03_05_01.csv.csv")
-    fish_3 = pd.read_csv(location + algorithm + "/fish_swim/15_0_0_35_24_11_14_04_13_53.csv.csv")
-    hcheetah_1 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/15_0_0_15_24_11_12_23_26_29.csv.csv")
-    hcheetah_2 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/15_0_0_25_24_11_13_00_23_27.csv.csv")
-    hcheetah_3 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/15_0_0_35_24_11_13_01_23_03.csv.csv")
-    hopper_1 = pd.read_csv(location + algorithm + "/Hopper-v5_/15_0_0_15_24_11_13_05_25_43.csv.csv")
-    hopper_2 = pd.read_csv(location + algorithm + "/Hopper-v5_/15_0_0_25_24_11_13_06_27_04.csv.csv")
-    hopper_3 = pd.read_csv(location + algorithm + "/Hopper-v5_/15_0_0_35_24_11_13_07_29_08.csv.csv")
-    swimmer_1 = pd.read_csv(location + algorithm + "/Swimmer-v5_/15_0_0_15_24_11_13_02_22_05.csv.csv")
-    swimmer_2 = pd.read_csv(location + algorithm + "/Swimmer-v5_/15_0_0_25_24_11_13_03_23_03.csv.csv")
-    swimmer_3 = pd.read_csv(location + algorithm + "/Swimmer-v5_/15_0_0_35_24_11_13_04_24_42.csv.csv")
-    walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/15_0_0_15_24_11_13_08_32_50.csv.csv")
-    walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/15_0_0_25_24_11_13_09_32_00.csv.csv")
-    walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/15_0_0_35_24_11_13_10_32_53.csv.csv")
+def load_2():
+    algorithm = "prior_network"
+    finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/0.5_16_16_15_24_11_18_05_52_33.csv.csv")
+    finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/0.5_16_16_25_24_11_18_06_14_00.csv.csv")
+    finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/0.5_16_16_35_24_11_18_06_35_25.csv.csv")
+    reacher_1 = pd.read_csv(location + algorithm + "/reacher_hard/0.5_16_16_15_24_11_18_13_24_56.csv.csv")
+    reacher_2 = pd.read_csv(location + algorithm + "/reacher_hard/0.5_16_16_25_24_11_18_13_48_55.csv.csv")
+    reacher_3 = pd.read_csv(location + algorithm + "/reacher_hard/0.5_16_16_35_24_11_18_14_12_55.csv.csv")
+    fish_1 = pd.read_csv(location + algorithm + "/fish_swim/0.5_16_16_15_24_11_18_09_24_51.csv.csv")
+    fish_2 = pd.read_csv(location + algorithm + "/fish_swim/0.5_16_16_25_24_11_18_09_52_51.csv.csv")
+    fish_3 = pd.read_csv(location + algorithm + "/fish_swim/0.5_16_16_35_24_11_18_10_20_47.csv.csv")
+    hcheetah_1 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/0.5_16_16_15_24_11_18_05_52_16.csv.csv")
+    hcheetah_2 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/0.5_16_16_25_24_11_18_06_14_02.csv.csv")
+    hcheetah_3 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/0.5_16_16_35_24_11_18_06_35_46.csv.csv")
+    hopper_1 = pd.read_csv(location + algorithm + "/Hopper-v5_/0.5_16_16_15_24_11_18_12_33_21.csv.csv")
+    hopper_2 = pd.read_csv(location + algorithm + "/Hopper-v5_/0.5_16_16_25_24_11_18_12_55_53.csv.csv")
+    hopper_3 = pd.read_csv(location + algorithm + "/Hopper-v5_/0.5_16_16_35_24_11_18_13_18_20.csv.csv")
+    swimmer_1 = pd.read_csv(location + algorithm + "/Swimmer-v5_/0.5_16_16_15_24_11_18_09_09_46.csv.csv")
+    swimmer_2 = pd.read_csv(location + algorithm + "/Swimmer-v5_/0.5_16_16_25_24_11_18_09_32_13.csv.csv")
+    swimmer_3 = pd.read_csv(location + algorithm + "/Swimmer-v5_/0.5_16_16_35_24_11_18_09_54_34.csv.csv")
+    walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/0.5_16_16_15_24_11_18_15_59_01.csv.csv")
+    walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/0.5_16_16_25_24_11_18_16_22_06.csv.csv")
+    walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/0.5_16_16_35_24_11_18_16_45_15.csv.csv")
     data_list_pnn = [finger_1, reacher_1, fish_1, hcheetah_1, hopper_1, swimmer_1, walker_1,
                      finger_2, reacher_2, fish_2, hcheetah_2, hopper_2, swimmer_2, walker_2,
                      finger_3, reacher_3, fish_3, hcheetah_3, hopper_3, swimmer_3, walker_3]
     return data_list_pnn
 
 
-def load_bbb():
-    algorithm = "bnn_bbb"
-    finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/5000_0.1_0.0_15_24_11_14_09_40_45.csv.csv")
-    finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/5000_0.1_0.0_25_24_11_14_10_00_27.csv.csv")
-    finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/5000_0.1_0.0_35_24_11_14_10_20_11.csv.csv")
-    reacher_1 = pd.read_csv(location + algorithm + "/reacher_hard/5000_0.1_0.0_15_24_11_15_01_21_40.csv.csv")
-    reacher_2 = pd.read_csv(location + algorithm + "/reacher_hard/5000_0.1_0.0_25_24_11_15_01_54_12.csv.csv")
-    reacher_3 = pd.read_csv(location + algorithm + "/reacher_hard/5000_0.1_0.0_35_24_11_15_02_26_55.csv.csv")
-    fish_1 = pd.read_csv(location + algorithm + "/fish_swim/5000_0.1_0.0_15_24_11_14_14_36_44.csv.csv")
-    fish_2 = pd.read_csv(location + algorithm + "/fish_swim/5000_0.1_0.0_25_24_11_14_15_19_45.csv.csv")
-    fish_3 = pd.read_csv(location + algorithm + "/fish_swim/5000_0.1_0.0_35_24_11_14_16_02_47.csv.csv")
-    hcheetah_1 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/5000_0.1_0.0_15_24_11_14_09_37_27.csv.csv")
-    hcheetah_2 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/5000_0.1_0.0_25_24_11_14_09_59_59.csv.csv")
-    hcheetah_3 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/5000_0.1_0.0_35_24_11_14_10_22_32.csv.csv")
-    hopper_1 = pd.read_csv(location + algorithm + "/Hopper-v5_/5000_0.1_0.0_15_24_11_14_22_00_31.csv.csv")
-    hopper_2 = pd.read_csv(location + algorithm + "/Hopper-v5_/5000_0.1_0.0_25_24_11_14_22_19_02.csv.csv")
-    hopper_3 = pd.read_csv(location + algorithm + "/Hopper-v5_/10000_0.1_0.0_15_24_11_14_23_02_01.csv.csv")
-    swimmer_1 = pd.read_csv(location + algorithm + "/Swimmer-v5_/5000_0.1_0.0_15_24_11_14_15_16_19.csv.csv")
-    swimmer_2 = pd.read_csv(location + algorithm + "/Swimmer-v5_/5000_0.1_0.0_25_24_11_14_15_43_20.csv.csv")
-    swimmer_3 = pd.read_csv(location + algorithm + "/Swimmer-v5_/5000_0.1_0.0_35_24_11_14_16_10_18.csv.csv")
-    walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_0.1_0.0_15_24_11_15_02_55_43.csv.csv")
-    walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_0.1_0.0_25_24_11_15_03_18_08.csv.csv")
-    walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_0.1_0.0_35_24_11_15_03_40_21.csv.csv")
+def load_3():
+    algorithm = "prior_network"
+    finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/0.9_1.csv")
+    finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/0.9_2.csv")
+    finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/0.9_3.csv")
+    reacher_1 = pd.read_csv(location + algorithm + "/reacher_hard/0.9_1.csv")
+    reacher_2 = pd.read_csv(location + algorithm + "/reacher_hard/0.9_2.csv")
+    reacher_3 = pd.read_csv(location + algorithm + "/reacher_hard/0.9_3.csv")
+    fish_1 = pd.read_csv(location + algorithm + "/fish_swim/0.9_1.csv")
+    fish_2 = pd.read_csv(location + algorithm + "/fish_swim/0.9_2.csv")
+    fish_3 = pd.read_csv(location + algorithm + "/fish_swim/0.9_3.csv")
+    hcheetah_1 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/0.9_1.csv")
+    hcheetah_2 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/0.9_2.csv")
+    hcheetah_3 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/0.9_3.csv")
+    hopper_1 = pd.read_csv(location + algorithm + "/Hopper-v5_/0.9_1.csv")
+    hopper_2 = pd.read_csv(location + algorithm + "/Hopper-v5_/0.9_2.csv")
+    hopper_3 = pd.read_csv(location + algorithm + "/Hopper-v5_/0.9_3.csv")
+    swimmer_1 = pd.read_csv(location + algorithm + "/Swimmer-v5_/0.9_1.csv")
+    swimmer_2 = pd.read_csv(location + algorithm + "/Swimmer-v5_/0.9_2.csv")
+    swimmer_3 = pd.read_csv(location + algorithm + "/Swimmer-v5_/0.9_3.csv")
+    walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/0.9_1.csv")
+    walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/0.9_2.csv")
+    walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/0.9_3.csv")
     data_list_pnn = [finger_1, reacher_1, fish_1, hcheetah_1, hopper_1, swimmer_1, walker_1,
                      finger_2, reacher_2, fish_2, hcheetah_2, hopper_2, swimmer_2, walker_2,
                      finger_3, reacher_3, fish_3, hcheetah_3, hopper_3, swimmer_3, walker_3]
@@ -174,20 +174,20 @@ sns.lineplot(
 #                  alpha=0.3)
 
 
-data_list_1 = load_prior()
-data_list_2 = load_ensemble()
-data_list_3 = load_bbb()
+data_list_1 = load_1()
+data_list_2 = load_2()
+data_list_3 = load_3()
 
 for j in range(3):
     if j == 0:
         data_list = data_list_1
-        label_name = "prior"
+        label_name = "0.3"
     if j == 1:
         data_list = data_list_2
-        label_name = "ensemble"
+        label_name = "0.5"
     if j == 2:
         data_list = data_list_3
-        label_name = "bayes backprop"
+        label_name = "0.9"
 
     for d in data_list:
         d.columns = attributes

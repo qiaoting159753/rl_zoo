@@ -9,10 +9,8 @@ import json
 
 def main():
     curr_path = os.getcwd()
-    alg_name = "prior_network.json"
+    alg_name = "bayesian_vi.json"
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
-    openai_or_dmcs = True
-
     with open(config_file, 'r') as file:
         data = json.load(file)
     logging.info(data)
@@ -43,15 +41,9 @@ def main():
     parent_dir = data["parent_direction"]
     # Switch
     parent_dir = curr_path + "/statistics/"
-
-    if openai_or_dmcs:
-        agents = ["HalfCheetah-v5", "Swimmer-v5", "Hopper-v5", "Walker2d-v5"]
-        tasks = ["", "", "", ""]
-    else:
-        agents = ['finger', 'fish', 'reacher']
-        tasks = ['turn_hard', 'swim','hard']
-
-    for i in range(6):
+    agents = ["HalfCheetah-v5", "Swimmer-v5", "Hopper-v5", "Walker2d-v5", "finger", "fish", "reacher"]
+    tasks = ["", "", "", "", "turn_hard", "swim", "hard"]
+    for i in range(7):
         env_domain = agents[i]
         env_task = tasks[i]
         sub_directory = agent_name + "_" + env_domain + "_" + env_task + "/"
@@ -70,7 +62,7 @@ def main():
                         # Random Seed
                         set_seed(seed)
                         # Environment
-                        if openai_or_dmcs:
+                        if i <= 3:
                             env = OpenAIEnvrionment(env_domain, param=False)
                         else:
                             env = DMCSEnvironment(env_domain, env_task)

@@ -208,7 +208,7 @@ class World_Model_Trainer:
 
         if self.generate_results:
             # Save the metrics
-            file_name = self.directory + str(self.seed) + "_" + self.date_and_time + ".csv"
+            file_name = self.directory + str(self.seed) + ".csv"
             np.savetxt(file_name + ".csv", np.array(self.evaluation_array), delimiter=",")
 
     def train(self, flush=False):
@@ -264,7 +264,6 @@ class World_Model_Trainer:
                 # End of Episode
                 if done or ((step_counter % self.episode_steps) == 0):
                     # Reset at next
-                    logging.info(f"Training:{epi_reward}")
                     need_reset = True
                     # Update World Model Statistics.
                     if len(self.memory) > self.batch_size:
