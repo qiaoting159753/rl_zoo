@@ -9,7 +9,7 @@ import json
 
 def main():
     curr_path = os.getcwd()
-    alg_name = "bayesian_la.json"
+    alg_name = "ensemble_big_pnn.json"
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
     with open(config_file, 'r') as file:
         data = json.load(file)

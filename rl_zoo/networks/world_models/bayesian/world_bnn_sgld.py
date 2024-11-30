@@ -1,67 +1,13 @@
 from __future__ import division
 import copy
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from rl_zoo.networks.world_models import World_Model
 from rl_zoo.utils.helpers import denormalize_observation_delta, normalize_observation, normalize_observation_delta
 from rl_zoo.networks.world_models.bayesian.bayesian_sgld_classes import SGLD_Sampler
+from rl_zoo.networks.world_models.bayesian.bayesian_sgld_stationary import CustomizedMLP
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
-
-
-class CustomizedMLP(nn.Module):
-    def __init__(self,
-                 observation_size,
-                 device,
-                 num_actions,
-                 hidden_sizes=None,
-                 name=None):
-        super().__init__()
-        self.name = name
-        self.device = device
-        self.dataloader = None
-        self.observation_size = observation_size
-        input_size = observation_size + num_actions
-        output_size = observation_size * 2
-
-        self.model = nn.Sequential(
-            nn.Linear(input_size, hidden_sizes[0]),
-            nn.ReLU(),
-            nn.Linear(hidden_sizes[0], hidden_sizes[1]),
-            nn.ReLU(),
-            nn.Linear(hidden_sizes[1], output_size)
-        )
-        self.log_std = nn.Parameter(torch.FloatTensor([-1]))
-        self.data = None
-        self.target = None
-
-    def reset_parameters(self):
-        for module in self.model.modules():
-            if isinstance(module, nn.Linear):
-                module.reset_parameters()
-        self.log_std.data = torch.FloatTensor([3.])
-
-    def sample(self):
-        self.reset_parameters()
-
-    def forward(self, x_x):
-        output = self.model(x_x)
-        means = output[:, :self.observation_size]
-        var_s = output[:, self.observation_size:]
-        var_s = torch.tanh(var_s)
-        var_s = torch.exp(var_s)
-        return means, var_s
-
-    def log_prob(self, data, target):
-        data = data.to(self.device)
-        target = target.to(self.device)
-        self.model.to(self.device)
-        mu, var_s = self.forward(data)
-        mse = F.mse_loss(mu, target)
-        # log_prob = torch.distributions.Normal(mu, F.softplus(self.log_std)).log_prob(self.target).mean()
-        log_prob = -F.gaussian_nll_loss(mu, target=target, var=var_s)
-        return {'log_prob': log_prob, 'MSE': mse.detach_()}
 
 
 class Bayesian_World_Model_SGLD(World_Model):
@@ -95,7 +41,7 @@ class Bayesian_World_Model_SGLD(World_Model):
         self.world_optimizers = torch.optim.Adam(self.world_model_0.parameters(), lr=l_r)
         self.trained_once = False
         self.counter = 0
-        self.stack_layers = 1
+        self.stack_layers = 5
         self.data = torch.ones((self.stack_layers * 256, observation_size + num_actions))
         self.target = torch.ones((self.stack_layers * 256, observation_size))
 
@@ -116,12 +62,6 @@ class Bayesian_World_Model_SGLD(World_Model):
             actions: torch.Tensor,
             next_states: torch.Tensor,
     ) -> None:
-        """
-        Train for On-policy flush training use.
-        :param states:
-        :param actions:
-        :param next_states:
-        """
         target = next_states - states
         delta_targets_normalized = normalize_observation_delta(target, self.statistics)
         normalized_state = normalize_observation(states, self.statistics)
@@ -136,7 +76,6 @@ class Bayesian_World_Model_SGLD(World_Model):
         :] = copy.deepcopy(data)
         self.target[256 * (self.counter % self.stack_layers):256 * ((self.counter % self.stack_layers) + 1),
         :] = copy.deepcopy(delta_targets_normalized)
-
         if self.counter > self.stack_layers:
             self.world_model_1.data = copy.deepcopy(self.data)
             self.world_model_1.data.to(self.device)
@@ -149,12 +88,13 @@ class Bayesian_World_Model_SGLD(World_Model):
     def estimate_uncertainty(self, observation: torch.Tensor, actions: torch.Tensor, train_reward:bool
     ) -> tuple[float, float]:
         total_unc = 0.0
-        if self.counter > self.stack_layers and (self.trained_once):
+
+        if self.counter > self.stack_layers and self.trained_once:
             normalized_state = normalize_observation(observation, self.statistics)
             data = torch.cat((normalized_state, actions), dim=1)
             # Get model uncertainty by sampling 100 parameters.
             self.world_model_1.load_state_dict(copy.deepcopy(self.world_model_0.state_dict()))
-            sampler = SGLD_Sampler(self.world_model_1, step_size=0.0001, burn_in=0, num_steps=3, num_chains=1, tune=False)
+            sampler = SGLD_Sampler(self.world_model_1, step_size=0.001, burn_in=0, num_steps=3, num_chains=3, tune=False)
             chains = sampler.sample_chains()
             # # Estimation from chains.
             preds = []
@@ -175,3 +115,5 @@ class Bayesian_World_Model_SGLD(World_Model):
             total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
             total_unc = total_unc.mean()
         return total_unc, 0.0, preds
+
+

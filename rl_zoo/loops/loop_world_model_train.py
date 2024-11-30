@@ -21,7 +21,8 @@ from rl_zoo.networks.world_models.deterministic import (Single_PNN,
                                                         Prior_World_Model)
 
 from rl_zoo.networks.world_models.ensembles import (Ensemble_Dyna_Ensemble_Reward,
-                                                    Ensemble_Dyna_One_Reward)
+                                                    Ensemble_Dyna_One_Reward,
+                                                    Ensemble_Dyna_Big)
 
 from rl_zoo.networks.world_models.bayesian import (Bayesian_World_Model_BBB,
                                                    Bayesian_World_Model_LA,
@@ -250,14 +251,14 @@ class World_Model_Trainer:
                     if self.model_G > 1.0:
                         for _ in range(int(self.model_G)):
                             self.agent.train_world_model(memory=self.memory,
-                                                               batch_size=self.batch_size,
-                                                               )
+                                                         batch_size=self.batch_size,
+                                                         )
                     else:
                         # For every a few steps
                         if self.counter % (int(1.0 / self.model_G)) == 0:
                             self.agent.train_world_model(memory=self.memory,
-                                                               batch_size=self.batch_size,
-                                                               )
+                                                         batch_size=self.batch_size,
+                                                         )
                 # Evaluating
                 if (self.counter % self.evaluate_interval == 0) and (self.counter > self.batch_size):
                     need_evaluate = True
@@ -304,6 +305,15 @@ class World_Model_Trainer:
                                                         sas=self.sas,
                                                         prob_rwd=self.prob_rwd)
 
+        if self.world_model_name == "Ensemble_Dyna_Big":
+            self.world_model = Ensemble_Dyna_One_Reward(observation_size=self.state_dim,
+                                                        num_actions=self.action_dim,
+                                                        num_models=7,
+                                                        device=self.device,
+                                                        boost_inter=int(self.parameter_a),
+                                                        sas=self.sas,
+                                                        prob_rwd=self.prob_rwd)
+
         if self.world_model_name == "Ensemble_Dyna_Ensemble_Reward":
             self.world_model = Ensemble_Dyna_Ensemble_Reward(observation_size=self.state_dim,
                                                              num_actions=self.action_dim,
@@ -345,7 +355,7 @@ class World_Model_Trainer:
 
         self.agent = SAC(actor_network=actor,
                          critic_network=critic,
-                         world_model= self.world_model,
+                         world_model=self.world_model,
                          action_num=self.action_dim,
                          alpha_lr=3e-4,
                          gamma=0.99,
