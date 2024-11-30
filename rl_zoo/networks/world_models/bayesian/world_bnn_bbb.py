@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 from torch import optim
-from rl_zoo.networks.world_models.bayesian.bnn_bbb_torchbnn import CustomizedMLP, BayesLinear
 from rl_zoo.networks.world_models import World_Model
 from rl_zoo.utils import normalize_observation, denormalize_observation_delta, normalize_observation_delta
 import torchbnn as bnn

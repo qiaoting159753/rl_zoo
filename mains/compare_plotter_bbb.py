@@ -127,7 +127,7 @@ def load_3():
 attributes = ['steps', 'dyna_mse', 'reward_mse', 'dyna_corr_l2', 'dyna_corr_l1', 'reward_corr_l1', 'reward_gt_corr_l1']
 envs = ["finger-turn_hard", "reacher-hard", "fish-swim", "HalfCheetah-v5", "Hopper-v5", "Swimmer-v5", "Walker2d-v5"]
 title = envs[0]
-attr = attributes[1]
+attr = attributes[6]
 cut = 1
 
 data_list_pnn = load_pnn()

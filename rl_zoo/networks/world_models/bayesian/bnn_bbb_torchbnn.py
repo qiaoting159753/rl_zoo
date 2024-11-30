@@ -1,8 +1,10 @@
-import torch.nn as nn
 import math
 import torch
+import torch.nn as nn
 from torch.nn import Module, Parameter
 import torch.nn.functional as F
+
+import torch.nn.init as init
 
 
 class BayesLinear(Module):
@@ -56,26 +58,23 @@ class BayesLinear(Module):
         if self.bias:
             self.bias_eps = None
 
-    def forward(self, input, sample=True):
+    def forward(self, input):
         r"""
         Overriden.
         """
-        if sample:
-            if self.weight_eps is None:
-                weight = self.weight_mu + torch.exp(self.weight_log_sigma) * torch.randn_like(self.weight_log_sigma)
-            else:
-                weight = self.weight_mu + torch.exp(self.weight_log_sigma) * self.weight_eps
-
-            if self.bias:
-                if self.bias_eps is None:
-                    bias = self.bias_mu + torch.exp(self.bias_log_sigma) * torch.randn_like(self.bias_log_sigma)
-                else:
-                    bias = self.bias_mu + torch.exp(self.bias_log_sigma) * self.bias_eps
-            else:
-                bias = None
+        if self.weight_eps is None:
+            weight = self.weight_mu + torch.exp(self.weight_log_sigma) * torch.randn_like(self.weight_log_sigma)
         else:
-            weight = self.weight_mu
-            bias = self.bias_mu
+            weight = self.weight_mu + torch.exp(self.weight_log_sigma) * self.weight_eps
+
+        if self.bias:
+            if self.bias_eps is None:
+                bias = self.bias_mu + torch.exp(self.bias_log_sigma) * torch.randn_like(self.bias_log_sigma)
+            else:
+                bias = self.bias_mu + torch.exp(self.bias_log_sigma) * self.bias_eps
+        else:
+            bias = None
+
         return F.linear(input, weight, bias)
 
     def extra_repr(self):
@@ -89,25 +88,14 @@ class BayesLinear(Module):
                                                                                               self.bias is not None)
 
 
-class CustomizedMLP(nn.Module):
-    def __init__(self, input_size: int, hidden_sizes: list[int], output_size: int, sigma: float):
-        super().__init__()
-        self.fully_connected_layers = []
-        for i, next_size in enumerate(hidden_sizes):
-            fully_connected_layer = BayesLinear(prior_mu=0.0,
-                                                prior_sigma=sigma,
-                                                in_features=input_size,
-                                                out_features=next_size)
-            self.add_module(f"fully_connected_layer_{i}", fully_connected_layer)
-            self.fully_connected_layers.append(fully_connected_layer)
-            input_size = next_size
-        self.output_layer = BayesLinear(prior_mu=0.0,
-                                        prior_sigma=sigma,
-                                        in_features=input_size,
-                                        out_features=output_size)
 
-    def forward(self, state, sample=True):
-        for fully_connected_layer in self.fully_connected_layers:
-            state = F.relu(fully_connected_layer(state, sample))
-        output = self.output_layer(state)
-        return output
+
+
+
+
+
+
+
+
+
+
