@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-
+import time
 
 def create_path_from_format_string(
     format_str: str,
@@ -83,6 +83,28 @@ def soft_update_params(net, target_net, tau):
     """
     for param, target_param in zip(net.parameters(), target_net.parameters()):
         target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
+
+
+def weight_init_pnn(module: torch.nn.Module) -> None:
+    """
+    Custom weight init for Conv2D and Linear layers
+
+    delta-orthogonal init from https://arxiv.org/pdf/1806.05393.pdf
+    """
+    if isinstance(module, torch.nn.Linear):
+        torch.manual_seed(int(time.time()))
+        torch.cuda.manual_seed_all(int(time.time()))
+        torch.nn.init.xavier_uniform_(module.weight)
+        module.bias.data.uniform_(-0.5, 0.5)
+
+    elif isinstance(module, (torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
+        assert module.weight.size(2) == module.weight.size(3)
+        module.weight.data.fill_(0.0)
+        module.bias.data.fill_(0.0)
+        mid = module.weight.size(2) // 2
+        gain = torch.nn.init.calculate_gain("relu")
+        torch.nn.init.orthogonal_(module.weight.data[:, :, mid, mid], gain)
+
 
 
 def weight_init(module: torch.nn.Module) -> None:

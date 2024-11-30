@@ -2,7 +2,7 @@ import torch
 import torch.utils
 from torch import nn
 
-from rl_zoo.utils import weight_init, MLP
+from rl_zoo.utils import weight_init_pnn, MLP
 
 
 class Probabilistic_Dynamics(nn.Module):
@@ -32,7 +32,8 @@ class Probabilistic_Dynamics(nn.Module):
                          output_size=2 * observation_size)
 
         self.add_module('mlp', self.model)
-        self.model.apply(weight_init)
+
+        self.model.apply(weight_init_pnn)
 
         self.statistics = {}
 
