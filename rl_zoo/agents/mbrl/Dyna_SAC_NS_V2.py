@@ -220,10 +220,11 @@ class Dyna_SAC_NS_V2:
                     # This part is controversial. But random actions is empirically better.
                     # rand_acts = np.random.uniform(-1, 1, (pred_state.shape[0], self.action_num))
                     # pred_acts = torch.FloatTensor(rand_acts).to(self.device)
-                    pred_acts,_,_ = self.actor_net(pred_state)
+                    pred_acts, _, _ = self.actor_net(pred_state)
                     pred_next_state, _, _, _ = self.world_model.pred_next_states(
                         pred_state, pred_acts
                     )
+
                     # pred_reward = self.world_model.pred_rewards(pred_next_state)
                     target_goal_tensor = pred_state[:, -2:]
                     target_goal = target_goal_tensor.cpu().numpy()
@@ -245,7 +246,6 @@ class Dyna_SAC_NS_V2:
                     pred_n_states.append(pred_next_state.detach())
 
                     pred_state = pred_next_state.detach()
-
                 pred_states = torch.vstack(pred_states)
                 pred_actions = torch.vstack(pred_actions)
                 pred_rs = torch.vstack(pred_rs)
