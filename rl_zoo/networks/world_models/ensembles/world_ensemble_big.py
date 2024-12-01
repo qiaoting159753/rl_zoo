@@ -43,17 +43,24 @@ class Ensemble_Dyna_Big(World_Model):
 
         self.world_models = []
         for i in range(self.num_models):
-            if i % 2 == 0:
+            i = i % 3
+            if i == 0:
                 model = Probabilistic_Dynamics(
                     observation_size=observation_size,
                     num_actions=num_actions,
                     hidden_size=[128, 128, 128],
                 )
-            else:
+            if i == 1:
                 model = Probabilistic_Dynamics(
                     observation_size=observation_size,
                     num_actions=num_actions,
                     hidden_size=hidden_size,
+                )
+            if i == 2:
+                model = Probabilistic_Dynamics(
+                    observation_size=observation_size,
+                    num_actions=num_actions,
+                    hidden_size=[256, 256],
                 )
             self.world_models.append(model)
 

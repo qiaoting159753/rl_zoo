@@ -308,9 +308,9 @@ class World_Model_Trainer:
         if self.world_model_name == "Ensemble_Dyna_Big":
             self.world_model = Ensemble_Dyna_One_Reward(observation_size=self.state_dim,
                                                         num_actions=self.action_dim,
-                                                        num_models=7,
                                                         device=self.device,
                                                         boost_inter=int(self.parameter_a),
+                                                        num_models=int(self.parameter_b),
                                                         sas=self.sas,
                                                         prob_rwd=self.prob_rwd)
 
