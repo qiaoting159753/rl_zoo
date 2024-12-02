@@ -285,6 +285,7 @@ class World_Model_Trainer:
                                           num_actions=self.action_dim,
                                           device=self.device,
                                           sas=self.sas,
+                                          net_type=int(self.parameter_a),
                                           prob_rwd=self.prob_rwd
                                           )
 

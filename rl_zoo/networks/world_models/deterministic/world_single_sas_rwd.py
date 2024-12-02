@@ -16,6 +16,7 @@ class Single_PNN(World_Model):
                  observation_size: int,
                  num_actions: int,
                  device: str,
+                 net_type: int,
                  l_r: float = 0.001,
                  hidden_size=None,
                  sas: bool = True,
@@ -23,6 +24,10 @@ class Single_PNN(World_Model):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
         if hidden_size is None:
             hidden_size = [128, 128]
+        if net_type == 2:
+            hidden_size = [128, 128, 128]
+        if net_type == 3:
+            hidden_size = [256, 256]
         self.prob_rwd = prob_rwd
         self.sas = sas
         self.observation_size = observation_size
