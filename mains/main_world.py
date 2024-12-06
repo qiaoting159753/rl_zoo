@@ -62,7 +62,7 @@ def main():
                         # Random Seed
                         set_seed(seed)
                         # Environment
-                        if i <= 3:
+                        if i <= 0:
                             env = OpenAIEnvrionment(env_domain, param=False)
                         else:
                             env = DMCSEnvironment(env_domain, env_task)

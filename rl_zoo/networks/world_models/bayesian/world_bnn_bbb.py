@@ -7,16 +7,82 @@ import torchbnn as bnn
 import torch.nn as nn
 import torch.nn.functional as F
 from .bnn_bbb_torchbnn import BayesLinear
+import math
+
+
+def _kl_loss(mu_0, log_sigma_0, mu_1, log_sigma_1):
+    """
+    An method for calculating KL divergence between two Normal distribtuion.
+
+    Arguments:
+        mu_0 (Float) : mean of normal distribution.
+        log_sigma_0 (Float): log(standard deviation of normal distribution).
+        mu_1 (Float): mean of normal distribution.
+        log_sigma_1 (Float): log(standard deviation of normal distribution).
+
+    """
+    kl = log_sigma_1 - log_sigma_0 + \
+         (torch.exp(log_sigma_0) ** 2 + (mu_0 - mu_1) ** 2) / (2 * math.exp(log_sigma_1) ** 2) - 0.5
+    return kl.sum()
+
+def bayesian_kl_loss(model, reduction='mean', last_layer_only=False):
+    """
+    An method for calculating KL divergence of whole layers in the model.
+
+
+    Arguments:
+        model (nn.Module): a model to be calculated for KL-divergence.
+        reduction (string, optional): Specifies the reduction to apply to the output:
+            ``'mean'``: the sum of the output will be divided by the number of
+            elements of the output.
+            ``'sum'``: the output will be summed.
+        last_layer_only (Bool): True for return only the last layer's KL divergence.
+
+    """
+    device = torch.device("cuda" if next(model.parameters()).is_cuda else "cpu")
+    kl = torch.Tensor([0]).to(device)
+    kl_sum = torch.Tensor([0]).to(device)
+    n = torch.Tensor([0]).to(device)
+
+    for m in model.modules():
+        if isinstance(m, (BayesLinear)):
+            kl = _kl_loss(m.weight_mu, m.weight_log_sigma, m.prior_mu, m.prior_log_sigma)
+            kl_sum += kl
+            n += len(m.weight_mu.view(-1))
+
+            if m.bias:
+                kl = _kl_loss(m.bias_mu, m.bias_log_sigma, m.prior_mu, m.prior_log_sigma)
+                kl_sum += kl
+                n += len(m.bias_mu.view(-1))
+
+    if last_layer_only or n == 0:
+        return kl
+
+    if reduction == 'mean':
+        return kl_sum / n
+    elif reduction == 'sum':
+        return kl_sum
+    else:
+        raise ValueError(reduction + " is not valid")
+
+
 
 class BNN_World(nn.Module):
     def __init__(self, observation_size, num_actions, hidden_size, sigma):
         super().__init__()
+        self.nn_layers = nn.ModuleList()
+
         self.l1 = BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=(observation_size + num_actions),out_features=hidden_size[0])
         self.l2 = BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=hidden_size[0], out_features=hidden_size[1])
         self.l3 = BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=hidden_size[1], out_features=2 * observation_size)
         self.add_module('l1',self.l1)
         self.add_module('l2', self.l2)
         self.add_module('l3', self.l3)
+        self.nn_layers.append(self.l1)
+        self.nn_layers.append(self.l2)
+        self.nn_layers.append(self.l3)
+
+
         # self.register_parameter('l1', self.l1.parameters())
         # self.register_parameter('l2', self.l2.parameters())
         # self.register_parameter('l3', self.l3.parameters())
@@ -72,7 +138,7 @@ class Bayesian_World_Model_BBB(World_Model):
         var_pred = torch.tanh(var_pred)
         var_pred = torch.exp(var_pred)
         self.world_optimizers.zero_grad()
-        kl_loss = self.kl_loss(self.world_model)
+        kl_loss = bayesian_kl_loss(self.world_model)
         nll_loss = F.gaussian_nll_loss(input=mean_pred, target=normalized_target, var=var_pred).mean()
         loss = nll_loss + self.ratio * kl_loss
         loss.backward()
