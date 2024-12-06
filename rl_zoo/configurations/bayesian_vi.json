@@ -1,7 +1,7 @@
 {
   "loop_name": "World_Model",
   "agent_name":"Bayesian_VI",
-  "device": "cuda",
+  "device": "cpu",
   "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 5.0,
@@ -13,7 +13,7 @@
   "horizon": 5,
   "branch_factor": 10,
   "on_policy": false,
-  "Parameter_A" : [0.01, 0.1, 1.0, 10.0],
+  "Parameter_A" : [0.01, 0.1, 1.0, 2000.0],
   "Parameter_B" : [0.1],
   "Parameter_C" : [0.0],
   "flush": false,

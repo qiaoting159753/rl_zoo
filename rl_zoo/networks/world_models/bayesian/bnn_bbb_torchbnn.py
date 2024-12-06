@@ -58,10 +58,15 @@ class BayesLinear(Module):
         if self.bias:
             self.bias_eps = None
 
-    def forward(self, input):
+    def forward(self, input, sample):
         r"""
         Overriden.
         """
+        if not sample:
+            weight = self.weight_mu
+            bias = self.bias_mu
+            return F.linear(input, weight, bias)
+
         if self.weight_eps is None:
             weight = self.weight_mu + torch.exp(self.weight_log_sigma) * torch.randn_like(self.weight_log_sigma)
         else:
@@ -74,7 +79,6 @@ class BayesLinear(Module):
                 bias = self.bias_mu + torch.exp(self.bias_log_sigma) * self.bias_eps
         else:
             bias = None
-
         return F.linear(input, weight, bias)
 
     def extra_repr(self):
@@ -86,16 +90,3 @@ class BayesLinear(Module):
                                                                                               self.in_features,
                                                                                               self.out_features,
                                                                                               self.bias is not None)
-
-
-
-
-
-
-
-
-
-
-
-
-

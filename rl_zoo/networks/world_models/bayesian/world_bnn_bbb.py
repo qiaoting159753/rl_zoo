@@ -6,7 +6,27 @@ from rl_zoo.utils import normalize_observation, denormalize_observation_delta, n
 import torchbnn as bnn
 import torch.nn as nn
 import torch.nn.functional as F
+from .bnn_bbb_torchbnn import BayesLinear
 
+class BNN_World(nn.Module):
+    def __init__(self, observation_size, num_actions, hidden_size, sigma):
+        super().__init__()
+        self.l1 = BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=(observation_size + num_actions),out_features=hidden_size[0])
+        self.l2 = BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=hidden_size[0], out_features=hidden_size[1])
+        self.l3 = BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=hidden_size[1], out_features=2 * observation_size)
+        self.add_module('l1',self.l1)
+        self.add_module('l2', self.l2)
+        self.add_module('l3', self.l3)
+        # self.register_parameter('l1', self.l1.parameters())
+        # self.register_parameter('l2', self.l2.parameters())
+        # self.register_parameter('l3', self.l3.parameters())
+    def forward(self, in_data, sample):
+        x = self.l1(in_data, sample)
+        x = F.relu(x)
+        x = self.l2(x, sample)
+        x = F.relu(x)
+        x = self.l3(x, sample)
+        return x
 
 class Bayesian_World_Model_BBB(World_Model):
     def __init__(self,
@@ -31,15 +51,7 @@ class Bayesian_World_Model_BBB(World_Model):
         self.device = device
         self.sas = sas
         self.prob_rwd = prob_rwd
-
-        self.world_model = nn.Sequential(
-            bnn.BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=(observation_size+num_actions), out_features=hidden_size[0]),
-            nn.ReLU(),
-            bnn.BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=hidden_size[0], out_features=hidden_size[1]),
-            nn.ReLU(),
-            bnn.BayesLinear(prior_mu=0, prior_sigma=sigma, in_features=hidden_size[1], out_features=2 * observation_size),
-        )
-
+        self.world_model =BNN_World(observation_size, num_actions, [128, 128], sigma=sigma)
         self.kl_loss = bnn.BKLLoss()
         self.world_optimizers = optim.Adam(self.world_model.parameters(), lr=self.l_r)
         self.world_model.to(self.device)
@@ -54,7 +66,7 @@ class Bayesian_World_Model_BBB(World_Model):
         normalized_target = normalize_observation_delta(target, self.statistics)
         normlized_state = normalize_observation(states, self.statistics)
         x = torch.cat((normlized_state, actions), dim=1)
-        preds = self.world_model(x)
+        preds = self.world_model(x, sample=True)
         mean_pred = preds[:, :self.observation_size]
         var_pred = preds[:, self.observation_size:]
         var_pred = torch.tanh(var_pred)
@@ -76,7 +88,7 @@ class Bayesian_World_Model_BBB(World_Model):
         sample_world_times = 20
         # for _ in range(sample_times):
         for i in range(sample_world_times):
-            pred = self.world_model(x)
+            pred = self.world_model(x, sample=True)
             mean_pred = pred[:, :self.observation_size]
             var_pred = pred[:, self.observation_size:]
             var_pred = torch.tanh(var_pred)
@@ -149,7 +161,7 @@ class Bayesian_World_Model_BBB(World_Model):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         normlized_state = normalize_observation(observation, self.statistics)
         normalized_obs_a = torch.cat((normlized_state, actions), dim=1)
-        pred = self.world_model(normalized_obs_a)
+        pred = self.world_model(normalized_obs_a, sample=False)
         preds = pred[:, :self.observation_size]
         mean_deltas = denormalize_observation_delta(preds, self.statistics)
         preds = mean_deltas + observation
