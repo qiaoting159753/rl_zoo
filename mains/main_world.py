@@ -9,7 +9,7 @@ import json
 
 def main():
     curr_path = os.getcwd()
-    alg_name = "bayesian_vi.json"
+    alg_name = "single_pnn.json"
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
     with open(config_file, 'r') as file:
         data = json.load(file)
@@ -41,8 +41,8 @@ def main():
     parent_dir = data["parent_direction"]
     # Switch
     parent_dir = curr_path + "/statistics/"
-    agents = ["HalfCheetah-v5", "Swimmer-v5", "Hopper-v5", "Walker2d-v5", "finger", "fish", "reacher"]
-    tasks = ["", "", "", "", "turn_hard", "swim", "hard"]
+    agents = ["Ant-v5", "Humanoid-v5", "ball_in_cup", "cartpole", "acrobot"]
+    tasks = ["", "", "catch", "swingup", "swingup"]
     for i in range(7):
         env_domain = agents[i]
         env_task = tasks[i]
@@ -62,10 +62,11 @@ def main():
                         # Random Seed
                         set_seed(seed)
                         # Environment
-                        if i <= 0:
+                        if i <= 1:
                             env = OpenAIEnvrionment(env_domain, param=False)
                         else:
                             env = DMCSEnvironment(env_domain, env_task)
+
                         env.set_seed(seed)
                         # Agent
                         # CHANGE THIS PART WHEN ON SCHOOL #

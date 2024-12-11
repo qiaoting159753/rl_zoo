@@ -4,32 +4,32 @@ import pandas as pd
 import seaborn as sns
 
 logging.basicConfig(level=logging.INFO)
-location = "/Users/tonyq/Downloads/CH1_DATA/"
+location = "/Users/tonyq/Desktop/CH1_Data/"
 
 
 def load_pnn():
-    algorithm = "bnn_bbb"
-    finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/10000_1.csv")
-    finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/10000_2.csv")
-    finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/10000_3.csv")
-    reacher_1 = pd.read_csv(location + algorithm + "/reacher_hard/10000_1.csv")
-    reacher_2 = pd.read_csv(location + algorithm + "/reacher_hard/10000_2.csv")
-    reacher_3 = pd.read_csv(location + algorithm + "/reacher_hard/10000_3.csv")
-    fish_1 = pd.read_csv(location + algorithm + "/fish_swim/10000_1.csv")
-    fish_2 = pd.read_csv(location + algorithm + "/fish_swim/10000_2.csv")
-    fish_3 = pd.read_csv(location + algorithm + "/fish_swim/10000_3.csv")
-    hcheetah_1 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/10000_1.csv")
-    hcheetah_2 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/10000_2.csv")
-    hcheetah_3 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/10000_3.csv")
-    hopper_1 = pd.read_csv(location + algorithm + "/Hopper-v5_/10000_1.csv")
-    hopper_2 = pd.read_csv(location + algorithm + "/Hopper-v5_/10000_2.csv")
-    hopper_3 = pd.read_csv(location + algorithm + "/Hopper-v5_/10000_3.csv")
-    swimmer_1 = pd.read_csv(location + algorithm + "/Swimmer-v5_/10000_1.csv")
-    swimmer_2 = pd.read_csv(location + algorithm + "/Swimmer-v5_/10000_2.csv")
-    swimmer_3 = pd.read_csv(location + algorithm + "/Swimmer-v5_/10000_3.csv")
-    walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_1.csv")
-    walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_2.csv")
-    walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_3.csv")
+    algorithm = "bayesian/overfit/Bayesian_VI_"
+    finger_1 = pd.read_csv(location + algorithm + "finger_turn_hard/0.1_0.1_0.0_15.csv.csv")
+    finger_2 = pd.read_csv(location + algorithm + "finger_turn_hard/0.1_0.1_0.0_25.csv.csv")
+    finger_3 = pd.read_csv(location + algorithm + "finger_turn_hard/0.1_0.1_0.0_35.csv.csv")
+    reacher_1 = pd.read_csv(location + algorithm + "reacher_hard/0.1_0.1_0.0_15.csv.csv")
+    reacher_2 = pd.read_csv(location + algorithm + "reacher_hard/0.1_0.1_0.0_25.csv.csv")
+    reacher_3 = pd.read_csv(location + algorithm + "reacher_hard/0.1_0.1_0.0_35.csv.csv")
+    fish_1 = pd.read_csv(location + algorithm + "fish_swim/0.1_0.1_0.0_15.csv.csv")
+    fish_2 = pd.read_csv(location + algorithm + "fish_swim/0.1_0.1_0.0_25.csv.csv")
+    fish_3 = pd.read_csv(location + algorithm + "fish_swim/0.1_0.1_0.0_35.csv.csv")
+    hcheetah_1 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.1_0.1_0.0_15.csv.csv")
+    hcheetah_2 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.1_0.1_0.0_25.csv.csv")
+    hcheetah_3 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.1_0.1_0.0_35.csv.csv")
+    hopper_1 = pd.read_csv(location + algorithm + "Hopper-v5_/0.1_0.1_0.0_15.csv.csv")
+    hopper_2 = pd.read_csv(location + algorithm + "Hopper-v5_/0.1_0.1_0.0_25.csv.csv")
+    hopper_3 = pd.read_csv(location + algorithm + "Hopper-v5_/0.1_0.1_0.0_35.csv.csv")
+    swimmer_1 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.1_0.1_0.0_15.csv.csv")
+    swimmer_2 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.1_0.1_0.0_25.csv.csv")
+    swimmer_3 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.1_0.1_0.0_35.csv.csv")
+    walker_1 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.1_0.1_0.0_15.csv.csv")
+    walker_2 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.1_0.1_0.0_25.csv.csv")
+    walker_3 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.1_0.1_0.0_35.csv.csv")
     data_list_pnn = [finger_1, reacher_1, fish_1, hcheetah_1, hopper_1, swimmer_1, walker_1,
                      finger_2, reacher_2, fish_2, hcheetah_2, hopper_2, swimmer_2, walker_2,
                      finger_3, reacher_3, fish_3, hcheetah_3, hopper_3, swimmer_3, walker_3]
@@ -37,28 +37,28 @@ def load_pnn():
 
 
 def load_1():
-    algorithm = "bnn_bbb"
-    finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/10000_1.csv")
-    finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/10000_2.csv")
-    finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/10000_3.csv")
-    reacher_1 = pd.read_csv(location + algorithm + "/reacher_hard/10000_1.csv")
-    reacher_2 = pd.read_csv(location + algorithm + "/reacher_hard/10000_2.csv")
-    reacher_3 = pd.read_csv(location + algorithm + "/reacher_hard/10000_3.csv")
-    fish_1 = pd.read_csv(location + algorithm + "/fish_swim/10000_1.csv")
-    fish_2 = pd.read_csv(location + algorithm + "/fish_swim/10000_2.csv")
-    fish_3 = pd.read_csv(location + algorithm + "/fish_swim/10000_3.csv")
-    hcheetah_1 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/10000_1.csv")
-    hcheetah_2 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/10000_2.csv")
-    hcheetah_3 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/10000_3.csv")
-    hopper_1 = pd.read_csv(location + algorithm + "/Hopper-v5_/10000_1.csv")
-    hopper_2 = pd.read_csv(location + algorithm + "/Hopper-v5_/10000_2.csv")
-    hopper_3 = pd.read_csv(location + algorithm + "/Hopper-v5_/10000_3.csv")
-    swimmer_1 = pd.read_csv(location + algorithm + "/Swimmer-v5_/10000_1.csv")
-    swimmer_2 = pd.read_csv(location + algorithm + "/Swimmer-v5_/10000_2.csv")
-    swimmer_3 = pd.read_csv(location + algorithm + "/Swimmer-v5_/10000_3.csv")
-    walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_1.csv")
-    walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_2.csv")
-    walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_3.csv")
+    algorithm = "bayesian/overfit/Bayesian_VI_"
+    finger_1 = pd.read_csv(location + algorithm + "finger_turn_hard/0.01_0.1_0.0_15.csv.csv")
+    finger_2 = pd.read_csv(location + algorithm + "finger_turn_hard/0.01_0.1_0.0_25.csv.csv")
+    finger_3 = pd.read_csv(location + algorithm + "finger_turn_hard/0.01_0.1_0.0_35.csv.csv")
+    reacher_1 = pd.read_csv(location + algorithm + "reacher_hard/0.01_0.1_0.0_15.csv.csv")
+    reacher_2 = pd.read_csv(location + algorithm + "reacher_hard/0.01_0.1_0.0_25.csv.csv")
+    reacher_3 = pd.read_csv(location + algorithm + "reacher_hard/0.01_0.1_0.0_35.csv.csv")
+    fish_1 = pd.read_csv(location + algorithm + "fish_swim/0.01_0.1_0.0_15.csv.csv")
+    fish_2 = pd.read_csv(location + algorithm + "fish_swim/0.01_0.1_0.0_25.csv.csv")
+    fish_3 = pd.read_csv(location + algorithm + "fish_swim/0.01_0.1_0.0_35.csv.csv")
+    hcheetah_1 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.01_0.1_0.0_15.csv.csv")
+    hcheetah_2 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.01_0.1_0.0_25.csv.csv")
+    hcheetah_3 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.01_0.1_0.0_35.csv.csv")
+    hopper_1 = pd.read_csv(location + algorithm + "Hopper-v5_/0.01_0.1_0.0_15.csv.csv")
+    hopper_2 = pd.read_csv(location + algorithm + "Hopper-v5_/0.01_0.1_0.0_25.csv.csv")
+    hopper_3 = pd.read_csv(location + algorithm + "Hopper-v5_/0.01_0.1_0.0_35.csv.csv")
+    swimmer_1 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.01_0.1_0.0_15.csv.csv")
+    swimmer_2 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.01_0.1_0.0_25.csv.csv")
+    swimmer_3 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.01_0.1_0.0_35.csv.csv")
+    walker_1 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.01_0.1_0.0_15.csv.csv")
+    walker_2 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.01_0.1_0.0_25.csv.csv")
+    walker_3 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.01_0.1_0.0_35.csv.csv")
     data_list_pnn = [finger_1, reacher_1, fish_1, hcheetah_1, hopper_1, swimmer_1, walker_1,
                      finger_2, reacher_2, fish_2, hcheetah_2, hopper_2, swimmer_2, walker_2,
                      finger_3, reacher_3, fish_3, hcheetah_3, hopper_3, swimmer_3, walker_3]
@@ -66,57 +66,28 @@ def load_1():
 
 
 def load_2():
-    algorithm = "bnn_bbb"
-    finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/50000_1.csv")
-    finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/50000_2.csv")
-    finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/50000_3.csv")
-    reacher_1 = pd.read_csv(location + algorithm + "/reacher_hard/50000_1.csv")
-    reacher_2 = pd.read_csv(location + algorithm + "/reacher_hard/50000_2.csv")
-    reacher_3 = pd.read_csv(location + algorithm + "/reacher_hard/50000_3.csv")
-    fish_1 = pd.read_csv(location + algorithm + "/fish_swim/50000_1.csv")
-    fish_2 = pd.read_csv(location + algorithm + "/fish_swim/50000_2.csv")
-    fish_3 = pd.read_csv(location + algorithm + "/fish_swim/50000_3.csv")
-    hcheetah_1 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/50000_1.csv")
-    hcheetah_2 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/50000_2.csv")
-    hcheetah_3 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/50000_3.csv")
-    hopper_1 = pd.read_csv(location + algorithm + "/Hopper-v5_/50000_1.csv")
-    hopper_2 = pd.read_csv(location + algorithm + "/Hopper-v5_/50000_2.csv")
-    hopper_3 = pd.read_csv(location + algorithm + "/Hopper-v5_/50000_3.csv")
-    swimmer_1 = pd.read_csv(location + algorithm + "/Swimmer-v5_/50000_1.csv")
-    swimmer_2 = pd.read_csv(location + algorithm + "/Swimmer-v5_/50000_2.csv")
-    swimmer_3 = pd.read_csv(location + algorithm + "/Swimmer-v5_/50000_3.csv")
-    walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/50000_1.csv")
-    walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/50000_2.csv")
-    walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/50000_3.csv")
-    data_list_pnn = [finger_1, reacher_1, fish_1, hcheetah_1, hopper_1, swimmer_1, walker_1,
-                     finger_2, reacher_2, fish_2, hcheetah_2, hopper_2, swimmer_2, walker_2,
-                     finger_3, reacher_3, fish_3, hcheetah_3, hopper_3, swimmer_3, walker_3]
-    return data_list_pnn
-
-
-def load_3():
-    algorithm = "bnn_bbb"
-    finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/100000_1.csv")
-    finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/100000_2.csv")
-    finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/100000_3.csv")
-    reacher_1 = pd.read_csv(location + algorithm + "/reacher_hard/100000_1.csv")
-    reacher_2 = pd.read_csv(location + algorithm + "/reacher_hard/100000_2.csv")
-    reacher_3 = pd.read_csv(location + algorithm + "/reacher_hard/100000_3.csv")
-    fish_1 = pd.read_csv(location + algorithm + "/fish_swim/100000_1.csv")
-    fish_2 = pd.read_csv(location + algorithm + "/fish_swim/100000_2.csv")
-    fish_3 = pd.read_csv(location + algorithm + "/fish_swim/100000_3.csv")
-    hcheetah_1 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/100000_1.csv")
-    hcheetah_2 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/100000_2.csv")
-    hcheetah_3 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/100000_3.csv")
-    hopper_1 = pd.read_csv(location + algorithm + "/Hopper-v5_/100000_1.csv")
-    hopper_2 = pd.read_csv(location + algorithm + "/Hopper-v5_/100000_2.csv")
-    hopper_3 = pd.read_csv(location + algorithm + "/Hopper-v5_/100000_3.csv")
-    swimmer_1 = pd.read_csv(location + algorithm + "/Swimmer-v5_/100000_1.csv")
-    swimmer_2 = pd.read_csv(location + algorithm + "/Swimmer-v5_/100000_2.csv")
-    swimmer_3 = pd.read_csv(location + algorithm + "/Swimmer-v5_/100000_3.csv")
-    walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/100000_1.csv")
-    walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/100000_2.csv")
-    walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/100000_3.csv")
+    algorithm = "bayesian/overfit/Bayesian_VI_"
+    finger_1 = pd.read_csv(location + algorithm + "finger_turn_hard/0.001_0.1_0.0_15.csv.csv")
+    finger_2 = pd.read_csv(location + algorithm + "finger_turn_hard/0.001_0.1_0.0_25.csv.csv")
+    finger_3 = pd.read_csv(location + algorithm + "finger_turn_hard/0.001_0.1_0.0_35.csv.csv")
+    reacher_1 = pd.read_csv(location + algorithm + "reacher_hard/0.001_0.1_0.0_15.csv.csv")
+    reacher_2 = pd.read_csv(location + algorithm + "reacher_hard/0.001_0.1_0.0_25.csv.csv")
+    reacher_3 = pd.read_csv(location + algorithm + "reacher_hard/0.001_0.1_0.0_35.csv.csv")
+    fish_1 = pd.read_csv(location + algorithm + "fish_swim/0.001_0.1_0.0_15.csv.csv")
+    fish_2 = pd.read_csv(location + algorithm + "fish_swim/0.001_0.1_0.0_25.csv.csv")
+    fish_3 = pd.read_csv(location + algorithm + "fish_swim/0.001_0.1_0.0_35.csv.csv")
+    hcheetah_1 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.001_0.1_0.0_15.csv.csv")
+    hcheetah_2 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.001_0.1_0.0_25.csv.csv")
+    hcheetah_3 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.001_0.1_0.0_35.csv.csv")
+    hopper_1 = pd.read_csv(location + algorithm + "Hopper-v5_/0.001_0.1_0.0_15.csv.csv")
+    hopper_2 = pd.read_csv(location + algorithm + "Hopper-v5_/0.001_0.1_0.0_25.csv.csv")
+    hopper_3 = pd.read_csv(location + algorithm + "Hopper-v5_/0.001_0.1_0.0_35.csv.csv")
+    swimmer_1 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.001_0.1_0.0_15.csv.csv")
+    swimmer_2 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.001_0.1_0.0_25.csv.csv")
+    swimmer_3 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.001_0.1_0.0_35.csv.csv")
+    walker_1 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.001_0.1_0.0_15.csv.csv")
+    walker_2 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.001_0.1_0.0_25.csv.csv")
+    walker_3 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.001_0.1_0.0_35.csv.csv")
     data_list_pnn = [finger_1, reacher_1, fish_1, hcheetah_1, hopper_1, swimmer_1, walker_1,
                      finger_2, reacher_2, fish_2, hcheetah_2, hopper_2, swimmer_2, walker_2,
                      finger_3, reacher_3, fish_3, hcheetah_3, hopper_3, swimmer_3, walker_3]
@@ -126,8 +97,8 @@ def load_3():
 # Control
 attributes = ['steps', 'dyna_mse', 'reward_mse', 'dyna_corr_l2', 'dyna_corr_l1', 'reward_corr_l1', 'reward_gt_corr_l1']
 envs = ["finger-turn_hard", "reacher-hard", "fish-swim", "HalfCheetah-v5", "Hopper-v5", "Swimmer-v5", "Walker2d-v5"]
-title = envs[0]
-attr = attributes[6]
+title = envs[5]
+attr = attributes[4]
 cut = 1
 
 data_list_pnn = load_pnn()
@@ -164,24 +135,21 @@ sns.lineplot(
     data=pnn_mean,
     x=pnn_mean["steps"],
     y="Data",
-    label="pnn",
+    label="0.1",
     errorbar="sd",
 )
 
 data_list_1 = load_1()
 data_list_2 = load_2()
-data_list_3 = load_3()
 
-for j in range(3):
+for j in range(2):
     if j == 0:
         data_list = data_list_1
-        label_name = "0.3"
+        label_name = "0.01"
     if j == 1:
         data_list = data_list_2
-        label_name = "0.5"
-    if j == 2:
-        data_list = data_list_3
-        label_name = "0.9"
+        label_name = "0.001"
+
 
     for d in data_list:
         d.columns = attributes
@@ -220,7 +188,7 @@ for j in range(3):
         label=label_name,
         errorbar="sd",
     )
-# plt.ylim(-0.1, 1)
+plt.ylim(-0.1, 1)
 plt.style.use("seaborn-v0_8")
 label_fontsize = 15
 title_fontsize = 20

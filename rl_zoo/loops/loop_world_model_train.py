@@ -115,9 +115,7 @@ class World_Model_Trainer:
                 action = self.agent.select_action_from_policy(gt_s)
             else:
                 action = self.env.sample_action()
-
             action = normalize(action, self.env.max_action_value, self.env.min_action_value)
-
             gt_ns, gt_rwd, gt_done, _ = self.env.step(action)
             # Converting to tensor
             tensor_action = torch.FloatTensor(action).to(self.device).unsqueeze(dim=0)
@@ -132,7 +130,6 @@ class World_Model_Trainer:
             l1_one_step_errors.append(one_step_l1)
             l2_one_step_errors.append(one_step_mse)
             episodic_pred_error += one_step_mse
-
             if self.train_reward:
                 pred_reward, _ = self.world_model.pred_rewards(observation=tensor_state,
                                                                action=tensor_action,
@@ -148,11 +145,13 @@ class World_Model_Trainer:
             else:
                 l1_one_rwd_errors.append(0.0)
 
-            pred_gt_reward = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(),
-                                                    pred_ns.detach().cpu().numpy().squeeze())
+            if not self.train_reward:
+                pred_gt_reward = self.env.get_gt_reward(gt_s.squeeze(), action.squeeze(),
+                                                        pred_ns.detach().cpu().numpy().squeeze())
+            else:
+                pred_gt_reward = pred_reward
             l1_one_gt_rwd_error = abs(pred_gt_reward - gt_rwd)
             l1_one_gt_rwd_errors.append(l1_one_gt_rwd_error)
-
             # Errors are done: L1 WM, L2 WM, L1 PRED RW, L1 GT RW.
             one_dyna_uncert, one_rwd_uncert, samples = self.world_model.estimate_uncertainty(observation=tensor_state,
                                                                                              actions=tensor_action,

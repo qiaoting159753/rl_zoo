@@ -91,9 +91,9 @@ class Bayesian_World_Model_LA(World_Model):
         pred_s_2 = self.world_model(s_n_a)
         mean_s_2 = pred_s_2[:, :self.observation_size]
         y_x = (delta_targets_normalized - mean_s_2) ** 2
-        target = torch.cat((delta_targets_normalized, y_x), dim=1).detach()
+        new_target = torch.cat((delta_targets_normalized, y_x), dim=1).detach()
 
-        train_loader = DataLoader(TensorDataset(s_n_a, target), batch_size=s_n_a.shape[0])
+        train_loader = DataLoader(TensorDataset(s_n_a, new_target), batch_size=s_n_a.shape[0])
         self.l_a.fit(train_loader, override=False)
 
     def estimate_uncertainty(
@@ -107,7 +107,6 @@ class Bayesian_World_Model_LA(World_Model):
             f_mean, f_var = self.l_a(s_n_a, pred_type="glm", link_approx="mc", n_samples=100)
             f_mean_detach = f_mean.detach().squeeze().cpu().numpy()
             aleatoric = f_mean_detach[self.observation_size:]
-            aleatoric = (aleatoric ** 2) ** 0.5
             f_var = f_var.squeeze()
             f_var = torch.diagonal(f_var)
             # Definitely not self.l_a.sigma_noise.item(), coz it remain the same everytime.
@@ -116,9 +115,11 @@ class Bayesian_World_Model_LA(World_Model):
             # # epistemic = all_means.var(axis=0) ** 0.5
             aleatoric = np.minimum(aleatoric, 10e3)
             epistemic = np.minimum(epistemic, 10e3)
+            print("---------------")
+            print(aleatoric.mean())
+            print(epistemic.mean())
             total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
             uncert = np.mean(total_unc).item()
-
             if not train_reward:
                 f_mean = f_mean.squeeze()
                 f_var = f_var.squeeze()

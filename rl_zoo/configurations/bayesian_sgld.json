@@ -4,7 +4,7 @@
   "device": "cpu",
   "seeds":[15],
   "G": 1,
-  "model_G": 0.2,
+  "model_G": 5.0,
   "random_goal": false,
   "batch_size": 256,
   "episode_steps": 257,
@@ -18,8 +18,8 @@
   "Parameter_C" : [16],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
-  "sas": true,
-  "prob_rwd": true,
+  "sas": false,
+  "prob_rwd": false,
   "train_both": false,
   "train_reward": false
 }

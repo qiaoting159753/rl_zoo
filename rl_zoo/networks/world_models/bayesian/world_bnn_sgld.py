@@ -94,7 +94,7 @@ class Bayesian_World_Model_SGLD(World_Model):
             data = torch.cat((normalized_state, actions), dim=1)
             # Get model uncertainty by sampling 100 parameters.
             self.world_model_1.load_state_dict(copy.deepcopy(self.world_model_0.state_dict()))
-            sampler = SGLD_Sampler(self.world_model_1, step_size=0.001, burn_in=0, num_steps=3, num_chains=3, tune=False)
+            sampler = SGLD_Sampler(self.world_model_1, step_size=0.00001, burn_in=0, num_steps=4, num_chains=3, tune=False)
             chains = sampler.sample_chains()
             # # Estimation from chains.
             preds = []
