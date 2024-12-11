@@ -150,7 +150,6 @@ class Ensemble_Dyna_One_Reward(World_Model):
             # Reward Uncertainty
             sample_times = 20
             means = torch.vstack(means)
-            vars_s = torch.vstack(vars_s)
             dist = torch.distributions.Normal(means, vars_s)
             samples = dist.sample([sample_times])
             samples = torch.reshape(samples, (sample_times * self.num_models, self.observation_size))
@@ -164,7 +163,7 @@ class Ensemble_Dyna_One_Reward(World_Model):
                     rewards, rwd_var = self.reward_network(observationss, actionss, samples)
                     epis_uncert = torch.var(rewards, dim=0).item()
                     rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
-                    alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
+                    alea_uncert = rwd_var
                     epis_uncert = np.minimum(epis_uncert, 10e3)
                     alea_uncert = np.minimum(alea_uncert, 10e3)
                     uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
@@ -176,7 +175,7 @@ class Ensemble_Dyna_One_Reward(World_Model):
                     rewards, rwd_var = self.reward_network(samples, actionss)
                     epis_uncert = torch.var(rewards, dim=0).item()
                     rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
-                    alea_uncert = (rwd_var ** 2).mean(axis=0) ** 0.5
+                    alea_uncert = rwd_var
                     epis_uncert = np.minimum(epis_uncert, 10e3)
                     alea_uncert = np.minimum(alea_uncert, 10e3)
                     uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
