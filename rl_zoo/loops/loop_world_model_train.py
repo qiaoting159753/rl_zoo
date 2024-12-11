@@ -158,7 +158,7 @@ class World_Model_Trainer:
                                                                                              train_reward=self.train_reward)
             one_dyna_uncerts.append(one_dyna_uncert)
             # Reward uncertainty estimation
-            if samples is None:
+            if samples is None or self.train_reward:
                 one_rwd_uncerts.append(one_rwd_uncert)
             else:
                 samples = samples.detach().cpu().numpy()
