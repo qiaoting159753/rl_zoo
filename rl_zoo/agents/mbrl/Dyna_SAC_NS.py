@@ -110,7 +110,7 @@ class Dyna_SAC_NS:
             rewards: torch.Tensor,
             next_states: torch.Tensor,
             dones: torch.Tensor,
-            weights=None,
+            weights: torch.Tensor,
     ) -> None:
         if weights is None:
             weights = torch.ones(rewards.shape)
@@ -191,7 +191,8 @@ class Dyna_SAC_NS:
             actions=actions,
             rewards=rewards,
             next_states=next_states,
-            dones=dones
+            dones=dones,
+            weights=torch.ones(rewards.shape)
         )
         self._dyna_generate_and_train(next_states)
 
@@ -242,7 +243,7 @@ class Dyna_SAC_NS:
             pred_dones = torch.FloatTensor(np.zeros(pred_rs.shape)).to(self.device)
             # states, actions, rewards, next_states, not_dones
         self._train_policy(
-            pred_states, pred_actions, pred_rs, pred_n_states, pred_dones
+            pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, torch.ones(pred_rs.shape)
         )
 
     def set_statistics(self, stats: dict) -> None:
