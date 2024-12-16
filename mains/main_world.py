@@ -9,7 +9,7 @@ import json
 
 def main():
     curr_path = os.getcwd()
-    alg_name = "mbrl_dyna_sac.json"
+    alg_name = "mbrl_ir_dyna_sac.json"
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
     with open(config_file, 'r') as file:
         data = json.load(file)
@@ -43,8 +43,8 @@ def main():
     train_reward = data['train_reward']
     # Switch
     parent_dir = curr_path + "/statistics/"
-    agents = ["cheetah", "hopper", "Pusher-v5", "Ant-v5"]
-    tasks = ["run", "hop", "", ""]
+    agents = ["ball_in_cup", "cheetah", "hopper", "Pusher-v5", "Ant-v5"]
+    tasks = ["catch", "run", "hop", "", ""]
     for i in range(len(agents)):
         env_domain = agents[i]
         env_task = tasks[i]

@@ -188,9 +188,14 @@ class Immerseive_Weighting_Dyna_SAC_NS(Dyna_SAC_NS):
             # As (max-min) decrease, threshold should go down.
             threshold = self.threshold * (max_var - min_var) + min_var
             total_var[total_var <= threshold] = threshold
-            total_var += 0.00000001
-            total_stds = 1 / total_var
-        return total_stds.detach()
+            # Inverse variance.
+            weights = 1 / total_var
+            # Normalization
+            new_min_var = torch.min(weights)
+            new_max_var = torch.max(weights)
+            weights = (weights - new_min_var) / (new_max_var - new_min_var)
+            weights += 0.0001
+        return weights.detach()
 
 
     def reward_function(self, curr_states, actions, next_states):

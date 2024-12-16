@@ -1,3 +1,4 @@
+import pandas as pd
 import torch
 import logging
 import numpy as np
@@ -5,6 +6,8 @@ from tqdm import trange
 from datetime import datetime
 from tqdm.contrib.logging import logging_redirect_tqdm
 from rl_zoo.utils import normalize
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 logging.basicConfig(level=logging.INFO)
 
@@ -141,10 +144,34 @@ class MBRL_Trainer:
         all_data[3] = self.training_rewards
         all_data[4] = epi_total_rwd
         self.evaluation_array.append(all_data)
+
         if self.generate_results:
             # Save the metrics
+            data_result = np.array(self.evaluation_array)
             file_name = self.directory + str(self.seed) + ".csv"
             np.savetxt(file_name + ".csv", np.array(self.evaluation_array), delimiter=",")
+
+            pnn_mean = pd.DataFrame(data={'steps': data_result[:, 0].astype(int), 'Data': data_result[:, 4]})
+            sns.lineplot(
+                data=pnn_mean,
+                x=pnn_mean["steps"],
+                y="Data",
+                label="pnn",
+                errorbar="sd",
+            )
+            plt.ylim(0, 1000)
+            plt.style.use("seaborn-v0_8")
+            label_fontsize = 15
+            ticks_fontsize = 10
+            plt.grid()
+            plt.xticks(fontsize=ticks_fontsize)
+            plt.yticks(fontsize=ticks_fontsize)
+            plt.xlabel("Steps", fontsize=label_fontsize)
+            plt.ylabel("Rewards", fontsize=label_fontsize)
+            plt.legend(loc="best").set_draggable(True)
+            plt.tight_layout(pad=0.5)
+            plt.savefig(self.directory + self.mbrl_agent_name + "_eval_rwds" + ".png")
+            plt.close()
 
     def train(self, flush=False):
         """
@@ -220,6 +247,7 @@ class MBRL_Trainer:
                                              num_models=int(self.parameter_b),
                                              sas=self.sas,
                                              prob_rwd=self.prob_rwd)
+
         actor = Actor(observation_size=self.state_dim, num_actions=self.action_dim)
         critic = SAC_Critic(observation_size=self.state_dim, num_actions=self.action_dim)
 
@@ -229,8 +257,8 @@ class MBRL_Trainer:
                                      world_network=self.world_model,
                                      action_num=self.action_dim,
                                      alpha_lr=3e-4,
-                                     horizon=2,
-                                     num_samples=15,
+                                     horizon=1,
+                                     num_samples=10,
                                      gamma=0.99,
                                      tau=0.005,
                                      actor_lr=3e-4,
@@ -246,13 +274,13 @@ class MBRL_Trainer:
                                                           world_network=self.world_model,
                                                           action_num=self.action_dim,
                                                           alpha_lr=3e-4,
-                                                          horizon=2,
-                                                          num_samples=15,
                                                           gamma=0.99,
                                                           tau=0.005,
                                                           actor_lr=3e-4,
                                                           critic_lr=3e-4,
-                                                          threshold=0.9,
+                                                          horizon=1,
+                                                          num_samples=10,
+                                                          threshold=self.parameter_c,
                                                           device=torch.device(self.device),
                                                           train_reward=self.train_reward,
                                                           train_both=self.train_both,

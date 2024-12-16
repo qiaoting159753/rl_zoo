@@ -110,6 +110,7 @@ class Dyna_SAC_NS:
             rewards: torch.Tensor,
             next_states: torch.Tensor,
             dones: torch.Tensor,
+            weights: torch.Tensor,
     ) -> None:
         ##################     Update the Critic First     ####################
         with torch.no_grad():
@@ -189,6 +190,7 @@ class Dyna_SAC_NS:
             rewards=rewards,
             next_states=next_states,
             dones=dones,
+            weights = torch.ones(rewards.shape)
         )
         self._dyna_generate_and_train(next_states)
 
