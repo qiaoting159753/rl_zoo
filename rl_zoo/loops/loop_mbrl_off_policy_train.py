@@ -16,7 +16,7 @@ from rl_zoo.networks.mfrl.common import Actor
 from rl_zoo.networks.mfrl.sac import SAC_Critic
 from rl_zoo.agents.mbrl import Dyna_SAC_NS, Immerseive_Weighting_Dyna_SAC_NS
 from rl_zoo.utils import PrioritizedReplayBuffer
-from rl_zoo.networks.world_models.ensembles import Ensemble_Dyna_One_Reward, Ensemble_Dyna_Big
+from rl_zoo.networks.world_models.ensembles import Ensemble_Dyna_Big
 
 
 class MBRL_Trainer:
