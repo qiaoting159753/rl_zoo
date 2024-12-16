@@ -1,7 +1,7 @@
 {
   "loop_name": "MBRL",
   "agent_name":"Dyna_SAC_NS",
-  "device": "cpu",
+  "device": "cuda",
   "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 5.0,
