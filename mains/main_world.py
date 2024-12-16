@@ -43,8 +43,8 @@ def main():
     train_reward = data['train_reward']
     # Switch
     parent_dir = curr_path + "/statistics/"
-    agents = ["ball_in_cup", "cheetah", "hopper", "Pusher-v5", "Ant-v5"]
-    tasks = ["catch", "run", "hop", "", ""]
+    agents = ["cheetah", "hopper", "ball_in_cup", "Pusher-v5", "Ant-v5"]
+    tasks = ["run", "hop", "catch", "", ""]
     for i in range(len(agents)):
         env_domain = agents[i]
         env_task = tasks[i]

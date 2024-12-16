@@ -5,7 +5,7 @@ from rl_zoo.networks.world_models import (
     World_Model,
 )
 from rl_zoo.utils.helpers import denormalize_observation_delta
-
+import logging
 
 class Immerseive_Weighting_Dyna_SAC_NS(Dyna_SAC_NS):
     """
@@ -19,6 +19,10 @@ class Immerseive_Weighting_Dyna_SAC_NS(Dyna_SAC_NS):
         super().__init__(actor_network, critic_network, world_network, gamma, tau, action_num, actor_lr, critic_lr,
                          alpha_lr, num_samples, horizon, device, train_reward, train_both, gripper)
         self.threshold = threshold
+        logging.info("----------------------------------------------------------------")
+        logging.info("---- I am runing the Immersive_Weighting_Dyna_SAC_NS Agent! ----")
+        logging.info("----------------------------------------------------------------")
+
 
     def _train_policy(
             self,
@@ -31,6 +35,7 @@ class Immerseive_Weighting_Dyna_SAC_NS(Dyna_SAC_NS):
     ) -> None:
         if weights is None:
             weights = torch.ones(rewards.shape).to(self.device)
+        weights = weights.to(self.device)
         info = {}
         with torch.no_grad():
             next_actions, next_log_pi, _ = self.actor_net(next_states)
