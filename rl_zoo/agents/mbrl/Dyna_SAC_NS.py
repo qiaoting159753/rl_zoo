@@ -20,32 +20,38 @@ from rl_zoo.networks.world_models import (
 )
 import math
 
+
 class Dyna_SAC_NS:
     """
     Dyna of SAC with Next state to predict rewards.
-
     """
     def __init__(
-        self,
-        actor_network: torch.nn.Module,
-        critic_network: torch.nn.Module,
-        world_network: World_Model,
-        gamma: float,
-        tau: float,
-        action_num: int,
-        actor_lr: float,
-        critic_lr: float,
-        alpha_lr: float,
-        num_samples: int,
-        horizon: int,
-        device: torch.device,
+            self,
+            actor_network: torch.nn.Module,
+            critic_network: torch.nn.Module,
+            world_network: World_Model,
+            gamma: float,
+            tau: float,
+            action_num: int,
+            actor_lr: float,
+            critic_lr: float,
+            alpha_lr: float,
+            num_samples: int,
+            horizon: int,
+            device: torch.device,
+            train_reward: bool,
+            train_both: bool,
+            gripper:bool,
     ):
-        logging.info("----------------------------------------------------------------------------------------")
-        logging.info("-----------------------I am runing the Dyna_SAC_NS Agent! ------------------------------")
-        logging.info("----------------------------------------------------------------------------------------")
+        logging.info("-------------------------------------------")
+        logging.info("----I am runing the Dyna_SAC_NS Agent! ----")
+        logging.info("-------------------------------------------")
+        self.train_reward = train_reward
+        self.train_both = train_both
+        self.gripper = gripper
+
         self.type = "mbrl"
         self.device = device
-
         # this may be called policy_net in other implementations
         self.actor_net = actor_network.to(self.device)
         # this may be called soft_q_net in other implementations
@@ -82,9 +88,8 @@ class Dyna_SAC_NS:
     def _alpha(self) -> float:
         return self.log_alpha.exp()
 
-    # pylint: disable-next=unused-argument to keep the same interface
     def select_action_from_policy(
-        self, state: np.ndarray, evaluation: bool = False, noise_scale: float = 0
+            self, state: np.ndarray, evaluation: bool = False, noise_scale: float = 0
     ) -> np.ndarray:
         # note that when evaluating this algorithm we need to select mu as
         self.actor_net.eval()
@@ -99,18 +104,16 @@ class Dyna_SAC_NS:
         return action
 
     def _train_policy(
-        self,
-        states: torch.Tensor,
-        actions: torch.Tensor,
-        rewards: torch.Tensor,
-        next_states: torch.Tensor,
-        dones: torch.Tensor,
+            self,
+            states: torch.Tensor,
+            actions: torch.Tensor,
+            rewards: torch.Tensor,
+            next_states: torch.Tensor,
+            dones: torch.Tensor,
     ) -> None:
-
         ##################     Update the Critic First     ####################
         with torch.no_grad():
             next_actions, next_log_pi, _ = self.actor_net(next_states)
-
             target_q_one, target_q_two = self.target_critic_net(
                 next_states, next_actions
             )
@@ -118,42 +121,33 @@ class Dyna_SAC_NS:
                     torch.minimum(target_q_one, target_q_two) - self._alpha * next_log_pi
             )
             q_target = rewards + self.gamma * (1 - dones) * target_q_values
-
         q_values_one, q_values_two = self.critic_net(states, actions)
-
         critic_loss_one = ((q_values_one - q_target).pow(2)).mean()
         critic_loss_two = ((q_values_two - q_target).pow(2)).mean()
-
         critic_loss_total = critic_loss_one + critic_loss_two
-
         # Update the Critic
         self.critic_net_optimiser.zero_grad()
         critic_loss_total.backward()
         self.critic_net_optimiser.step()
-
         ##################     Update the Actor Second     ####################
         pi, first_log_p, _ = self.actor_net(states)
         qf1_pi, qf2_pi = self.critic_net(states, pi)
         min_qf_pi = torch.minimum(qf1_pi, qf2_pi)
         actor_loss = ((self._alpha * first_log_p) - min_qf_pi).mean()
-
         # Update the Actor
         self.actor_net_optimiser.zero_grad()
         actor_loss.backward()
         self.actor_net_optimiser.step()
-
         # Update the temperature
         alpha_loss = -(
-            self.log_alpha * (first_log_p + self.target_entropy).detach()
+                self.log_alpha * (first_log_p + self.target_entropy).detach()
         ).mean()
-
         self.log_alpha_optimizer.zero_grad()
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
-
         if self.learn_counter % self.policy_update_freq == 0:
             for target_param, param in zip(
-                self.target_critic_net.parameters(), self.critic_net.parameters()
+                    self.target_critic_net.parameters(), self.critic_net.parameters()
             ):
                 target_param.data.copy_(
                     param.data * self.tau + target_param.data * (1.0 - self.tau)
@@ -167,35 +161,27 @@ class Dyna_SAC_NS:
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
         self.world_model.train_world(states, actions, next_states)
-
-        # train_reward = False
-        # train_both = False
-        # batch_size = len(states)
-        # Convert into tensor
-        # states = states[:, :-2]
-        # next_states = next_states[:, :-2]
+        batch_size = len(states)
         # Reshape to batch_size x whatever
-        # if train_reward:
-        #     rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
-        #     rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
-        #     if train_both:
-        #         self.world_model.train_together(states, actions, rewards)
-        #     else:
-        #         self.world_model.train_reward(states, actions, next_states, rewards)
+        if self.train_reward:
+            rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+            rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+            if self.train_both:
+                self.world_model.train_together(states, actions, rewards)
+            else:
+                self.world_model.train_reward(states, actions, next_states, rewards)
 
     def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:
         self.learn_counter += 1
 
         experiences = memory.sample_uniform(batch_size)
         states, actions, rewards, next_states, dones, _ = experiences
-
         # Convert into tensor
         states = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
         rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device).unsqueeze(1)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
         dones = torch.LongTensor(np.asarray(dones)).to(self.device).unsqueeze(1)
-
         # Step 2 train as usual
         self._train_policy(
             states=states,
@@ -204,7 +190,6 @@ class Dyna_SAC_NS:
             next_states=next_states,
             dones=dones,
         )
-
         self._dyna_generate_and_train(next_states)
 
     def _dyna_generate_and_train(self, next_states: torch.Tensor) -> None:
@@ -212,31 +197,35 @@ class Dyna_SAC_NS:
         pred_actions = []
         pred_rs = []
         pred_n_states = []
-
         with torch.no_grad():
             pred_state = next_states
             for _ in range(self.horizon):
                 pred_state = torch.repeat_interleave(pred_state, self.num_samples, dim=0)
                 # This part is controversial. But random actions is empirically better.
-                rand_acts = np.random.uniform(-1, 1, (pred_state.shape[0], self.action_num))
-                pred_acts = torch.FloatTensor(rand_acts).to(self.device)
+                # rand_acts = np.random.uniform(-1, 1, (pred_state.shape[0], self.action_num))
+                # pred_acts = torch.FloatTensor(rand_acts).to(self.device)
+                pred_acts, _, _ = self.actor_net(pred_state)
                 pred_next_state, _, _, _ = self.world_model.pred_next_states(
                     pred_state, pred_acts
                 )
-                # pred_reward = self.world_model.pred_rewards(pred_next_state)
-                target_goal_tensor = pred_state[:, -2:]
-                target_goal = target_goal_tensor.cpu().numpy()
-                object_current = pred_next_state[:, -4:-2]
-                object_current = object_current.cpu().numpy()
-                sq_diff = (target_goal - object_current) ** 2
-                goal_distance_after = np.expand_dims(np.sqrt(np.sum(sq_diff, axis=1)), axis=1)
-                pred_reward = np.round((-goal_distance_after+70), 2)
-                mask1 = goal_distance_after <= 10
-                mask2 = goal_distance_after > 70
-                pred_reward[mask1] = 800
-                pred_reward[mask2] = 0
-                pred_reward = torch.FloatTensor(pred_reward).to(self.device)
-                pred_next_state[:, -2:] = pred_state[:, -2:]
+                if self.gripper:
+                    target_goal_tensor = pred_state[:, -2:]
+                    target_goal = target_goal_tensor.cpu().numpy()
+                    object_current = pred_next_state[:, -4:-2]
+                    object_current = object_current.cpu().numpy()
+                    sq_diff = (target_goal - object_current) ** 2
+                    goal_distance_after = np.expand_dims(np.sqrt(np.sum(sq_diff, axis=1)), axis=1)
+                    pred_reward = np.round((-goal_distance_after + 70), 2)
+                    mask1 = goal_distance_after <= 10
+                    mask2 = goal_distance_after > 70
+                    pred_reward[mask1] = 800
+                    pred_reward[mask2] = 0
+                    pred_reward = torch.FloatTensor(pred_reward).to(self.device)
+                    pred_next_state[:, -2:] = pred_state[:, -2:]
+                else:
+                    pred_reward, _ = self.world_model.pred_rewards(observation=pred_state,
+                                                                   action=pred_acts,
+                                                                   next_observation=pred_next_state)
                 pred_states.append(pred_state)
                 pred_actions.append(pred_acts.detach())
                 pred_rs.append(pred_reward)

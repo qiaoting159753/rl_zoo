@@ -99,6 +99,7 @@ def load_ensemble():
     walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/30_9_0_15.csv.csv")
     walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/30_9_0_25.csv.csv")
     walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/30_9_0_35.csv.csv")
+
     data_list_pnn = [finger_1, reacher_1, fish_1, hcheetah_1, hopper_1, swimmer_1, walker_1,
                      finger_2, reacher_2, fish_2, hcheetah_2, hopper_2, swimmer_2, walker_2,
                      finger_3, reacher_3, fish_3, hcheetah_3, hopper_3, swimmer_3, walker_3]
@@ -106,28 +107,35 @@ def load_ensemble():
 
 
 def load_bbb():
-    algorithm = "bnn_bbb"
-    finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/5000_0.1_0.0_15_24_11_14_09_40_45.csv.csv")
-    finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/5000_0.1_0.0_25_24_11_14_10_00_27.csv.csv")
-    finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/5000_0.1_0.0_35_24_11_14_10_20_11.csv.csv")
-    reacher_1 = pd.read_csv(location + algorithm + "/reacher_hard/5000_0.1_0.0_15_24_11_15_01_21_40.csv.csv")
-    reacher_2 = pd.read_csv(location + algorithm + "/reacher_hard/5000_0.1_0.0_25_24_11_15_01_54_12.csv.csv")
-    reacher_3 = pd.read_csv(location + algorithm + "/reacher_hard/5000_0.1_0.0_35_24_11_15_02_26_55.csv.csv")
-    fish_1 = pd.read_csv(location + algorithm + "/fish_swim/5000_0.1_0.0_15_24_11_14_14_36_44.csv.csv")
-    fish_2 = pd.read_csv(location + algorithm + "/fish_swim/5000_0.1_0.0_25_24_11_14_15_19_45.csv.csv")
-    fish_3 = pd.read_csv(location + algorithm + "/fish_swim/5000_0.1_0.0_35_24_11_14_16_02_47.csv.csv")
-    hcheetah_1 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/5000_0.1_0.0_15_24_11_14_09_37_27.csv.csv")
-    hcheetah_2 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/5000_0.1_0.0_25_24_11_14_09_59_59.csv.csv")
-    hcheetah_3 = pd.read_csv(location + algorithm + "/HalfCheetah-v5_/5000_0.1_0.0_35_24_11_14_10_22_32.csv.csv")
-    hopper_1 = pd.read_csv(location + algorithm + "/Hopper-v5_/5000_0.1_0.0_15_24_11_14_22_00_31.csv.csv")
-    hopper_2 = pd.read_csv(location + algorithm + "/Hopper-v5_/5000_0.1_0.0_25_24_11_14_22_19_02.csv.csv")
-    hopper_3 = pd.read_csv(location + algorithm + "/Hopper-v5_/10000_0.1_0.0_15_24_11_14_23_02_01.csv.csv")
-    swimmer_1 = pd.read_csv(location + algorithm + "/Swimmer-v5_/5000_0.1_0.0_15_24_11_14_15_16_19.csv.csv")
-    swimmer_2 = pd.read_csv(location + algorithm + "/Swimmer-v5_/5000_0.1_0.0_25_24_11_14_15_43_20.csv.csv")
-    swimmer_3 = pd.read_csv(location + algorithm + "/Swimmer-v5_/5000_0.1_0.0_35_24_11_14_16_10_18.csv.csv")
-    walker_1 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_0.1_0.0_15_24_11_15_02_55_43.csv.csv")
-    walker_2 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_0.1_0.0_25_24_11_15_03_18_08.csv.csv")
-    walker_3 = pd.read_csv(location + algorithm + "/Walker2d-v5_/10000_0.1_0.0_35_24_11_15_03_40_21.csv.csv")
+    algorithm = "bayesian/overfit/Bayesian_VI_"
+    finger_1 = pd.read_csv(location + algorithm + "finger_turn_hard/0.001_0.1_0.0_15.csv.csv")
+    finger_2 = pd.read_csv(location + algorithm + "finger_turn_hard/0.001_0.1_0.0_25.csv.csv")
+    finger_3 = pd.read_csv(location + algorithm + "finger_turn_hard/0.001_0.1_0.0_35.csv.csv")
+
+    reacher_1 = pd.read_csv(location + algorithm + "reacher_hard/0.001_0.1_0.0_15.csv.csv")
+    reacher_2 = pd.read_csv(location + algorithm + "reacher_hard/0.001_0.1_0.0_25.csv.csv")
+    reacher_3 = pd.read_csv(location + algorithm + "reacher_hard/0.001_0.1_0.0_35.csv.csv")
+
+    fish_1 = pd.read_csv(location + algorithm + "fish_swim/0.001_0.1_0.0_15.csv.csv")
+    fish_2 = pd.read_csv(location + algorithm + "fish_swim/0.001_0.1_0.0_25.csv.csv")
+    fish_3 = pd.read_csv(location + algorithm + "fish_swim/0.001_0.1_0.0_35.csv.csv")
+
+    hcheetah_1 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.001_0.1_0.0_15.csv.csv")
+    hcheetah_2 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.001_0.1_0.0_25.csv.csv")
+    hcheetah_3 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.001_0.1_0.0_35.csv.csv")
+
+    hopper_1 = pd.read_csv(location + algorithm + "Hopper-v5_/0.001_0.1_0.0_15.csv.csv")
+    hopper_2 = pd.read_csv(location + algorithm + "Hopper-v5_/0.001_0.1_0.0_25.csv.csv")
+    hopper_3 = pd.read_csv(location + algorithm + "Hopper-v5_/0.001_0.1_0.0_35.csv.csv")
+
+    swimmer_1 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.001_0.1_0.0_15.csv.csv")
+    swimmer_2 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.001_0.1_0.0_25.csv.csv")
+    swimmer_3 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.001_0.1_0.0_35.csv.csv")
+
+    walker_1 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.001_0.1_0.0_15.csv.csv")
+    walker_2 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.001_0.1_0.0_25.csv.csv")
+    walker_3 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.001_0.1_0.0_35.csv.csv")
+
     data_list_pnn = [finger_1, reacher_1, fish_1, hcheetah_1, hopper_1, swimmer_1, walker_1,
                      finger_2, reacher_2, fish_2, hcheetah_2, hopper_2, swimmer_2, walker_2,
                      finger_3, reacher_3, fish_3, hcheetah_3, hopper_3, swimmer_3, walker_3]
@@ -140,8 +148,8 @@ def load_laplace():
 attributes = ['steps', 'dyna_mse', 'reward_mse', 'dyna_corr_l2', 'dyna_corr_l1', 'reward_corr_l1', 'reward_gt_corr_l1']
 envs = ["finger-turn_hard", "reacher-hard", "fish-swim", "HalfCheetah-v5", "Hopper-v5", "Swimmer-v5", "Walker2d-v5"]
 title = envs[6]
-attr = attributes[6]
-cut = 1
+attr = attributes[4]
+cut = 20
 
 data_list_pnn = load_pnn()
 for d in data_list_pnn:
@@ -259,124 +267,3 @@ plt.legend(loc="best").set_draggable(True)
 plt.tight_layout(pad=0.5)
 plt.savefig(title + "_" + attr + ".png")
 plt.show()
-
-
-
-
-
-
-
-
-
-# plot_frame_prior[att_name] = plot_frame_prior[att_name].rolling(window_size, step=1, min_periods=1).mean()
-# sns.lineplot(
-#     data=plot_frame_prior,
-#     x=plot_frame_prior["steps"],
-#     y=att_name,
-#     label="prior",
-#     errorbar="sd",
-# )
-
-# plot_frame_ensemble[att_name] = plot_frame_ensemble[att_name].rolling(window_size, step=1, min_periods=1).mean()
-# sns.lineplot(
-#     data=plot_frame_ensemble,
-#     x=plot_frame_ensemble["steps"],
-#     y=att_name,
-#     label='ensemble',
-#     errorbar="sd",
-# )
-
-# plot_frame_vi[att_name] = plot_frame_vi[att_name].rolling(window_size, step=1, min_periods=1).mean()
-# sns.lineplot(
-#     data=plot_frame_vi,
-#     x=plot_frame_vi["steps"],
-#     y=att_name,
-#     label='variational inference',
-#     errorbar="sd",
-# )
-
-# if not os.path.exists(f"{directory}/figures"):
-#     os.makedirs(f"{directory}/figures")
-# plt.savefig(f"{directory}/figures/{filename}.png")
-
-# def prepare_train_plot_frame(
-#     train_data: pd.DataFrame, window_size: int
-# ) -> pd.DataFrame:
-#     x_data: str = "total_steps"
-#     y_data: str = "episode_reward"
-#     plot_frame: pd.DataFrame = pd.DataFrame()
-#     plot_frame["steps"] = train_data[x_data]
-#     plot_frame["avg"] = (
-#         train_data[y_data].rolling(window_size, step=1, min_periods=1).mean()
-#     )
-#     plot_frame["std_dev"] = (
-#         train_data[y_data].rolling(window_size, step=1, min_periods=1).std()
-#     )
-#     return plot_frame
-
-
-# def plot_train(
-#     train_data: pd.DataFrame,
-#     title: str,
-#     label: str,
-#     directory: str,
-#     filename: str,
-#     window_size: int,
-#     display: bool = False,
-# ) -> None:
-#     train_plot_frame = prepare_train_plot_frame(train_data, window_size)
-#     plot_data(
-#         train_plot_frame,
-#         title,
-#         label,
-#         "Steps",
-#         "Average Reward",
-#         directory,
-#         filename,
-#         display=display,
-#     )
-
-
-# def get_param_value(param_tag: str, config: dict) -> str:
-#     if param_tag in config:
-#         return config[param_tag]
-#     return None
-
-
-# def get_param_tag(param_tags: dict, alg_config: dict, train_config: dict) -> str:
-#     if len(param_tags) == 0:
-#         return ""
-#     param_tag = ""
-#     for key, tags in param_tags.items():
-#         value = get_param_value(key, alg_config)
-#         if value is None:
-#             value = get_param_value(key, train_config)
-#         if isinstance(value, dict):
-#             tags = tags.split(",")
-#             for tag in tags:
-#                 tag = tag.strip()
-#                 secondary_value = get_param_value(tag, value)
-#                 if secondary_value is not None:
-#                     param_tag += f"_{tag}_{secondary_value}"
-#         elif value is not None:
-#             param_tag += f"_{key}_{value}"
-#     return param_tag
-
-
-# def generate_labels(
-#     args, title: str, result_directory: str
-# ) -> tuple[str, str, str, str]:
-#     env_config = read_environmnet_config(result_directory)
-#     train_config = read_train_config(result_directory)
-#     alg_config = read_algorithm_config(result_directory)
-#
-#     algorithm = alg_config["algorithm"]
-#     domain = env_config["domain"]
-#     task = env_config["task"]
-#     task = task if domain == "" else f"{domain}-{task}"
-#
-#     param_tag = get_param_tag(args["param_tag"], alg_config, train_config)
-#     label = algorithm + param_tag
-#
-#     title = task if title == "" else title
-#     return title, algorithm, task, label

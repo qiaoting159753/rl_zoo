@@ -26,15 +26,14 @@ class Ensemble_Dyna_Big(World_Model):
                  observation_size: int,
                  num_actions: int,
                  device: str,
-                 num_models: int = 7,
                  l_r: float = 0.001,
-                 boost_inter: int = 3,
                  hidden_size=None,
                  sas: bool = True,
-                 prob_rwd: bool = True):
+                 prob_rwd: bool = True,
+                 num_models: int = 7,
+                 boost_inter: int = 3,
+                 ):
         super().__init__(observation_size, num_actions, l_r, device, hidden_size, sas, prob_rwd)
-        if hidden_size is None:
-            hidden_size = [128, 128]
         self.num_models = num_models
         self.observation_size = observation_size
         self.num_actions = num_actions
@@ -43,7 +42,7 @@ class Ensemble_Dyna_Big(World_Model):
 
         self.world_models = []
         for i in range(self.num_models):
-            i = i % 3
+            i %= 3
             if i == 0:
                 model = Probabilistic_Dynamics(
                     observation_size=observation_size,
@@ -54,7 +53,7 @@ class Ensemble_Dyna_Big(World_Model):
                 model = Probabilistic_Dynamics(
                     observation_size=observation_size,
                     num_actions=num_actions,
-                    hidden_size=hidden_size,
+                    hidden_size=[128, 128],
                 )
             if i == 2:
                 model = Probabilistic_Dynamics(

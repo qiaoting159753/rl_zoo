@@ -1,7 +1,7 @@
 {
   "loop_name": "World_Model",
   "agent_name":"Bayesian_VI",
-  "device": "cuda",
+  "device": "cpu",
   "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 5.0,

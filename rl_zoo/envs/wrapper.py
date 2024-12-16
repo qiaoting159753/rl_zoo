@@ -36,7 +36,6 @@ class Environment:
 class DMCSEnvironment(Environment):
     """
     Deepmind Control Suite.
-
     """
 
     def __init__(self, domain, task) -> None:

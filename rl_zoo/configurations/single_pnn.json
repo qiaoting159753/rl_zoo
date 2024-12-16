@@ -1,7 +1,7 @@
 {
   "loop_name": "World_Model",
   "agent_name":"Single_PNN",
-  "device": "cuda",
+  "device": "cpu",
   "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 5.0,
@@ -13,7 +13,7 @@
   "horizon": 5,
   "branch_factor": 10,
   "on_policy": true,
-  "Parameter_A": [1, 2, 3],
+  "Parameter_A": [1],
   "Parameter_B" : [16],
   "Parameter_C" : [16],
   "flush": false,

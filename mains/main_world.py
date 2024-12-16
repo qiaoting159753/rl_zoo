@@ -1,6 +1,6 @@
 import logging
 import shutil
-from rl_zoo.loops import World_Model_Trainer
+from rl_zoo.loops import World_Model_Trainer, MBRL_Trainer
 from rl_zoo.envs import DMCSEnvironment, OpenAIEnvrionment
 from rl_zoo.utils import set_seed
 import os
@@ -9,7 +9,7 @@ import json
 
 def main():
     curr_path = os.getcwd()
-    alg_name = "ensemble_pnn.json"
+    alg_name = "mbrl_dyna_sac.json"
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
     with open(config_file, 'r') as file:
         data = json.load(file)
@@ -24,26 +24,28 @@ def main():
     model_G = data["model_G"]
     # Training
     G = data["G"]
+    loop_name = data["loop_name"]
     batch_size = data["batch_size"]
     episode_steps = data["episode_steps"]
     evaluate_interval = data["evaluate_interval"]
     maximum_steps = data["maximum_steps"]
+    flush = data["flush"]
     on_policy = data["on_policy"]
     # Parameter tuning.
     Parameter_A = data["Parameter_A"]
     Parameter_B = data["Parameter_B"]
     Parameter_C = data["Parameter_C"]
+    # Reward
+    gripper = data["gripper"]
     sas = data["sas"]
     prob_rwd = data["prob_rwd"]
     train_both = data["train_both"]
-    flush = data["flush"]
     train_reward = data['train_reward']
-    parent_dir = data["parent_direction"]
     # Switch
     parent_dir = curr_path + "/statistics/"
-    agents = ["Ant-v5", "Humanoid-v5", "ball_in_cup", "cartpole", "acrobot"]
-    tasks = ["", "", "catch", "swingup", "swingup"]
-    for i in range(7):
+    agents = ["cheetah", "hopper", "Pusher-v5", "Ant-v5"]
+    tasks = ["run", "hop", "", ""]
+    for i in range(len(agents)):
         env_domain = agents[i]
         env_task = tasks[i]
         sub_directory = agent_name + "_" + env_domain + "_" + env_task + "/"
@@ -62,42 +64,59 @@ def main():
                         # Random Seed
                         set_seed(seed)
                         # Environment
-                        if i <= 1:
-                            env = OpenAIEnvrionment(env_domain, param=False)
+                        if i > 1:
+                            env = OpenAIEnvrionment(env_domain, param=True)
                         else:
                             env = DMCSEnvironment(env_domain, env_task)
-
                         env.set_seed(seed)
                         # Agent
                         # CHANGE THIS PART WHEN ON SCHOOL #
-                        trainer = World_Model_Trainer(env=env,
-                                                      evaluate_interval=evaluate_interval,
-                                                      world_model_name=agent_name,
-                                                      random_goal=random_goal,
-                                                      device=device,
-                                                      on_policy=on_policy,
-                                                      G=G,
-                                                      model_G=model_G,
-                                                      batch_size=batch_size,
-                                                      episode_steps=episode_steps,
-                                                      maximum_steps=maximum_steps,
-                                                      generate_results=True,
-                                                      seed=seed,
-                                                      directory=direct_param,
-                                                      parameter_a=parameter_a,
-                                                      parameter_b=parameter_b,
-                                                      parameter_c=parameter_c,
-                                                      sas=sas,
-                                                      train_both=train_both,
-                                                      train_reward=train_reward,
-                                                      prob_rwd=prob_rwd)
+                        if loop_name == "World_Model":
+                            trainer = World_Model_Trainer(env=env,
+                                                          evaluate_interval=evaluate_interval,
+                                                          world_model_name=agent_name,
+                                                          random_goal=random_goal,
+                                                          device=device,
+                                                          on_policy=on_policy,
+                                                          G=G,
+                                                          model_G=model_G,
+                                                          batch_size=batch_size,
+                                                          episode_steps=episode_steps,
+                                                          maximum_steps=maximum_steps,
+                                                          generate_results=True,
+                                                          seed=seed,
+                                                          directory=direct_param,
+                                                          parameter_a=parameter_a,
+                                                          parameter_b=parameter_b,
+                                                          parameter_c=parameter_c,
+                                                          sas=sas,
+                                                          train_both=train_both,
+                                                          train_reward=train_reward,
+                                                          prob_rwd=prob_rwd)
+                        if loop_name == "MBRL":
+                            trainer = MBRL_Trainer(env=env,
+                                                   evaluate_interval=evaluate_interval,
+                                                   mbrl_agent_name=agent_name,
+                                                   random_goal=random_goal,
+                                                   device=device,
+                                                   on_policy=on_policy,
+                                                   G=G,
+                                                   model_G=model_G,
+                                                   batch_size=batch_size,
+                                                   episode_steps=episode_steps,
+                                                   maximum_steps=maximum_steps,
+                                                   generate_results=True,
+                                                   seed=seed,
+                                                   directory=direct_param,
+                                                   parameter_a=parameter_a,
+                                                   parameter_b=parameter_b,
+                                                   parameter_c=parameter_c,
+                                                   sas=sas,
+                                                   train_both=train_both,
+                                                   train_reward=train_reward,
+                                                   prob_rwd=prob_rwd,
+                                                   gripper=gripper)
                         trainer.train(flush=flush)
-                        # try:
-                        #     trainer.train(flush=flush)
-                        # except Exception as e:
-                        #     logging.info("--------------------")
-                        #     logging.info(e)
-                        #     pass
 
 
 if __name__ == "__main__":
