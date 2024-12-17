@@ -113,8 +113,8 @@ class Bounded_Expo_Dyna_SAC_NS:
                         # [10, 17]
                         aleatoric = torch.mean(nstate_vars ** 2, dim=0) ** 0.5
                         epistemic = torch.var(nstate_means, dim=0) ** 0.5
-                        aleatoric = torch.minimum(aleatoric, 10e3)
-                        epistemic = torch.minimum(epistemic, 10e3)
+                        aleatoric = torch.clamp(aleatoric, max=10e3)
+                        epistemic = torch.clamp(epistemic, max=10e3)
                         total_unc = (aleatoric ** 2 + epistemic ** 2) ** 0.5
                         uncert = torch.mean(total_unc, dim=1)
                         multi_log_pi = multi_log_pi.squeeze()
