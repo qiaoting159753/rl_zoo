@@ -16,6 +16,7 @@
   "Parameter_A" : [0.001, 0.01, 0.1],
   "Parameter_B" : [0.1],
   "Parameter_C" : [0.0],
+  "Parameter_D" : [3],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
   "sas": true,

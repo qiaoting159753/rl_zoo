@@ -1,6 +1,6 @@
 {
   "loop_name": "MBRL",
-  "agent_name":"Dyna_SAC_NS",
+  "agent_name":"Dyna_SAC_Immersive_Weighting",
   "device": "cuda",
   "seeds":[15, 25, 35],
   "G": 1,
@@ -15,7 +15,7 @@
   "on_policy": true,
   "Parameter_A" : [30],
   "Parameter_B" : [6],
-  "Parameter_C" : [0],
+  "Parameter_C" : [0.8],
   "Parameter_D" : [3],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",

@@ -159,7 +159,7 @@ class World_Model:
 
     def estimate_uncertainty(
             self, observation: torch.Tensor, actions: torch.Tensor, train_reward:bool,
-    ) -> tuple[float, float]:
+    ) -> tuple[float, float, torch.Tensor]:
         """
         Estimate next state uncertainty and reward uncertainty.
 
@@ -168,7 +168,7 @@ class World_Model:
         :return: Dynamic Uncertainty, Reward Uncertainty
         """
         logging.info("Estimating Uncertainty Not Implemented")
-        return 0.0, 0.0
+        return 0.0, 0.0, None
 
     def train_together(self, states: torch.Tensor, actions: torch.Tensor, rewards: torch.Tensor, ):
         logging.info("Train Together Not Implemented")

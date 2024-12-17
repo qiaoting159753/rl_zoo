@@ -1,7 +1,7 @@
 {
   "loop_name": "MBRL",
-  "agent_name":"Ensemble_Dyna_One_Reward",
-  "device": "cuda",
+  "agent_name":"Dyna_SAC",
+  "device": "cpu",
   "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 5.0,
@@ -14,14 +14,15 @@
   "branch_factor": 10,
   "on_policy": true,
   "Parameter_A": [30],
-  "Parameter_B" : [0],
+  "Parameter_B" : [9],
   "Parameter_C" : [0],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
   "sas": true,
   "prob_rwd": true,
   "train_both": true,
-  "train_reward": true
+  "train_reward": true,
+  "gripper": false
 }
 
 

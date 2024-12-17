@@ -55,7 +55,8 @@ class World_Model_Trainer:
                  train_reward: bool,
                  parameter_a: float,
                  parameter_b: float,
-                 parameter_c: float):
+                 parameter_c: float,
+                 parameter_d: float):
         # Training
         self.counter = 0
         self.G = G
@@ -66,6 +67,7 @@ class World_Model_Trainer:
         self.parameter_a = parameter_a
         self.parameter_b = parameter_b
         self.parameter_c = parameter_c
+        self.parameter_d = parameter_d
         # Environment
         self.env = env
         self.state_dim = env.observation_space

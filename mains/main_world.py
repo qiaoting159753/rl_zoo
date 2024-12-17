@@ -1,6 +1,6 @@
 import logging
 import shutil
-from rl_zoo.loops import World_Model_Trainer, MBRL_Trainer
+from rl_zoo.loops import World_Model_Trainer, MBRL_Trainer, MFRL_Trainer
 from rl_zoo.envs import DMCSEnvironment, OpenAIEnvrionment
 from rl_zoo.utils import set_seed
 import os
@@ -9,7 +9,7 @@ import json
 
 def main():
     curr_path = os.getcwd()
-    alg_name = "mbrl_ir_dyna_sac.json"
+    alg_name = "mbrl_dyna_sac_bounded.json"
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
     with open(config_file, 'r') as file:
         data = json.load(file)
@@ -35,6 +35,7 @@ def main():
     Parameter_A = data["Parameter_A"]
     Parameter_B = data["Parameter_B"]
     Parameter_C = data["Parameter_C"]
+    Parameter_D = data["Parameter_D"]
     # Reward
     gripper = data["gripper"]
     sas = data["sas"]
@@ -55,68 +56,94 @@ def main():
         if not os.path.exists(directory):
             os.mkdir(directory)
         shutil.copyfile(config_file, directory + alg_name)
-
         for parameter_a in Parameter_A:
             for parameter_b in Parameter_B:
                 for parameter_c in Parameter_C:
-                    direct_param = directory + str(parameter_a) + "_" + str(parameter_b) + "_" + str(parameter_c) + "_"
-                    for seed in seeds:
-                        # Random Seed
-                        set_seed(seed)
-                        # Environment
-                        if i > 2:
-                            env = OpenAIEnvrionment(env_domain, param=True)
-                        else:
-                            env = DMCSEnvironment(env_domain, env_task)
-                        env.set_seed(seed)
-                        # Agent
-                        # CHANGE THIS PART WHEN ON SCHOOL #
-                        if loop_name == "World_Model":
-                            trainer = World_Model_Trainer(env=env,
-                                                          evaluate_interval=evaluate_interval,
-                                                          world_model_name=agent_name,
-                                                          random_goal=random_goal,
-                                                          device=device,
-                                                          on_policy=on_policy,
-                                                          G=G,
-                                                          model_G=model_G,
-                                                          batch_size=batch_size,
-                                                          episode_steps=episode_steps,
-                                                          maximum_steps=maximum_steps,
-                                                          generate_results=True,
-                                                          seed=seed,
-                                                          directory=direct_param,
-                                                          parameter_a=parameter_a,
-                                                          parameter_b=parameter_b,
-                                                          parameter_c=parameter_c,
-                                                          sas=sas,
-                                                          train_both=train_both,
-                                                          train_reward=train_reward,
-                                                          prob_rwd=prob_rwd)
-                        if loop_name == "MBRL":
-                            trainer = MBRL_Trainer(env=env,
-                                                   evaluate_interval=evaluate_interval,
-                                                   mbrl_agent_name=agent_name,
-                                                   random_goal=random_goal,
-                                                   device=device,
-                                                   on_policy=on_policy,
-                                                   G=G,
-                                                   model_G=model_G,
-                                                   batch_size=batch_size,
-                                                   episode_steps=episode_steps,
-                                                   maximum_steps=maximum_steps,
-                                                   generate_results=True,
-                                                   seed=seed,
-                                                   directory=direct_param,
-                                                   parameter_a=parameter_a,
-                                                   parameter_b=parameter_b,
-                                                   parameter_c=parameter_c,
-                                                   sas=sas,
-                                                   train_both=train_both,
-                                                   train_reward=train_reward,
-                                                   prob_rwd=prob_rwd,
-                                                   gripper=gripper)
-                        trainer.train(flush=flush)
+                    for parameter_d in Parameter_D:
+                        direct_param = directory + str(parameter_a) + "_" + str(parameter_b) + "_" + str(parameter_c) + "_" + str(parameter_d) + "_"
+                        for seed in seeds:
+                            # Random Seed
+                            set_seed(seed)
+                            # Environment
+                            if i > 2:
+                                env = OpenAIEnvrionment(env_domain, param=True)
+                            else:
+                                env = DMCSEnvironment(env_domain, env_task)
+                            env.set_seed(seed)
+                            # Agent
+                            # CHANGE THIS PART WHEN ON SCHOOL #
+                            if loop_name == "World_Model":
+                                trainer = World_Model_Trainer(env=env,
+                                                              evaluate_interval=evaluate_interval,
+                                                              world_model_name=agent_name,
+                                                              random_goal=random_goal,
+                                                              device=device,
+                                                              on_policy=on_policy,
+                                                              G=G,
+                                                              model_G=model_G,
+                                                              batch_size=batch_size,
+                                                              episode_steps=episode_steps,
+                                                              maximum_steps=maximum_steps,
+                                                              generate_results=True,
+                                                              seed=seed,
+                                                              directory=direct_param,
+                                                              parameter_a=parameter_a,
+                                                              parameter_b=parameter_b,
+                                                              parameter_c=parameter_c,
+                                                              parameter_d=parameter_d,
+                                                              sas=sas,
+                                                              train_both=train_both,
+                                                              train_reward=train_reward,
+                                                              prob_rwd=prob_rwd)
+                            if loop_name == "MBRL":
+                                trainer = MBRL_Trainer(env=env,
+                                                       evaluate_interval=evaluate_interval,
+                                                       mbrl_agent_name=agent_name,
+                                                       random_goal=random_goal,
+                                                       device=device,
+                                                       on_policy=on_policy,
+                                                       G=G,
+                                                       model_G=model_G,
+                                                       batch_size=batch_size,
+                                                       episode_steps=episode_steps,
+                                                       maximum_steps=maximum_steps,
+                                                       generate_results=True,
+                                                       seed=seed,
+                                                       directory=direct_param,
+                                                       parameter_a=parameter_a,
+                                                       parameter_b=parameter_b,
+                                                       parameter_c=parameter_c,
+                                                       parameter_d=parameter_d,
+                                                       sas=sas,
+                                                       train_both=train_both,
+                                                       train_reward=train_reward,
+                                                       prob_rwd=prob_rwd,
+                                                       gripper=gripper)
+                            if loop_name == "MFRL":
+                                trainer = MFRL_Trainer(env=env,
+                                                       evaluate_interval=evaluate_interval,
+                                                       mbrl_agent_name=agent_name,
+                                                       random_goal=random_goal,
+                                                       device=device,
+                                                       on_policy=on_policy,
+                                                       G=G,
+                                                       model_G=model_G,
+                                                       batch_size=batch_size,
+                                                       episode_steps=episode_steps,
+                                                       maximum_steps=maximum_steps,
+                                                       generate_results=True,
+                                                       seed=seed,
+                                                       directory=direct_param,
+                                                       parameter_a=parameter_a,
+                                                       parameter_b=parameter_b,
+                                                       parameter_c=parameter_c,
+                                                       parameter_d=parameter_d,
+                                                       sas=sas,
+                                                       train_both=train_both,
+                                                       train_reward=train_reward,
+                                                       prob_rwd=prob_rwd,
+                                                       gripper=gripper)
+                            trainer.train(flush=flush)
 
 
 if __name__ == "__main__":

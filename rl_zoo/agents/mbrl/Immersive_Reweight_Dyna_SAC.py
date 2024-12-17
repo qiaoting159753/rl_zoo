@@ -23,7 +23,6 @@ class Immerseive_Weighting_Dyna_SAC_NS(Dyna_SAC_NS):
         logging.info("---- I am runing the Immersive_Weighting_Dyna_SAC_NS Agent! ----")
         logging.info("----------------------------------------------------------------")
 
-
     def _train_policy(
             self,
             states: torch.Tensor,
