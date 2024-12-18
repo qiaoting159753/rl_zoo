@@ -175,7 +175,7 @@ class Immerseive_Weighting_Dyna_SAC_NS(Dyna_SAC_NS):
                     pred_act, log_pi, _ = self.actor_net(samples[i])
                     act_logs.append(log_pi)
                     # pred_rwd1 = self.world_model.pred_rewards(samples[i])
-                    rewards = self.reward_function(curr_states, pred_act, samples[i])
+                    rewards = self.reward_function(curr_states, samples[i])
                     r_s.append(rewards)
                     qa1, qa2 = self.target_critic_net(samples[i], pred_act)
                     q_a = torch.minimum(qa1, qa2)
