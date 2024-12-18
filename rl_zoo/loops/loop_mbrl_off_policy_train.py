@@ -86,7 +86,7 @@ class MBRL_Trainer:
         self.memory = PrioritizedReplayBuffer()
         self.device = device
         self.agent_selection()
-
+        logging.info("-------------------- In a MBRL Loop --------------------------- ")
         logging.info(f"Name: {self.mbrl_agent_name}, On Policy: {on_policy}, Random Goal:{random_goal}")
 
     def evaluate(self):
