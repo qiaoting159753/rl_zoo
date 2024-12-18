@@ -1,97 +1,56 @@
-"""
-Sutton, Richard S. "Dyna, an integrated architecture for learning, planning, and reacting."
-
-Original Paper: https://dl.acm.org/doi/abs/10.1145/122344.122377
-
-This code runs automatic entropy tuning
-"""
-
-import copy
 import logging
-import os
-
 import numpy as np
 import torch
 import torch.nn.functional as F
-from rl_zoo.utils import PrioritizedReplayBuffer
-
+from rl_zoo.agents.mbrl import Dyna_SAC_NS
 from rl_zoo.networks.world_models import (
     World_Model,
 )
-import math
 
 
-class Bounded_Expo_Dyna_SAC_NS:
+class Bounded_Expo_Dyna_SAC_NS(Dyna_SAC_NS):
     """
     Dyna of SAC with Next state to predict rewards.
     """
-    def __init__(
-            self,
-            actor_network: torch.nn.Module,
-            critic_network: torch.nn.Module,
-            world_network: World_Model,
-            gamma: float,
-            tau: float,
-            action_num: int,
-            actor_lr: float,
-            critic_lr: float,
-            alpha_lr: float,
-            num_samples: int,
-            horizon: int,
-            exploration_samples: int,
-            alpha: float,
-            device: torch.device,
-            train_reward: bool,
-            train_both: bool,
-            gripper:bool,
-    ):
-
-        self.alpha = alpha
+    def __init__(self,
+                 actor_network: torch.nn.Module,
+                 critic_network: torch.nn.Module,
+                 world_network: World_Model,
+                 gamma: float,
+                 tau: float,
+                 action_num: int,
+                 actor_lr: float,
+                 critic_lr: float,
+                 alpha_lr: float,
+                 num_samples: int,
+                 horizon: int,
+                 exploration_samples: int,
+                 alpha: float,
+                 device: torch.device,
+                 train_reward: bool,
+                 train_both: bool,
+                 gripper: bool):
+        super().__init__(actor_network=actor_network,
+                         critic_network=critic_network,
+                         world_network=world_network,
+                         gamma=gamma,
+                         tau=tau,
+                         action_num=action_num,
+                         actor_lr=actor_lr,
+                         critic_lr=critic_lr,
+                         alpha_lr=alpha_lr,
+                         num_samples=num_samples,
+                         horizon=horizon,
+                         device=device,
+                         train_reward=train_reward,
+                         train_both=train_both,
+                         gripper=gripper)
         logging.info("---------------------------------------------------------------")
         logging.info("----I am runing the Bounded_Exploration_Dyna_SAC_NS Agent! ----")
         logging.info("---------------------------------------------------------------")
-        self.train_reward = train_reward
-        self.train_both = train_both
-        self.gripper = gripper
         self.exploration_samples = exploration_samples
-        self.type = "mbrl"
-        self.device = device
-        # this may be called policy_net in other implementations
-        self.actor_net = actor_network.to(self.device)
-        # this may be called soft_q_net in other implementations
-        self.critic_net = critic_network.to(self.device)
-        self.target_critic_net = copy.deepcopy(self.critic_net)
+        self.alpha = alpha
         self.set_stat = False
-
-        self.gamma = gamma
-        self.tau = tau
-
-        self.num_samples = num_samples
-        self.horizon = horizon
-        self.action_num = action_num
-
-        self.learn_counter = 0
-        self.policy_update_freq = 1
-
-        self.actor_net_optimiser = torch.optim.Adam(
-            self.actor_net.parameters(), lr=actor_lr
-        )
-        self.critic_net_optimiser = torch.optim.Adam(
-            self.critic_net.parameters(), lr=critic_lr
-        )
-
-        # Set to initial alpha to 1.0 according to other baselines.
-        self.log_alpha = torch.tensor(np.log(1.0)).to(device)
-        self.log_alpha.requires_grad = True
-        self.target_entropy = -action_num
-        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=alpha_lr)
-
-        # World model
-        self.world_model = world_network
-
-    @property
-    def _alpha(self) -> float:
-        return self.log_alpha.exp()
 
     def select_action_from_policy(
             self, state: np.ndarray, evaluation: bool = False, noise_scale: float = 0
@@ -134,173 +93,6 @@ class Bounded_Expo_Dyna_SAC_NS:
         self.actor_net.train()
         return action
 
-    # # Solution: s1: Epistemic / s2: Aleatoric
-    # new_dist = torch.distributions.Categorical(prob2)
-    # # Sample less in favor of world model, sample more infavor of sac
-    # candi = new_dist.sample([5]).squeeze()
-    # uncert_actions = ten_times[candi]
-    # # Who should be closer? Random Action? Mu? Mean?
-    # dist_2_mean = torch.pow((uncert_actions - dist_mean), 2)
-    # dist_2_mean = torch.sum(dist_2_mean, dim=1).squeeze()
-    # use_action = uncert_actions[torch.argmin(dist_2_mean)].unsqueeze(0)
-
-    def _train_policy(
-            self,
-            states: torch.Tensor,
-            actions: torch.Tensor,
-            rewards: torch.Tensor,
-            next_states: torch.Tensor,
-            dones: torch.Tensor,
-            weights: torch.Tensor,
-    ) -> None:
-        if weights is None:
-            weights = torch.ones(rewards.shape)
-        ##################     Update the Critic First     ####################
-        with torch.no_grad():
-            next_actions, next_log_pi, _ = self.actor_net(next_states)
-            target_q_one, target_q_two = self.target_critic_net(
-                next_states, next_actions
-            )
-            target_q_values = (
-                    torch.minimum(target_q_one, target_q_two) - self._alpha * next_log_pi
-            )
-            q_target = rewards + self.gamma * (1 - dones) * target_q_values
-        q_values_one, q_values_two = self.critic_net(states, actions)
-        critic_loss_one = ((q_values_one - q_target).pow(2)).mean()
-        critic_loss_two = ((q_values_two - q_target).pow(2)).mean()
-        critic_loss_total = critic_loss_one + critic_loss_two
-        # Update the Critic
-        self.critic_net_optimiser.zero_grad()
-        critic_loss_total.backward()
-        self.critic_net_optimiser.step()
-        ##################     Update the Actor Second     ####################
-        pi, first_log_p, _ = self.actor_net(states)
-        qf1_pi, qf2_pi = self.critic_net(states, pi)
-        min_qf_pi = torch.minimum(qf1_pi, qf2_pi)
-        actor_loss = ((self._alpha * first_log_p) - min_qf_pi).mean()
-        # Update the Actor
-        self.actor_net_optimiser.zero_grad()
-        actor_loss.backward()
-        self.actor_net_optimiser.step()
-        # Update the temperature
-        alpha_loss = -(
-                self.log_alpha * (first_log_p + self.target_entropy).detach()
-        ).mean()
-        self.log_alpha_optimizer.zero_grad()
-        alpha_loss.backward()
-        self.log_alpha_optimizer.step()
-        if self.learn_counter % self.policy_update_freq == 0:
-            for target_param, param in zip(
-                    self.target_critic_net.parameters(), self.critic_net.parameters()
-            ):
-                target_param.data.copy_(
-                    param.data * self.tau + target_param.data * (1.0 - self.tau)
-                )
-
-    def train_world_model(self, memory: PrioritizedReplayBuffer,
-                          batch_size: int):
-        experiences = memory.sample_uniform(batch_size)
-        states, actions, rewards, next_states, _, _ = experiences
-        states = torch.FloatTensor(np.asarray(states)).to(self.device)
-        actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
-        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        self.world_model.train_world(states, actions, next_states)
-        batch_size = len(states)
-        # Reshape to batch_size x whatever
-        if self.train_reward:
-            rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
-            rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
-            if self.train_both:
-                self.world_model.train_together(states, actions, rewards)
-            else:
-                self.world_model.train_reward(states, actions, next_states, rewards)
-
-    def train_policy(self, memory: PrioritizedReplayBuffer, batch_size: int) -> None:
-        self.learn_counter += 1
-        experiences = memory.sample_uniform(batch_size)
-        states, actions, rewards, next_states, dones, _ = experiences
-        # Convert into tensor
-        states = torch.FloatTensor(np.asarray(states)).to(self.device)
-        actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
-        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device).unsqueeze(1)
-        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        dones = torch.LongTensor(np.asarray(dones)).to(self.device).unsqueeze(1)
-        # Step 2 train as usual
-        self._train_policy(
-            states=states,
-            actions=actions,
-            rewards=rewards,
-            next_states=next_states,
-            dones=dones,
-            weights=torch.ones(rewards.shape)
-        )
-        self._dyna_generate_and_train(next_states)
-
-    def _dyna_generate_and_train(self, next_states: torch.Tensor) -> None:
-        pred_states = []
-        pred_actions = []
-        pred_rs = []
-        pred_n_states = []
-        with torch.no_grad():
-            pred_state = next_states
-            for _ in range(self.horizon):
-                pred_state = torch.repeat_interleave(pred_state, self.num_samples, dim=0)
-                # This part is controversial. But random actions is empirically better.
-                # rand_acts = np.random.uniform(-1, 1, (pred_state.shape[0], self.action_num))
-                # pred_acts = torch.FloatTensor(rand_acts).to(self.device)
-                pred_acts, _, _ = self.actor_net(pred_state)
-                pred_next_state, _, _, _ = self.world_model.pred_next_states(
-                    pred_state, pred_acts
-                )
-                if self.gripper:
-                    target_goal_tensor = pred_state[:, -2:]
-                    target_goal = target_goal_tensor.cpu().numpy()
-                    object_current = pred_next_state[:, -4:-2]
-                    object_current = object_current.cpu().numpy()
-                    sq_diff = (target_goal - object_current) ** 2
-                    goal_distance_after = np.expand_dims(np.sqrt(np.sum(sq_diff, axis=1)), axis=1)
-                    pred_reward = np.round((-goal_distance_after + 70), 2)
-                    mask1 = goal_distance_after <= 10
-                    mask2 = goal_distance_after > 70
-                    pred_reward[mask1] = 800
-                    pred_reward[mask2] = 0
-                    pred_reward = torch.FloatTensor(pred_reward).to(self.device)
-                    pred_next_state[:, -2:] = pred_state[:, -2:]
-                else:
-                    pred_reward, _ = self.world_model.pred_rewards(observation=pred_state,
-                                                                   action=pred_acts,
-                                                                   next_observation=pred_next_state)
-                pred_states.append(pred_state)
-                pred_actions.append(pred_acts.detach())
-                pred_rs.append(pred_reward)
-                pred_n_states.append(pred_next_state.detach())
-                pred_state = pred_next_state.detach()
-            pred_states = torch.vstack(pred_states)
-            pred_actions = torch.vstack(pred_actions)
-            pred_rs = torch.vstack(pred_rs)
-            pred_n_states = torch.vstack(pred_n_states)
-            # Pay attention to here! It is dones in the Cares RL Code!
-            pred_dones = torch.FloatTensor(np.zeros(pred_rs.shape)).to(self.device)
-            # states, actions, rewards, next_states, not_dones
-        self._train_policy(
-            pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, torch.ones(pred_rs.shape)
-        )
-
     def set_statistics(self, stats: dict) -> None:
         self.world_model.set_statistics(stats)
         self.set_stat = True
-
-    def save_models(self, filename: str, filepath: str = "models") -> None:
-        path = f"{filepath}/models" if filepath != "models" else filepath
-        dir_exists = os.path.exists(path)
-        if not dir_exists:
-            os.makedirs(path)
-        torch.save(self.actor_net.state_dict(), f"{path}/{filename}_actor.pth")
-        torch.save(self.critic_net.state_dict(), f"{path}/{filename}_critic.pth")
-        logging.info("models has been saved...")
-
-    def load_models(self, filepath: str, filename: str) -> None:
-        path = f"{filepath}/models" if filepath != "models" else filepath
-        self.actor_net.load_state_dict(torch.load(f"{path}/{filename}_actor.pth"))
-        self.critic_net.load_state_dict(torch.load(f"{path}/{filename}_critic.pth"))
-        logging.info("models has been loaded...")
