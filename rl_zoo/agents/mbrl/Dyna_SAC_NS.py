@@ -213,18 +213,7 @@ class Dyna_SAC_NS:
                     pred_state, pred_acts
                 )
                 if self.gripper:
-                    target_goal_tensor = pred_state[:, -2:]
-                    target_goal = target_goal_tensor.cpu().numpy()
-                    object_current = pred_next_state[:, -4:-2]
-                    object_current = object_current.cpu().numpy()
-                    sq_diff = (target_goal - object_current) ** 2
-                    goal_distance_after = np.expand_dims(np.sqrt(np.sum(sq_diff, axis=1)), axis=1)
-                    pred_reward = np.round((-goal_distance_after + 70), 2)
-                    mask1 = goal_distance_after <= 10
-                    mask2 = goal_distance_after > 70
-                    pred_reward[mask1] = 800
-                    pred_reward[mask2] = 0
-                    pred_reward = torch.FloatTensor(pred_reward).to(self.device)
+                    pred_reward = self.reward_function(pred_state, pred_next_state)
                     pred_next_state[:, -2:] = pred_state[:, -2:]
                 else:
                     pred_reward, _ = self.world_model.pred_rewards(observation=pred_state,
@@ -245,6 +234,19 @@ class Dyna_SAC_NS:
         self._train_policy(
             pred_states, pred_actions, pred_rs, pred_n_states, pred_dones, torch.ones(pred_rs.shape)
         )
+
+    def reward_function(self, curr_states, next_states):
+        target_goal_tensor = curr_states[:, -2:]
+        object_current = next_states[:, -4:-2]
+        sq_diff = (target_goal_tensor - object_current) ** 2
+        # [256, 1]
+        goal_distance_after = torch.sqrt(torch.sum(sq_diff, dim=1)).unsqueeze(dim=1)
+        pred_reward = torch.round((-goal_distance_after + 70), decimals=2)
+        mask1 = goal_distance_after <= 10
+        mask2 = goal_distance_after > 70
+        pred_reward[mask1] = 800
+        pred_reward[mask2] = 0
+        return pred_reward
 
     def set_statistics(self, stats: dict) -> None:
         self.world_model.set_statistics(stats)

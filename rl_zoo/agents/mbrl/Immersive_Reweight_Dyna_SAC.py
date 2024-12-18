@@ -7,15 +7,30 @@ from rl_zoo.networks.world_models import (
 from rl_zoo.utils.helpers import denormalize_observation_delta
 import logging
 
+
 class Immerseive_Weighting_Dyna_SAC_NS(Dyna_SAC_NS):
     """
     Dyna of SAC with Next state to predict rewards.
 
     """
-    def __init__(self, actor_network: torch.nn.Module, critic_network: torch.nn.Module, world_network: World_Model,
-                 gamma: float, tau: float, action_num: int, actor_lr: float, critic_lr: float, alpha_lr: float,
-                 num_samples: int, horizon: int, threshold: float, device: torch.device, train_reward: bool,
-                 train_both: bool, gripper: bool):
+
+    def __init__(self,
+                 actor_network: torch.nn.Module,
+                 critic_network: torch.nn.Module,
+                 world_network: World_Model,
+                 gamma: float,
+                 tau: float,
+                 action_num: int,
+                 actor_lr: float,
+                 critic_lr: float,
+                 alpha_lr: float,
+                 num_samples: int,
+                 horizon: int,
+                 threshold: float,
+                 device: torch.device,
+                 train_reward: bool,
+                 train_both: bool,
+                 gripper: bool):
         super().__init__(actor_network, critic_network, world_network, gamma, tau, action_num, actor_lr, critic_lr,
                          alpha_lr, num_samples, horizon, device, train_reward, train_both, gripper)
         self.threshold = threshold
@@ -109,7 +124,7 @@ class Immerseive_Weighting_Dyna_SAC_NS(Dyna_SAC_NS):
                     pred_state, pred_acts
                 )
                 if self.gripper:
-                    pred_reward = self.reward_function(pred_state, pred_acts, pred_next_state)
+                    pred_reward = self.reward_function(pred_state, pred_next_state)
                     pred_next_state[:, -2:] = pred_state[:, -2:]
                 else:
                     pred_reward, _ = self.world_model.pred_rewards(observation=pred_state,
@@ -201,17 +216,3 @@ class Immerseive_Weighting_Dyna_SAC_NS(Dyna_SAC_NS):
             weights = (weights - new_min_var) / (new_max_var - new_min_var)
             weights += 0.0001
         return weights.detach()
-
-
-    def reward_function(self, curr_states, actions, next_states):
-        target_goal_tensor = curr_states[:, -2:]
-        object_current = next_states[:, -4:-2]
-        sq_diff = (target_goal_tensor - object_current) ** 2
-        # [256, 1]
-        goal_distance_after = torch.sqrt(torch.sum(sq_diff, dim=1)).unsqueeze(dim=1)
-        pred_reward = torch.round((-goal_distance_after + 70), decimals=2)
-        mask1 = goal_distance_after <= 10
-        mask2 = goal_distance_after > 70
-        pred_reward[mask1] = 800
-        pred_reward[mask2] = 0
-        return pred_reward
