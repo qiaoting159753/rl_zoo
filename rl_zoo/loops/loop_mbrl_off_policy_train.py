@@ -171,7 +171,7 @@ class MBRL_Trainer:
             plt.ylabel("Rewards", fontsize=label_fontsize)
             plt.legend(loc="best").set_draggable(True)
             plt.tight_layout(pad=0.5)
-            plt.savefig("/root/" + self.mbrl_agent_name + "_eval_rwds_" + str(self.seed) + ".png")
+            plt.savefig(self.directory + self.mbrl_agent_name + "_eval_rwds_" + str(self.seed) + ".png")
             plt.close()
 
     def train(self, flush=False):

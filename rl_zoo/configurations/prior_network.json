@@ -1,7 +1,7 @@
 {
   "loop_name": "World_Model",
   "agent_name":"Prior_World_Model",
-  "device": "cpu",
+  "device": "cuda",
   "seeds":[15, 25, 35],
   "G": 1,
   "model_G": 5.0,

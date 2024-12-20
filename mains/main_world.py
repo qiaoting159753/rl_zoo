@@ -8,8 +8,13 @@ import json
 
 
 def main():
+    # Control: <= separator: dmcs, > separator: OpenAI
+    alg_name = "mbrl_dyna_sac.json"
+    separator = 2
+    agents = ["cheetah"]
+    tasks = ["run"]
+
     curr_path = os.getcwd()
-    alg_name = "mbrl_dyna_sac_bounded.json"
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
     with open(config_file, 'r') as file:
         data = json.load(file)
@@ -44,8 +49,7 @@ def main():
     train_reward = data['train_reward']
     # Switch
     parent_dir = curr_path + "/statistics/"
-    agents = ["swimmer", "hopper", "ball_in_cup", "Pusher-v5", "Ant-v5"]
-    tasks = ["swimmer15", "hop", "catch", "", ""]
+
     for i in range(len(agents)):
         env_domain = agents[i]
         env_task = tasks[i]
@@ -65,7 +69,7 @@ def main():
                             # Random Seed
                             set_seed(seed)
                             # Environment
-                            if i > 2:
+                            if i > separator:
                                 env = OpenAIEnvrionment(env_domain, param=True)
                             else:
                                 env = DMCSEnvironment(env_domain, env_task)
