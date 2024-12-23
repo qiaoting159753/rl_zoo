@@ -304,6 +304,7 @@ class World_Model_Trainer:
                                                         num_actions=self.action_dim,
                                                         device=self.device,
                                                         boost_inter=int(self.parameter_a),
+                                                        num_models=int(self.parameter_b),
                                                         sas=self.sas,
                                                         prob_rwd=self.prob_rwd)
 

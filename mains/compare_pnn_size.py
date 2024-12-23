@@ -98,7 +98,7 @@ def load_2():
 # Control
 attributes = ['steps', 'dyna_mse', 'reward_mse', 'dyna_corr_l2', 'dyna_corr_l1', 'reward_corr_l1', 'reward_gt_corr_l1']
 envs = ["finger-turn_hard", "reacher-hard", "fish-swim", "HalfCheetah-v5", "Hopper-v5", "Swimmer-v5", "Walker2d-v5"]
-title = envs[5]
+title = envs[6]
 attr = attributes[4]
 cut = 1
 
@@ -142,7 +142,6 @@ sns.lineplot(
 
 data_list_1 = load_1()
 data_list_2 = load_2()
-# data_list_3 = load_3()
 
 for j in range(2):
     if j == 0:
@@ -191,15 +190,14 @@ for j in range(2):
     )
 plt.ylim(-0.1, 1)
 plt.style.use("seaborn-v0_8")
-label_fontsize = 15
+label_fontsize = 25
 title_fontsize = 20
-ticks_fontsize = 10
+ticks_fontsize = 17
 plt.grid()
 plt.xticks(fontsize=ticks_fontsize)
 plt.yticks(fontsize=ticks_fontsize)
 plt.xlabel("Steps", fontsize=label_fontsize)
 plt.ylabel("Pearson-Correlation", fontsize=label_fontsize)
-# plt.title(title, fontsize=title_fontsize)
 plt.legend(loc="best").set_draggable(True)
 plt.tight_layout(pad=0.5)
 plt.savefig(title + "_" + attr + "pnn_size.png")

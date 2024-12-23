@@ -8,7 +8,7 @@ location = "/Users/tonyq/Desktop/CH1_Data/"
 
 
 def load_pnn():
-    algorithm = "pnn/non_overfit/standard_non_overfit/Single_PNN_"
+    algorithm = "pnn/overfit/standard_overfit/Single_PNN_"
     finger_1 = pd.read_csv(location + algorithm + "finger_turn_hard/16_16_16_15.csv.csv")
     reacher_1 = pd.read_csv(location + algorithm + "reacher_hard/16_16_16_15.csv.csv")
     fish_1 = pd.read_csv(location + algorithm + "fish_swim/16_16_16_15.csv.csv")
@@ -39,30 +39,30 @@ def load_pnn():
 
 
 def load_prior():
-    algorithm = "prior/non_overfit/Prior_World_Model_"
-    finger_1 = pd.read_csv(location + algorithm  + "finger_turn_hard/0.3_1.csv")
-    reacher_1 = pd.read_csv(location + algorithm     + "reacher_hard/0.3_1.csv")
-    fish_1 = pd.read_csv(location + algorithm           + "fish_swim/0.3_1.csv")
-    hcheetah_1 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.3_1.csv")
-    hopper_1 = pd.read_csv(location + algorithm        + "Hopper-v5_/0.3_1.csv")
-    swimmer_1 = pd.read_csv(location + algorithm      + "Swimmer-v5_/0.3_1.csv")
-    walker_1 = pd.read_csv(location + algorithm      + "Walker2d-v5_/0.3_1.csv")
+    algorithm = "prior/overfit/Prior_World_Model_"
+    finger_1 = pd.read_csv(location + algorithm + "finger_turn_hard/0.1_16_16_15.csv.csv")
+    reacher_1 = pd.read_csv(location + algorithm + "reacher_hard/0.1_16_16_15.csv.csv")
+    fish_1 = pd.read_csv(location + algorithm + "fish_swim/0.1_16_16_15.csv.csv")
+    hcheetah_1 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.1_16_16_15.csv.csv")
+    hopper_1 = pd.read_csv(location + algorithm + "Hopper-v5_/0.1_16_16_15.csv.csv")
+    swimmer_1 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.1_16_16_15.csv.csv")
+    walker_1 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.1_16_16_15.csv.csv")
 
-    finger_2 = pd.read_csv(location + algorithm  + "finger_turn_hard/0.3_2.csv")
-    reacher_2 = pd.read_csv(location + algorithm     + "reacher_hard/0.3_2.csv")
-    fish_2 = pd.read_csv(location + algorithm           + "fish_swim/0.3_2.csv")
-    hcheetah_2 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.3_2.csv")
-    hopper_2 = pd.read_csv(location + algorithm        + "Hopper-v5_/0.3_2.csv")
-    swimmer_2 = pd.read_csv(location + algorithm      + "Swimmer-v5_/0.3_2.csv")
-    walker_2 = pd.read_csv(location + algorithm      + "Walker2d-v5_/0.3_2.csv")
+    finger_2 = pd.read_csv(location + algorithm + "finger_turn_hard/0.1_16_16_25.csv.csv")
+    reacher_2 = pd.read_csv(location + algorithm + "reacher_hard/0.1_16_16_25.csv.csv")
+    fish_2 = pd.read_csv(location + algorithm + "fish_swim/0.1_16_16_25.csv.csv")
+    hcheetah_2 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.1_16_16_25.csv.csv")
+    hopper_2 = pd.read_csv(location + algorithm + "Hopper-v5_/0.1_16_16_25.csv.csv")
+    swimmer_2 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.1_16_16_25.csv.csv")
+    walker_2 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.1_16_16_25.csv.csv")
 
-    finger_3 = pd.read_csv(location + algorithm  + "finger_turn_hard/0.3_3.csv")
-    reacher_3 = pd.read_csv(location + algorithm     + "reacher_hard/0.3_3.csv")
-    fish_3 = pd.read_csv(location + algorithm           + "fish_swim/0.3_3.csv")
-    hcheetah_3 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.3_3.csv")
-    hopper_3 = pd.read_csv(location + algorithm        + "Hopper-v5_/0.3_3.csv")
-    swimmer_3 = pd.read_csv(location + algorithm      + "Swimmer-v5_/0.3_3.csv")
-    walker_3 = pd.read_csv(location + algorithm      + "Walker2d-v5_/0.3_3.csv")
+    finger_3 = pd.read_csv(location + algorithm + "finger_turn_hard/0.1_16_16_35.csv.csv")
+    reacher_3 = pd.read_csv(location + algorithm + "reacher_hard/0.1_16_16_35.csv.csv")
+    fish_3 = pd.read_csv(location + algorithm + "fish_swim/0.1_16_16_35.csv.csv")
+    hcheetah_3 = pd.read_csv(location + algorithm + "HalfCheetah-v5_/0.1_16_16_35.csv.csv")
+    hopper_3 = pd.read_csv(location + algorithm + "Hopper-v5_/0.1_16_16_35.csv.csv")
+    swimmer_3 = pd.read_csv(location + algorithm + "Swimmer-v5_/0.1_16_16_35.csv.csv")
+    walker_3 = pd.read_csv(location + algorithm + "Walker2d-v5_/0.1_16_16_35.csv.csv")
 
     data_list_pnn = [finger_1, reacher_1, fish_1, hcheetah_1, hopper_1, swimmer_1, walker_1,
                      finger_2, reacher_2, fish_2, hcheetah_2, hopper_2, swimmer_2, walker_2,
@@ -71,7 +71,7 @@ def load_prior():
 
 
 def load_ensemble():
-    algorithm = "ensemble/non_overfit"
+    algorithm = "ensemble/overfit"
     finger_1 = pd.read_csv(location + algorithm + "/finger_turn_hard/30_9_0_15.csv.csv")
     finger_2 = pd.read_csv(location + algorithm + "/finger_turn_hard/30_9_0_25.csv.csv")
     finger_3 = pd.read_csv(location + algorithm + "/finger_turn_hard/30_9_0_35.csv.csv")
@@ -107,7 +107,7 @@ def load_ensemble():
 
 
 def load_bbb():
-    algorithm = "bayesian/non_overfit/Bayesian_VI_"
+    algorithm = "bayesian/overfit/Bayesian_VI_"
     finger_1 = pd.read_csv(location + algorithm + "finger_turn_hard/0.001_0.1_0.0_15.csv.csv")
     finger_2 = pd.read_csv(location + algorithm + "finger_turn_hard/0.001_0.1_0.0_25.csv.csv")
     finger_3 = pd.read_csv(location + algorithm + "finger_turn_hard/0.001_0.1_0.0_35.csv.csv")
@@ -147,7 +147,7 @@ attributes = ['steps', 'dyna_mse', 'reward_mse', 'dyna_corr_l2', 'dyna_corr_l1',
 envs = ["finger-turn_hard", "reacher-hard", "fish-swim", "HalfCheetah-v5", "Hopper-v5", "Swimmer-v5", "Walker2d-v5"]
 title = envs[6]
 attr = attributes[6]
-cut = 1
+cut = 20
 
 data_list_pnn = load_pnn()
 for d in data_list_pnn:
@@ -239,7 +239,10 @@ for j in range(3):
         label=label_name,
         errorbar="sd",
     )
-
+    # plt.fill_between(compare_mean["steps"],
+    #                  compare_mean["Data"] - compare_var["Data"],
+    #                  compare_mean["Data"] + compare_var["Data"],
+    #                 alpha=0.3)
 plt.ylim(-0.1, 1)
 plt.style.use("seaborn-v0_8")
 label_fontsize = 25
@@ -250,7 +253,8 @@ plt.xticks(fontsize=ticks_fontsize)
 plt.yticks(fontsize=ticks_fontsize)
 plt.xlabel("Steps", fontsize=label_fontsize)
 plt.ylabel("Pearson-Correlation", fontsize=label_fontsize)
+# plt.title(title, fontsize=title_fontsize)
 plt.legend(loc="best").set_draggable(True)
 plt.tight_layout(pad=0.5)
-plt.savefig(title + "_" + attr + ".png")
+# plt.savefig(title + "_" + attr + ".png")
 plt.show()

@@ -4,7 +4,7 @@
   "device": "cuda",
   "seeds":[15, 25, 35],
   "G": 1,
-  "model_G": 5.0,
+  "model_G": 0.2,
   "random_goal": false,
   "batch_size": 256,
   "episode_steps": 257,
@@ -14,15 +14,16 @@
   "branch_factor": 10,
   "on_policy": true,
   "Parameter_A" : [30],
-  "Parameter_B" : [0],
+  "Parameter_B" : [9],
   "Parameter_C" : [0],
-  "Parameter_D" : [3],
+  "Parameter_D" : [0],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
   "sas": true,
   "prob_rwd": true,
   "train_both": true,
-  "train_reward": true
+  "train_reward": true,
+  "gripper": false
 }
 
 

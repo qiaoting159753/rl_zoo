@@ -176,7 +176,6 @@ pnn_var = pnns[title].var(axis=0)
 pnn_mean = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': pnn_mean})
 pnn_var = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': pnn_var})
 
-
 pnn_mean = pnn_mean.iloc[cut:, :]
 pnn_var = pnn_var.iloc[cut:, :]
 window_size = 10
@@ -189,12 +188,6 @@ sns.lineplot(
     label="pnn",
     errorbar="sd",
 )
-
-# plt.fill_between(pnn_mean["steps"],
-#                  pnn_mean["Data"] - pnn_var["Data"],
-#                  pnn_mean["Data"] + pnn_var["Data"],
-#                  alpha=0.3)
-
 
 data_list_1 = load_prior()
 data_list_2 = load_ensemble()
@@ -254,9 +247,9 @@ for j in range(3):
     #                 alpha=0.3)
 plt.ylim(-0.1, 1)
 plt.style.use("seaborn-v0_8")
-label_fontsize = 15
+label_fontsize = 25
 title_fontsize = 20
-ticks_fontsize = 10
+ticks_fontsize = 17
 plt.grid()
 plt.xticks(fontsize=ticks_fontsize)
 plt.yticks(fontsize=ticks_fontsize)
@@ -265,5 +258,5 @@ plt.ylabel("Pearson-Correlation", fontsize=label_fontsize)
 # plt.title(title, fontsize=title_fontsize)
 plt.legend(loc="best").set_draggable(True)
 plt.tight_layout(pad=0.5)
-# plt.savefig(title + "_" + attr + ".png")
+plt.savefig(title + "_" + attr + ".png")
 plt.show()
