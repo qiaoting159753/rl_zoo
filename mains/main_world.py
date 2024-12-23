@@ -9,10 +9,10 @@ import json
 
 def main():
     # Control: <= separator: dmcs, > separator: OpenAI
-    alg_name = "mbrl_dyna_sac.json"
+    alg_name = "ensemble_pnn.json"
     separator = 2
-    agents = ["cheetah"]
-    tasks = ["run"]
+    agents = ["finger",   "fish", "reacher", "HalfCheetah-v5", "Hopper-v5", "Swimmer-v5", "Walker2d-v5"]
+    tasks = ["turn_hard", "swim", "hard",    "",               "",          "",           ""]
 
     curr_path = os.getcwd()
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
