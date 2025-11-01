@@ -14,7 +14,7 @@
   "branch_factor": 10,
   "on_policy": true,
   "Parameter_A" : [30],
-  "Parameter_B" : [9],
+  "Parameter_B" : [5,9,14],
   "Parameter_C" : [0],
   "Parameter_D" : [3],
   "flush": false,
@@ -22,8 +22,9 @@
   "sas": false,
   "prob_rwd": false,
   "train_both": false,
-  "train_reward": true,
-  "gripper": false
+  "train_reward": false,
+  "gripper": false,
+  "description": "Parameter_A : [Boost] Ensemble Size [30], Parameter_B : Number of Models [9]"
 }
 
 

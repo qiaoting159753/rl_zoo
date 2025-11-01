@@ -1,6 +1,8 @@
+import sys
+sys.path.append('/Users/tonyq/PycharmProjects/rl_zoo')
 import logging
 import shutil
-from rl_zoo.loops import World_Model_Trainer, MBRL_Trainer, MFRL_Trainer
+from rl_zoo.loops import World_Model_Trainer # , MBRL_Trainer, MFRL_Trainer
 from rl_zoo.envs import DMCSEnvironment, OpenAIEnvrionment
 from rl_zoo.utils import set_seed
 import os
@@ -100,55 +102,57 @@ def main():
                                                               train_both=train_both,
                                                               train_reward=train_reward,
                                                               prob_rwd=prob_rwd)
-                            if loop_name == "MBRL":
-                                trainer = MBRL_Trainer(env=env,
-                                                       evaluate_interval=evaluate_interval,
-                                                       mbrl_agent_name=agent_name,
-                                                       random_goal=random_goal,
-                                                       device=device,
-                                                       on_policy=on_policy,
-                                                       G=G,
-                                                       model_G=model_G,
-                                                       batch_size=batch_size,
-                                                       episode_steps=episode_steps,
-                                                       maximum_steps=maximum_steps,
-                                                       generate_results=True,
-                                                       seed=seed,
-                                                       directory=direct_param,
-                                                       parameter_a=parameter_a,
-                                                       parameter_b=parameter_b,
-                                                       parameter_c=parameter_c,
-                                                       parameter_d=parameter_d,
-                                                       sas=sas,
-                                                       train_both=train_both,
-                                                       train_reward=train_reward,
-                                                       prob_rwd=prob_rwd,
-                                                       gripper=gripper)
-                            if loop_name == "MFRL":
-                                trainer = MFRL_Trainer(env=env,
-                                                       evaluate_interval=evaluate_interval,
-                                                       mbrl_agent_name=agent_name,
-                                                       random_goal=random_goal,
-                                                       device=device,
-                                                       on_policy=on_policy,
-                                                       G=G,
-                                                       model_G=model_G,
-                                                       batch_size=batch_size,
-                                                       episode_steps=episode_steps,
-                                                       maximum_steps=maximum_steps,
-                                                       generate_results=True,
-                                                       seed=seed,
-                                                       directory=direct_param,
-                                                       parameter_a=parameter_a,
-                                                       parameter_b=parameter_b,
-                                                       parameter_c=parameter_c,
-                                                       parameter_d=parameter_d,
-                                                       sas=sas,
-                                                       train_both=train_both,
-                                                       train_reward=train_reward,
-                                                       prob_rwd=prob_rwd,
-                                                       gripper=gripper)
-                            trainer.train(flush=flush)
+                                trainer.train(flush=flush)
+
+                            # if loop_name == "MBRL":
+                            #     trainer = MBRL_Trainer(env=env,
+                            #                            evaluate_interval=evaluate_interval,
+                            #                            mbrl_agent_name=agent_name,
+                            #                            random_goal=random_goal,
+                            #                            device=device,
+                            #                            on_policy=on_policy,
+                            #                            G=G,
+                            #                            model_G=model_G,
+                            #                            batch_size=batch_size,
+                            #                            episode_steps=episode_steps,
+                            #                            maximum_steps=maximum_steps,
+                            #                            generate_results=True,
+                            #                            seed=seed,
+                            #                            directory=direct_param,
+                            #                            parameter_a=parameter_a,
+                            #                            parameter_b=parameter_b,
+                            #                            parameter_c=parameter_c,
+                            #                            parameter_d=parameter_d,
+                            #                            sas=sas,
+                            #                            train_both=train_both,
+                            #                            train_reward=train_reward,
+                            #                            prob_rwd=prob_rwd,
+                            #                            gripper=gripper)
+                            # if loop_name == "MFRL":
+                            #     trainer = MFRL_Trainer(env=env,
+                            #                            evaluate_interval=evaluate_interval,
+                            #                            mbrl_agent_name=agent_name,
+                            #                            random_goal=random_goal,
+                            #                            device=device,
+                            #                            on_policy=on_policy,
+                            #                            G=G,
+                            #                            model_G=model_G,
+                            #                            batch_size=batch_size,
+                            #                            episode_steps=episode_steps,
+                            #                            maximum_steps=maximum_steps,
+                            #                            generate_results=True,
+                            #                            seed=seed,
+                            #                            directory=direct_param,
+                            #                            parameter_a=parameter_a,
+                            #                            parameter_b=parameter_b,
+                            #                            parameter_c=parameter_c,
+                            #                            parameter_d=parameter_d,
+                            #                            sas=sas,
+                            #                            train_both=train_both,
+                            #                            train_reward=train_reward,
+                            #                            prob_rwd=prob_rwd,
+                            #                            gripper=gripper)
+                            
 
 
 if __name__ == "__main__":

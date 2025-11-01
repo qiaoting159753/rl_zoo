@@ -8,6 +8,7 @@ import math
 from rl_zoo.utils import normalize
 from scipy import stats
 
+
 logging.basicConfig(level=logging.INFO)
 
 # Agents
@@ -177,42 +178,103 @@ class World_Model_Trainer:
             gt_s = gt_ns
             if gt_done:
                 break
-        l1_one_step_errors = np.array(l1_one_step_errors)
-        l2_one_step_errors = np.array(l2_one_step_errors)
-        l1_one_rwd_errors = np.array(l1_one_rwd_errors)
-        l1_one_gt_rwd_errors = np.array(l1_one_gt_rwd_errors)
-        one_dyna_uncerts = np.array(one_dyna_uncerts)
-        one_rwd_uncerts = np.array(one_rwd_uncerts)
 
-        c_1 = np.corrcoef(l2_one_step_errors, one_dyna_uncerts)
-        c_2 = np.corrcoef(l1_one_step_errors, one_dyna_uncerts)
-        c_3 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
-        c_4 = np.corrcoef(l1_one_gt_rwd_errors, one_rwd_uncerts)
+        if (len(l1_one_step_errors) > 2) and (len(l1_one_rwd_errors) > 2) and (len(one_rwd_uncerts) > 2):
+            l1_one_step_errors = np.array(l1_one_step_errors)
+            l2_one_step_errors = np.array(l2_one_step_errors)
+            l1_one_rwd_errors = np.array(l1_one_rwd_errors)
+            l1_one_gt_rwd_errors = np.array(l1_one_gt_rwd_errors)
+            one_dyna_uncerts = np.array(one_dyna_uncerts)
+            one_rwd_uncerts = np.array(one_rwd_uncerts)
 
-        logging.info(f"Prediction Error dynamics: {episodic_pred_error}, reward:{episodic_rwd_pred_error}")
-        all_data = np.zeros((7,))
-        all_data[0] = self.counter
-        all_data[1] = episodic_pred_error
-        all_data[2] = episodic_rwd_pred_error
-        if math.isnan(c_1[0, 1]):
-            c_1[0, 1] = 0.0
-        if math.isnan(c_2[0, 1]):
-            c_2[0, 1] = 0.0
-        if math.isnan(c_3[0, 1]):
-            c_3[0, 1] = 0.0
-        if math.isnan(c_4[0, 1]):
-            c_4[0, 1] = 0.0
-        all_data[3] = c_1[0, 1]
-        all_data[4] = c_2[0, 1]
-        all_data[5] = c_3[0, 1]
-        all_data[6] = c_4[0, 1]
+            c_1 = np.corrcoef(l2_one_step_errors, one_dyna_uncerts)
+            c_2 = np.corrcoef(l1_one_step_errors, one_dyna_uncerts)
+            c_3 = np.corrcoef(l1_one_rwd_errors, one_rwd_uncerts)
+            c_4 = np.corrcoef(l1_one_gt_rwd_errors, one_rwd_uncerts)
 
-        self.evaluation_array.append(all_data)
+            kc_1,_ = stats.kendalltau(l2_one_step_errors, one_dyna_uncerts)
+            kc_2,_ = stats.kendalltau(l1_one_step_errors, one_dyna_uncerts)
+            kc_3,_ = stats.kendalltau(l1_one_rwd_errors, one_rwd_uncerts)
+            kc_4,_ = stats.kendalltau(l1_one_gt_rwd_errors, one_rwd_uncerts)
 
-        if self.generate_results:
-            # Save the metrics
-            file_name = self.directory + str(self.seed) + ".csv"
-            np.savetxt(file_name + ".csv", np.array(self.evaluation_array), delimiter=",")
+            sc_1,_ = stats.spearmanr(l2_one_step_errors, one_dyna_uncerts)
+            sc_2,_ = stats.spearmanr(l1_one_step_errors, one_dyna_uncerts)
+            sc_3,_ = stats.spearmanr(l1_one_rwd_errors, one_rwd_uncerts)
+            sc_4,_ = stats.spearmanr(l1_one_gt_rwd_errors, one_rwd_uncerts)
+
+            xc_1, _ = stats.chatterjeexi(l2_one_step_errors, one_dyna_uncerts)
+            xc_2, _ = stats.chatterjeexi(l1_one_step_errors, one_dyna_uncerts)
+            xc_3, _ = stats.chatterjeexi(l1_one_rwd_errors, one_rwd_uncerts)
+            xc_4, _ = stats.chatterjeexi(l1_one_gt_rwd_errors, one_rwd_uncerts)
+
+            logging.info(f"Prediction Error dynamics: {episodic_pred_error}, reward:{episodic_rwd_pred_error}")
+            all_data = np.zeros((19,))
+            all_data[0] = self.counter
+            all_data[1] = episodic_pred_error
+            all_data[2] = episodic_rwd_pred_error
+
+            if math.isnan(c_1[0, 1]):
+                c_1[0, 1] = 0.0
+            if math.isnan(c_2[0, 1]):
+                c_2[0, 1] = 0.0
+            if math.isnan(c_3[0, 1]):
+                c_3[0, 1] = 0.0
+            if math.isnan(c_4[0, 1]):
+                c_4[0, 1] = 0.0
+            
+            if math.isnan(kc_1):
+                kc_1 = 0.0
+            if math.isnan(kc_2):
+                kc_2 = 0.0
+            if math.isnan(kc_3):
+                kc_3 = 0.0
+            if math.isnan(kc_4):
+                kc_4 = 0.0
+
+            if math.isnan(sc_1):
+                sc_1 = 0.0
+            if math.isnan(sc_2):
+                sc_2 = 0.0
+            if math.isnan(sc_3):
+                sc_3 = 0.0
+            if math.isnan(sc_4):
+                sc_4 = 0.0
+            
+            if math.isnan(xc_1):
+                xc_1 = 0.0
+            if math.isnan(xc_2):
+                xc_2 = 0.0
+            if math.isnan(xc_3):
+                xc_3 = 0.0
+            if math.isnan(xc_4):
+                xc_4 = 0.0
+
+            all_data[3] = c_1[0, 1]
+            all_data[4] = c_2[0, 1]
+            all_data[5] = c_3[0, 1]
+            all_data[6] = c_4[0, 1]
+
+            all_data[7] = kc_1
+            all_data[8] = kc_2
+            all_data[9] = kc_3
+            all_data[10] = kc_4
+
+            all_data[11] = sc_1
+            all_data[12] = sc_2
+            all_data[13] = sc_3
+            all_data[14] = sc_4
+
+            all_data[15] = xc_1
+            all_data[16] = xc_2
+            all_data[17] = xc_3
+            all_data[18] = xc_4
+
+            self.evaluation_array.append(all_data)
+
+            if self.generate_results:
+                # Save the metrics
+                file_name = self.directory + str(self.seed) + ".csv"
+                np.savetxt(file_name + ".csv", np.array(self.evaluation_array), delimiter=",")
 
     def train(self, flush=False):
         """
@@ -310,7 +372,7 @@ class World_Model_Trainer:
                                                         prob_rwd=self.prob_rwd)
 
         if self.world_model_name == "Ensemble_Dyna_Big":
-            self.world_model = Ensemble_Dyna_One_Reward(observation_size=self.state_dim,
+            self.world_model = Ensemble_Dyna_Big(observation_size=self.state_dim,
                                                         num_actions=self.action_dim,
                                                         device=self.device,
                                                         boost_inter=int(self.parameter_a),

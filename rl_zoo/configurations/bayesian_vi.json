@@ -19,10 +19,11 @@
   "Parameter_D" : [3],
   "flush": false,
   "parent_direction": "/root/rl_zoo_data/",
-  "sas": true,
-  "prob_rwd": true,
-  "train_both": true,
-  "train_reward": true
+  "sas": false,
+  "prob_rwd": false,
+  "train_both": false,
+  "train_reward": false,
+  "description": "Parameter_A: Ratio [0.001, 0.01, 0.1], Parameter_B : Sigma [0.1] "
 }
 
 
