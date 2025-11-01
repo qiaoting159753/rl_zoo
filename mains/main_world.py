@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/Users/tonyq/PycharmProjects/rl_zoo')
+sys.path.append('~/PycharmProjects/rl_zoo')
 import logging
 import shutil
 from rl_zoo.loops import World_Model_Trainer # , MBRL_Trainer, MFRL_Trainer
