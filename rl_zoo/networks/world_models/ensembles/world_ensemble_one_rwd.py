@@ -160,7 +160,7 @@ class Ensemble_Dyna_One_Reward(World_Model):
 
             if self.sas:
                 if self.prob_rwd:
-                    rewards, rwd_var = self.reward_network(observationss, actionss, samples)
+                    rewards, rwd_var = self.pred_rewards(observationss, actionss, samples)
                     epis_uncert = torch.var(rewards, dim=0).item()
                     rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
                     alea_uncert = rwd_var
@@ -168,11 +168,11 @@ class Ensemble_Dyna_One_Reward(World_Model):
                     alea_uncert = np.minimum(alea_uncert, 10e3)
                     uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
                 else:
-                    rewards = self.reward_network(observationss, actionss, samples)
+                    rewards, _ = self.pred_rewards(observationss, actionss, samples)
                     uncert_rwd = torch.var(rewards, dim=0).item()
             else:
                 if self.prob_rwd:
-                    rewards, rwd_var = self.reward_network(samples, actionss)
+                    rewards, rwd_var = self.pred_rewards(observationss, actionss, samples)
                     epis_uncert = torch.var(rewards, dim=0).item()
                     rwd_var = rwd_var.squeeze().detach().cpu().numpy().mean()
                     alea_uncert = rwd_var
@@ -180,7 +180,7 @@ class Ensemble_Dyna_One_Reward(World_Model):
                     alea_uncert = np.minimum(alea_uncert, 10e3)
                     uncert_rwd = ((epis_uncert ** 2) + (alea_uncert ** 2)) ** 0.5
                 else:
-                    rewards = self.reward_network(samples, actionss)
+                    rewards, _ = self.pred_rewards(observationss, actionss, samples)
                     uncert_rwd = torch.var(rewards, dim=0).item()
         else:
             dist = torch.distributions.Normal(all_means, vars_s)

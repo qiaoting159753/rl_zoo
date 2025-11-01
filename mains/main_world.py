@@ -8,11 +8,12 @@ import json
 
 
 def main():
-    # Control: <= separator: dmcs, > separator: OpenAI
-    alg_name = "ensemble_pnn.json"
+    alg_name = "ensemble_big_pnn.json"
+    allow_reward_for_openai = True
+    # Control: <= separator: dmcs, > separator: OpenAI.
     separator = 2
     agents = ["finger",   "fish", "reacher", "HalfCheetah-v5", "Hopper-v5", "Swimmer-v5", "Walker2d-v5"]
-    tasks = ["turn_hard", "swim", "hard",    "",               "",          "",           ""]
+    tasks =  ["turn_hard", "swim", "hard",    "",               "",          "",           ""]
 
     curr_path = os.getcwd()
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name
@@ -70,7 +71,7 @@ def main():
                             set_seed(seed)
                             # Environment
                             if i > separator:
-                                env = OpenAIEnvrionment(env_domain, param=True)
+                                env = OpenAIEnvrionment(env_domain, param=(not allow_reward_for_openai))
                             else:
                                 env = DMCSEnvironment(env_domain, env_task)
                             env.set_seed(seed)

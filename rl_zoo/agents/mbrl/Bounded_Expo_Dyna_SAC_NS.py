@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import torch
+from torch import nn as nn
 import torch.nn.functional as F
 from rl_zoo.agents.mbrl import Dyna_SAC_NS
 from rl_zoo.networks.world_models import (
@@ -51,6 +52,12 @@ class Bounded_Expo_Dyna_SAC_NS(Dyna_SAC_NS):
         self.exploration_samples = exploration_samples
         self.alpha = alpha
         self.set_stat = False
+        self.k_l = nn.KLDivLoss(reduction='batchmean', log_target=True)
+
+    def _jsd(self, p, q):
+        p, q = p.view(-1, p.size(-1)).log_softmax(-1), q.view(-1, q.size(-1)).log_softmax(-1)
+        m = (0.5 * (p + q))
+        return 0.5 * (self.k_l(m, p) + self.k_l(m, q))
 
     def select_action_from_policy(
             self, state: np.ndarray, evaluation: bool = False, noise_scale: float = 0
@@ -81,6 +88,9 @@ class Bounded_Expo_Dyna_SAC_NS(Dyna_SAC_NS):
                         world_dist = F.softmax(uncert, dim=0)
                         final_dist = (1 - self.alpha) * policy_dist + self.alpha * world_dist
                         final_dist = F.softmax(final_dist, dim=0)
+
+                        print(self._jsd(policy_dist, final_dist))
+
                         candi = torch.argmax(final_dist)
                         # new_dist = torch.distributions.Categorical(final_dist)
                         # candi = new_dist.sample([5]).squeeze()
