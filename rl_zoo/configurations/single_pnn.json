@@ -22,7 +22,8 @@
   "sas": false,
   "prob_rwd": false,
   "train_both": false,
-  "train_reward": false, 
+  "train_reward": false,
+  "gripper": false,
   "description": "Parameter_A : [1], // Network Size [128, 128]. Parameter_A : [2], // Network Size [128, 128, 128]. Parameter_A : [3], // Network Size [256, 256]."
 }
 

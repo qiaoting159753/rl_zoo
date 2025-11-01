@@ -22,7 +22,8 @@
   "sas": false,
   "prob_rwd": false,
   "train_both": false,
-  "train_reward": false
+  "train_reward": false,
+  "gripper": false,
 }
 
 

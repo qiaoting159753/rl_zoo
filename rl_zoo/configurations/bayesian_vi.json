@@ -23,6 +23,7 @@
   "prob_rwd": false,
   "train_both": false,
   "train_reward": false,
+  "gripper": false,
   "description": "Parameter_A: Ratio [0.001, 0.01, 0.1], Parameter_B : Sigma [0.1] "
 }
 
