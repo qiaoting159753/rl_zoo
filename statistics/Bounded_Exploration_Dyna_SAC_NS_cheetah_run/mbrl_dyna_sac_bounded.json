@@ -1,0 +1,29 @@
+{
+  "loop_name": "MBRL",
+  "agent_name":"Bounded_Exploration_Dyna_SAC_NS",
+  "device": "cpu",
+  "seeds":[15, 25, 35],
+  "G": 1,
+  "model_G": 5.0,
+  "random_goal": false,
+  "batch_size": 256,
+  "episode_steps": 1000,
+  "evaluate_interval": 10000,
+  "maximum_steps": 1000000,
+  "horizon": 5,
+  "branch_factor": 10,
+  "on_policy": true,
+  "Parameter_A" : [30],
+  "Parameter_B" : [6],
+  "Parameter_C" : [3],
+  "Parameter_D" : [0.5],
+  "flush": false,
+  "parent_direction": "/root/rl_zoo_data/",
+  "sas": true,
+  "prob_rwd": true,
+  "train_both": true,
+  "train_reward": true,
+  "gripper": false
+}
+
+
