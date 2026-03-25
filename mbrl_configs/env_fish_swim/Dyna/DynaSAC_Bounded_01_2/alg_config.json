@@ -1,0 +1,33 @@
+{
+    "algorithm": "DynaSAC_Bounded",
+    "type": "mbrl",
+    "G": 1,
+    "G_model": 5.0,
+    "batch_size": 256,
+    "buffer_size": 1000000,
+    "max_steps_exploration": 256,
+    "max_steps_training": 1000000,
+    "number_steps_per_train_policy": 1,
+
+    "reward_scale": 1.0,
+    "actor_lr": 3e-4,
+    "critic_lr": 3e-4,
+    "alpha_lr": 3e-4,
+    "gamma": 0.99,
+    "tau": 0.005,
+
+    "min_noise": 0.0,
+    "noise_scale": 0.1,
+    "noise_decay": 1.0,
+
+    "num_models": 6,
+    "world_model_lr": 0.001,
+    "horizon": 1,
+    "num_samples": 10,
+    "sas": false,
+    "train_reward": true,
+    "train_both": false,
+    "gripper": false,
+    "threshold": 0.1,
+    "exploration_sample": 2
+}

@@ -1,0 +1,5 @@
+{
+    "gym": "dmcs",
+    "task": "manipulator",
+    "domain": "bring_ball"
+}

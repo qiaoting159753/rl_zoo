@@ -1,0 +1,5 @@
+{
+    "seeds": [15,25,35,45,55],
+    "number_steps_per_evaluation": 10000,
+    "number_eval_episodes": 10
+}
