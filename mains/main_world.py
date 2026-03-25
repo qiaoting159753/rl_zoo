@@ -1,8 +1,8 @@
 import sys
-sys.path.append('~/PycharmProjects/rl_zoo')
+sys.path.append('/Users/tonyq/PycharmProjects/rl_zoo')
 import logging
 import shutil
-from rl_zoo.loops import World_Model_Trainer # , MBRL_Trainer, MFRL_Trainer
+from rl_zoo.loops import World_Model_Trainer
 from rl_zoo.envs import DMCSEnvironment, OpenAIEnvrionment
 from rl_zoo.utils import set_seed
 import os
@@ -10,12 +10,12 @@ import json
 
 
 def main():
-    alg_name = "ensemble_big_pnn.json"
+    alg_name = "single_pnn.json"
     allow_reward_for_openai = True
     # Control: <= separator: dmcs, > separator: OpenAI.
-    separator = 2
-    agents = ["finger",   "fish", "reacher", "HalfCheetah-v5", "Hopper-v5", "Swimmer-v5", "Walker2d-v5"]
-    tasks =  ["turn_hard", "swim", "hard",    "",               "",          "",           ""]
+    separator = 0
+    agents = ["reacher"]
+    tasks =  ["hard"]
 
     curr_path = os.getcwd()
     config_file = curr_path + '/rl_zoo/configurations/' + alg_name

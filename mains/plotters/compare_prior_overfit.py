@@ -4,7 +4,7 @@ import pandas as pd
 import seaborn as sns
 
 logging.basicConfig(level=logging.INFO)
-location = "/Users/tonyq/Desktop/CH1_Data/prior/overfit/Prior_World_Model_"
+location = "/Users/tonyq/Desktop/CH1_Data/prior/Prior_World_Model_"
 
 
 def load_pnn():
@@ -124,114 +124,126 @@ def load_3():
 
 
 # Control
-attributes = ['steps', 'dyna_mse', 'reward_mse', 'dyna_corr_l2', 'dyna_corr_l1', 'reward_corr_l1', 'reward_gt_corr_l1']
+attributes = ['steps', 'dyna_mse', 'reward_mse',
+            'dyna_corr_l2', 'dyna_corr_l1', 'reward_corr_l1', 'reward_gt_corr_l1',
+            'kendall_corr_l2','  kendall_corr_l1', 'kendall_reward_corr_l1', 'kendall_reward_gt_corr_l1',
+            'spearman_corr_l2','spearman_corr_l1','spearman_reward_corr_l1','spearman_reward_gt_corr_l1',
+            'xi_corr_l2',      'xi_corr_l1',      'xi_reward_corr_l1',      'xi_reward_gt_corr_l1']
+
+# = 0.3
 envs = ["finger-turn_hard", "reacher-hard", "fish-swim", "HalfCheetah-v5", "Hopper-v5", "Swimmer-v5", "Walker2d-v5"]
-title = envs[6]
-attr = attributes[4]
-cut = 1
 
-data_list_pnn = load_pnn()
-for d in data_list_pnn:
-    d.columns = attributes
+att_num = [8, 12, 16]
+for abc in range(7):
+    for cba in range(3):
+        title = envs[abc]
+        attr = attributes[att_num[cba]]
 
-finger_pnn = pd.DataFrame([data_list_pnn[0][attr], data_list_pnn[7][attr], data_list_pnn[14][attr]])
-reacher_pnn = pd.DataFrame([data_list_pnn[1][attr], data_list_pnn[8][attr], data_list_pnn[15][attr]])
-fish_pnn = pd.DataFrame([data_list_pnn[2][attr], data_list_pnn[9][attr], data_list_pnn[16][attr]])
-hcheetah_pnn = pd.DataFrame([data_list_pnn[3][attr], data_list_pnn[10][attr], data_list_pnn[17][attr]])
-hopper_pnn = pd.DataFrame([data_list_pnn[4][attr], data_list_pnn[11][attr], data_list_pnn[18][attr]])
-swimmer_pnn = pd.DataFrame([data_list_pnn[5][attr], data_list_pnn[12][attr], data_list_pnn[19][attr]])
-walker_pnn = pd.DataFrame([data_list_pnn[6][attr], data_list_pnn[13][attr], data_list_pnn[20][attr]])
+        cut = 1
 
-pnns = {"finger-turn_hard": finger_pnn,
-        "reacher-hard": reacher_pnn,
-        "fish-swim": fish_pnn,
-        "HalfCheetah-v5": hcheetah_pnn,
-        "Hopper-v5": hopper_pnn,
-        "Swimmer-v5": swimmer_pnn,
-        "Walker2d-v5": walker_pnn}
+        data_list_pnn = load_pnn()
+        for d in data_list_pnn:
+            d.columns = attributes
 
-pnn_mean = pnns[title].mean(axis=0)
-pnn_var = pnns[title].var(axis=0)
-pnn_mean = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': pnn_mean})
-pnn_var = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': pnn_var})
+        finger_pnn = pd.DataFrame([data_list_pnn[0][attr], data_list_pnn[7][attr], data_list_pnn[14][attr]])
+        reacher_pnn = pd.DataFrame([data_list_pnn[1][attr], data_list_pnn[8][attr], data_list_pnn[15][attr]])
+        fish_pnn = pd.DataFrame([data_list_pnn[2][attr], data_list_pnn[9][attr], data_list_pnn[16][attr]])
+        hcheetah_pnn = pd.DataFrame([data_list_pnn[3][attr], data_list_pnn[10][attr], data_list_pnn[17][attr]])
+        hopper_pnn = pd.DataFrame([data_list_pnn[4][attr], data_list_pnn[11][attr], data_list_pnn[18][attr]])
+        swimmer_pnn = pd.DataFrame([data_list_pnn[5][attr], data_list_pnn[12][attr], data_list_pnn[19][attr]])
+        walker_pnn = pd.DataFrame([data_list_pnn[6][attr], data_list_pnn[13][attr], data_list_pnn[20][attr]])
 
-pnn_mean = pnn_mean.iloc[cut:, :]
-pnn_var = pnn_var.iloc[cut:, :]
-window_size = 10
-pnn_mean["Data"] = pnn_mean["Data"].rolling(window_size, step=1, min_periods=1).mean()
-sns.set_style("dark")
-sns.lineplot(
-    data=pnn_mean,
-    x=pnn_mean["steps"],
-    y="Data",
-    label="lambda=0.1",
-    errorbar="sd",
-)
+        pnns = {"finger-turn_hard": finger_pnn,
+                "reacher-hard": reacher_pnn,
+                "fish-swim": fish_pnn,
+                "HalfCheetah-v5": hcheetah_pnn,
+                "Hopper-v5": hopper_pnn,
+                "Swimmer-v5": swimmer_pnn,
+                "Walker2d-v5": walker_pnn}
 
-data_list_1 = load_1()
-data_list_2 = load_2()
-data_list_3 = load_3()
+        pnn_mean = pnns[title].mean(axis=0)
+        pnn_var = pnns[title].var(axis=0)
+        pnn_mean = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': pnn_mean})
+        pnn_var = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': pnn_var})
 
-for j in range(3):
-    if j == 0:
-        data_list = data_list_1
-        label_name = "0.3"
-    if j == 1:
-        data_list = data_list_2
-        label_name = "0.5"
-    if j == 2:
-        data_list = data_list_3
-        label_name = "0.9"
+        pnn_mean = pnn_mean.iloc[cut:, :]
+        pnn_var = pnn_var.iloc[cut:, :]
+        window_size = 10
+        pnn_mean["Data"] = pnn_mean["Data"].rolling(window_size, step=1, min_periods=1).mean()
+        sns.set_style("dark")
+        sns.lineplot(
+            data=pnn_mean,
+            x=pnn_mean["steps"],
+            y="Data",
+            label="lambda=0.1",
+            errorbar="sd",
+        )
 
-    for d in data_list:
-        d.columns = attributes
-    finger_compare = pd.DataFrame([data_list[0][attr], data_list[7][attr], data_list[14][attr]])
-    reacher_compare = pd.DataFrame([data_list[1][attr], data_list[8][attr], data_list[15][attr]])
-    fish_compare = pd.DataFrame([data_list[2][attr], data_list[9][attr], data_list[16][attr]])
-    hcheetah_compare = pd.DataFrame([data_list[3][attr], data_list[10][attr], data_list[17][attr]])
-    hopper_compare = pd.DataFrame([data_list[4][attr], data_list[11][attr], data_list[18][attr]])
-    swimmer_compare = pd.DataFrame([data_list[5][attr], data_list[12][attr], data_list[19][attr]])
-    walker_compare = pd.DataFrame([data_list[6][attr], data_list[13][attr], data_list[20][attr]])
-    compares = {"finger-turn_hard": finger_compare,
-                "reacher-hard": reacher_compare,
-                "fish-swim": fish_compare,
-                "HalfCheetah-v5": hcheetah_compare,
-                "Hopper-v5": hopper_compare,
-                "Swimmer-v5": swimmer_compare,
-                "Walker2d-v5": walker_compare,
-                }
-    compare_mean = compares[title].mean(axis=0)
-    compare_var = compares[title].var(axis=0)
-    compare_mean = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': compare_mean})
-    compare_var = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': compare_var})
+        data_list_1 = load_1()
+        data_list_2 = load_2()
+        data_list_3 = load_3()
 
-    # att_name = 'dyna_mse'
-    window_size = 10
+        for j in range(3):
+            if j == 0:
+                data_list = data_list_1
+                label_name = "0.3"
+            if j == 1:
+                data_list = data_list_2
+                label_name = "0.5"
+            if j == 2:
+                data_list = data_list_3
+                label_name = "0.9"
 
-    compare_mean["Data"] = compare_mean["Data"].rolling(window_size, step=1, min_periods=1).mean()
-    compare_mean = compare_mean.iloc[cut:, :]
-    compare_var = compare_var.iloc[cut:, :]
+            for d in data_list:
+                d.columns = attributes
+            finger_compare = pd.DataFrame([data_list[0][attr], data_list[7][attr], data_list[14][attr]])
+            reacher_compare = pd.DataFrame([data_list[1][attr], data_list[8][attr], data_list[15][attr]])
+            fish_compare = pd.DataFrame([data_list[2][attr], data_list[9][attr], data_list[16][attr]])
+            hcheetah_compare = pd.DataFrame([data_list[3][attr], data_list[10][attr], data_list[17][attr]])
+            hopper_compare = pd.DataFrame([data_list[4][attr], data_list[11][attr], data_list[18][attr]])
+            swimmer_compare = pd.DataFrame([data_list[5][attr], data_list[12][attr], data_list[19][attr]])
+            walker_compare = pd.DataFrame([data_list[6][attr], data_list[13][attr], data_list[20][attr]])
+            compares = {"finger-turn_hard": finger_compare,
+                        "reacher-hard": reacher_compare,
+                        "fish-swim": fish_compare,
+                        "HalfCheetah-v5": hcheetah_compare,
+                        "Hopper-v5": hopper_compare,
+                        "Swimmer-v5": swimmer_compare,
+                        "Walker2d-v5": walker_compare,
+                        }
+            compare_mean = compares[title].mean(axis=0)
+            compare_var = compares[title].var(axis=0)
+            compare_mean = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': compare_mean})
+            compare_var = pd.DataFrame({'steps': data_list_pnn[0]['steps'], 'Data': compare_var})
 
-    ################################    PPPPPPLLLLLLOOOOOOTTTTTT    ###########
-    sns.lineplot(
-        data=compare_mean,
-        x=compare_mean["steps"],
-        y="Data",
-        label="lambda="+label_name,
-        errorbar="sd",
-    )
-plt.ylim(-0.1, 1)
-plt.style.use("seaborn-v0_8")
-label_fontsize = 25
-title_fontsize = 20
-ticks_fontsize = 17
-plt.grid()
-plt.xticks(fontsize=ticks_fontsize)
-plt.yticks(fontsize=ticks_fontsize)
-plt.xlabel("Steps", fontsize=label_fontsize)
-plt.ylabel("Pearson-Correlation", fontsize=label_fontsize)
-# plt.title(title, fontsize=title_fontsize)
-plt.legend(loc="best").set_draggable(True)
-plt.tight_layout(pad=0.5)
-plt.savefig(title + "_" + attr + "prior_param.png")
-plt.show()
+            # att_name = 'dyna_mse'
+            window_size = 10
+
+            compare_mean["Data"] = compare_mean["Data"].rolling(window_size, step=1, min_periods=1).mean()
+            compare_mean = compare_mean.iloc[cut:, :]
+            compare_var = compare_var.iloc[cut:, :]
+
+            ################################    PPPPPPLLLLLLOOOOOOTTTTTT    ###########
+            sns.lineplot(
+                data=compare_mean,
+                x=compare_mean["steps"],
+                y="Data",
+                label="lambda="+label_name,
+                errorbar="sd",
+            )
+        plt.ylim(-0.1, 1)
+        plt.style.use("seaborn-v0_8")
+        label_fontsize = 25
+        title_fontsize = 20
+        ticks_fontsize = 17
+        plt.grid()
+        plt.xticks(fontsize=ticks_fontsize)
+        plt.yticks(fontsize=ticks_fontsize)
+        plt.xlabel("Steps", fontsize=label_fontsize)
+        plt.ylabel("Pearson-Correlation", fontsize=label_fontsize)
+        plt.title(title, fontsize=title_fontsize)
+        plt.legend(loc="best").set_draggable(True)
+        plt.tight_layout(pad=0.5)
+        plt.savefig(title + "_" + attr + "prior_param.png")
+        # plt.show()
+        plt.close()
